@@ -63,6 +63,10 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
 
   // Click-through (transparent pet window)
   setClickThrough: (value) => ipcRenderer.send('set-click-through', value),
+  setPanelOpen: (value) => ipcRenderer.send('set-panel-open', value),
+  onCursorState: (callback) => {
+    ipcRenderer.on('cursor-state', (_event, mode) => callback(mode));
+  },
 
   // Multimodal pet animation
   multimodalGenerate: (imageDataUrl) => ipcRenderer.invoke('multimodal:generate', imageDataUrl),

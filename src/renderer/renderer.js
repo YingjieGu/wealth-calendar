@@ -14,40 +14,20 @@ function showToast(msg) {
 }
 
 // --- Click-through management (transparent pet window) ---
+// Main process polls the cursor and sends 'cursor-state' (interactive/transparent/outside).
+// We just mirror it: interactive -> show hover buttons; outside -> hide.
 (function setupClickThrough() {
-  let lastValue = null;
-
-  function refresh() {
-    const panelOpen =
+  function panelOpen() {
+    return (
       !document.getElementById('settings-panel').classList.contains('hidden') ||
       !document.getElementById('chat-panel').classList.contains('hidden') ||
-      document.getElementById('calendar-view').style.display !== 'none';
-
-    const value = !panelOpen;
-    if (value !== lastValue) {
-      lastValue = value;
-      window.wealthCalendar.setClickThrough(value);
-    }
+      document.getElementById('calendar-view').style.display !== 'none'
+    );
   }
 
-  // Hovering interactive elements keeps the window clickable
-  document.addEventListener('mouseover', (e) => {
-    const interactive = e.target.closest(
-      '#pet, #pet-emoji, #pet-img, #hover-buttons, #context-menu, #chat-panel, #settings-panel, #calendar-view, #schedule-form-modal'
-    );
-    const panelOpen =
-      !document.getElementById('settings-panel').classList.contains('hidden') ||
-      !document.getElementById('chat-panel').classList.contains('hidden') ||
-      document.getElementById('calendar-view').style.display !== 'none';
-    const value = !(interactive || panelOpen);
-    if (value !== lastValue) {
-      lastValue = value;
-      window.wealthCalendar.setClickThrough(value);
-    }
-  });
-
-  // Panels toggling changes click-through state
-  const observer = new MutationObserver(() => refresh());
+  // Notify main process when a panel opens/closes (forces interactive mode)
+  const notifyPanel = () => window.wealthCalendar.setPanelOpen(panelOpen());
+  const observer = new MutationObserver(notifyPanel);
   ['settings-panel', 'chat-panel', 'context-menu'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) observer.observe(el, { attributes: true, attributeFilter: ['class'] });
@@ -55,7 +35,17 @@ function showToast(msg) {
   const calView = document.getElementById('calendar-view');
   if (calView) observer.observe(calView, { attributes: true, attributeFilter: ['style'] });
 
-  refresh();
+  // Cursor state drives hover button visibility
+  const hoverButtons = document.getElementById('hover-buttons');
+  window.wealthCalendar.onCursorState((mode) => {
+    if (mode === 'interactive') {
+      hoverButtons.classList.add('visible');
+    } else {
+      hoverButtons.classList.remove('visible');
+    }
+  });
+
+  notifyPanel();
 })();
 
 // --- Custom window drag (drag the pet itself) ---
@@ -92,21 +82,6 @@ function showToast(msg) {
       pet.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
     }
-  });
-})();
-
-// --- Hover button visibility ---
-(function setupHoverButtons() {
-  const app = document.getElementById('app');
-  const hoverButtons = document.getElementById('hover-buttons');
-  let hoverTimeout = null;
-
-  app.addEventListener('mousemove', () => {
-    hoverButtons.classList.add('visible');
-    if (hoverTimeout) clearTimeout(hoverTimeout);
-    hoverTimeout = setTimeout(() => {
-      hoverButtons.classList.remove('visible');
-    }, 2000);
   });
 })();
 

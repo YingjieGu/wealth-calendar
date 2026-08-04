@@ -463,11 +463,65 @@ function setupIPC() {
   });
 
   // --- Click-through for transparent pet window ---
-  ipcMain.on('set-click-through', (_event, value) => {
-    if (mainWindow) {
-      mainWindow.setIgnoreMouseEvents(!!value, { forward: true });
+  // Poll cursor position from main process (event forwarding from transparent
+  // windows is unreliable on Linux) and drive click-through + hover state.
+  let cursorTimer = null;
+  let panelOpen = false;
+  let currentClickThrough = null;
+  let lastSentMode = null;
+
+  function updateCursorState() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const b = mainWindow.getBounds();
+    const inWin =
+      cursor.x >= b.x && cursor.x <= b.x + b.width &&
+      cursor.y >= b.y && cursor.y <= b.y + b.height;
+
+    let mode;
+    if (!inWin) {
+      mode = 'outside';
+    } else if (panelOpen || isCalendarMode) {
+      mode = 'interactive';
+    } else {
+      // Interactive zones: window center (pet) + bottom button row
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      const inCenter = Math.abs(cursor.x - cx) <= 82 && Math.abs(cursor.y - cy) <= 82;
+      const inBottom = cursor.y >= b.y + b.height - 60 && cursor.y <= b.y + b.height;
+      mode = inCenter || inBottom ? 'interactive' : 'transparent';
     }
+
+    const clickThrough = mode !== 'interactive';
+    if (clickThrough !== currentClickThrough) {
+      currentClickThrough = clickThrough;
+      mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
+    }
+    if (mode !== lastSentMode) {
+      lastSentMode = mode;
+      mainWindow.webContents.send('cursor-state', mode);
+    }
+  }
+
+  function startCursorWatch() {
+    if (cursorTimer) clearInterval(cursorTimer);
+    cursorTimer = setInterval(updateCursorState, 120);
+    updateCursorState();
+  }
+
+  ipcMain.on('set-panel-open', (_event, value) => {
+    panelOpen = !!value;
+    updateCursorState();
   });
+
+  ipcMain.on('set-click-through', (_event, value) => {
+    // kept for compatibility; the cursor watch drives the real state
+    currentClickThrough = null;
+    updateCursorState();
+  });
+
+  // Start cursor watch (guarded until mainWindow exists)
+  startCursorWatch();
 
   // --- Multimodal pet animation (image -> video) ---
   ipcMain.handle('multimodal:generate', (_event, imageDataUrl) => {

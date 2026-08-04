@@ -23,6 +23,7 @@ const PetState = {
     this.enterState(this.currentState);
     this.walkLoop();
     this.scheduleStateChange();
+    this.setupInteraction();
   },
 
   setActivity(mode) {
@@ -72,6 +73,7 @@ const PetState = {
         break;
       case 'walk':
         // Start walking from current position
+        this.petEl.classList.add('walking');
         break;
       case 'sleep':
         // Sleep: still position, show Zzz
@@ -119,14 +121,37 @@ const PetState = {
 
   updatePetPosition() {
     if (!this.petEl) return;
-    // Remove CSS transition during walk for smooth movement
+    // Walk: smooth follow + face the direction of travel; else gentle transition
     if (this.currentState === 'walk') {
-      this.petEl.style.transition = 'none';
+      this.petEl.style.transition = 'left 0.06s linear, top 0.2s ease';
+      this.petEl.style.transform = `translate(-50%, -50%) rotateY(${this.walkDir < 0 ? 180 : 0}deg)`;
     } else {
       this.petEl.style.transition = 'left 0.8s ease-in-out, top 0.3s ease';
+      this.petEl.style.transform = 'translate(-50%, -50%)';
     }
     this.petEl.style.left = `calc(50% + ${this.petX}px)`;
     this.petEl.style.top = `calc(50% + ${this.petY}px)`;
+  },
+
+  // ---- Double-click interaction ----
+  setupInteraction() {
+    const lines = [
+      '喵～找小财有什么事呀？',
+      '今天也要加油哦！💰',
+      '右键小财可以看今日运势哦～',
+      '想聊天就点 💬，小财随时在！',
+      '偷偷告诉你，今天财神方位在正东～',
+      '小财会一直陪着你的！',
+    ];
+    this.petEl.addEventListener('dblclick', () => {
+      const line = lines[Math.floor(Math.random() * lines.length)];
+      const bubble = document.getElementById('reminder-bubble');
+      const text = document.getElementById('reminder-bubble-text');
+      text.textContent = `💬 ${line}`;
+      bubble.classList.remove('hidden');
+      clearTimeout(this._bubbleTimer);
+      this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 3500);
+    });
   },
 
   setTheme(theme) {

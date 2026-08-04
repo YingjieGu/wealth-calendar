@@ -137,6 +137,9 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
       body: JSON.stringify({
         model: model || 'deepseek-chat',
         temperature: 0.8,
+        // v4 series are reasoning models: reasoning_content also consumes tokens,
+        // so keep a generous budget or content may come back empty/truncated.
+        max_tokens: 8000,
         messages: [
           {
             role: 'system',
@@ -150,6 +153,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
     });
     if (!res.ok) {
       const errText = await res.text();
+      console.error(`[fortune] LLM HTTP ${res.status} url=${url} keyTail=${(apiKey || '').slice(-4)} err=${errText.slice(0, 200)}`);
       throw new Error(`LLM HTTP ${res.status}: ${errText.slice(0, 200)}`);
     }
     const json = await res.json();

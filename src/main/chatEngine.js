@@ -65,7 +65,8 @@ async function callLLM(mc, messages) {
       body: JSON.stringify({
         model: mc.llmModel || 'deepseek-chat',
         temperature: 0.8,
-        max_tokens: 1000,
+        // v4 series are reasoning models: reasoning_content consumes tokens too.
+        max_tokens: 8000,
         messages,
       }),
     });

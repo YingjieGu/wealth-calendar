@@ -88,6 +88,14 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(windowOptions);
 
+  // Forward renderer console + errors to stdout for debugging
+  mainWindow.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+  });
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[renderer] process gone:', JSON.stringify(details));
+  });
+
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   let moveTimeout = null;
@@ -478,24 +486,14 @@ function setupIPC() {
       cursor.x >= b.x && cursor.x <= b.x + b.width &&
       cursor.y >= b.y && cursor.y <= b.y + b.height;
 
-    let mode;
-    if (!inWin) {
-      mode = 'outside';
-    } else if (panelOpen || isCalendarMode) {
-      mode = 'interactive';
-    } else {
-      // Interactive zones: window center (pet) + bottom button row
-      const cx = b.x + b.width / 2;
-      const cy = b.y + b.height / 2;
-      const inCenter = Math.abs(cursor.x - cx) <= 82 && Math.abs(cursor.y - cy) <= 82;
-      const inBottom = cursor.y >= b.y + b.height - 60 && cursor.y <= b.y + b.height;
-      mode = inCenter || inBottom ? 'interactive' : 'transparent';
-    }
+    // No click-through: the whole translucent window is interactive
+    // (fully transparent windows render all-alpha-0 on some Linux setups).
+    let mode = inWin ? 'interactive' : 'outside';
+    if (panelOpen || isCalendarMode) mode = 'interactive';
 
-    const clickThrough = mode !== 'interactive';
-    if (clickThrough !== currentClickThrough) {
-      currentClickThrough = clickThrough;
-      mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
+    if (currentClickThrough !== false) {
+      currentClickThrough = false;
+      mainWindow.setIgnoreMouseEvents(false);
     }
     if (mode !== lastSentMode) {
       lastSentMode = mode;

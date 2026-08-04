@@ -28,23 +28,24 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Transparent pet window: only the pet + its glow are visible on desktop.
-     Panels (settings/chat/calendar) carry their own backgrounds. */
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  /* Very light translucent backdrop: Linux software-rendered transparent
+     windows render all-alpha-0 (invisible content), so keep a faint
+     background instead of fully transparent. */
+  background: rgba(18, 16, 32, 0.42);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: background 0.4s ease;
 }
 
-/* ---------- 主题配色（体现在宠物光晕，窗口本身透明） ---------- */
+/* ---------- 主题配色（淡色背景 + 光晕） ---------- */
 #app.theme-cat {
-  background: transparent;
+  background: rgba(36, 28, 56, 0.45);
 }
 #app.theme-fortune {
-  background: transparent;
+  background: rgba(64, 22, 20, 0.5);
 }
 #app.theme-bagua {
-  background: transparent;
+  background: rgba(14, 36, 52, 0.5);
 }
 
 /* ============================================================

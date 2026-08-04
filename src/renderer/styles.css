@@ -549,6 +549,30 @@ html, body {
   opacity: 0.4;
   cursor: default;
 }
+.chat-mic-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: #ddd;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.chat-mic-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+.chat-mic-btn.recording {
+  background: rgba(255, 80, 80, 0.5);
+  color: #fff;
+  animation: micPulse 1.2s ease-in-out infinite;
+}
+@keyframes micPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
 
 /* ===== View containers ===== */
 #pet-view {

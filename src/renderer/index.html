@@ -45,6 +45,7 @@
           <div class="chat-msg chat-assistant">你好呀～我是小财！可以找我聊天、查运势，也可以直接说"明天下午3点开会"帮你记日程哦 ✨</div>
         </div>
         <div class="chat-input-row">
+          <button id="btn-chat-mic" class="chat-mic-btn" title="语音输入">🎤</button>
           <input id="chat-input" placeholder="说点什么…（如：明天下午3点开会）" autocomplete="off">
           <button id="btn-chat-send" class="chat-send-btn">➤</button>
         </div>
@@ -86,6 +87,10 @@
             </div>
             <p class="placeholder-text" id="user-zodiac">星座：—</p>
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
+          </div>
+          <div class="setting-group">
+            <label>本地模型状态</label>
+            <p class="placeholder-text" id="model-status">检测中…</p>
           </div>
           <div class="setting-group">
             <label>唤醒口令（语音对话用）</label>

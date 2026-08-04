@@ -31,6 +31,53 @@ except ImportError:
     HAS_SWISSEPH = False
     print("[sidecar] WARNING: pyswisseph not available, /chart/natal disabled")
 
+# --- Optional speech modules (lazy) ---
+import io
+import os
+import asyncio
+import threading
+
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")  # China-friendly HF mirror
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")  # hf-mirror has no xet CAS server; force plain HTTP
+MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+_asr_model = None
+_asr_model_size = None
+_asr_lock = threading.Lock()
+
+def get_asr_model(size="base"):
+    """Lazily load faster-whisper model (thread-safe)."""
+    global _asr_model, _asr_model_size
+    if _asr_model is not None and _asr_model_size == size:
+        return _asr_model
+    with _asr_lock:
+        if _asr_model is not None and _asr_model_size == size:
+            return _asr_model
+        from faster_whisper import WhisperModel
+        print(f"[sidecar] loading faster-whisper model '{size}' ...", flush=True)
+        _asr_model = WhisperModel(size, device="cpu", compute_type="int8", download_root=MODEL_DIR)
+        _asr_model_size = size
+        print("[sidecar] ASR model ready", flush=True)
+        return _asr_model
+
+def transcribe_audio(audio_bytes, language="zh"):
+    """Transcribe audio bytes (webm/wav/mp3 all supported via PyAV)."""
+    model = get_asr_model()
+    segments, info = model.transcribe(io.BytesIO(audio_bytes), language=language)
+    text = "".join(s.text for s in segments).strip()
+    return {"text": text, "language": info.language, "duration": round(info.duration, 2) if info.duration else None}
+
+async def synthesize_speech(text, voice="zh-CN-XiaoxiaoNeural"):
+    """Synthesize speech via edge-tts, return mp3 bytes."""
+    import edge_tts
+    communicate = edge_tts.Communicate(text, voice)
+    buf = io.BytesIO()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            buf.write(chunk["data"])
+    return buf.getvalue()
+
 VERSION = "0.1"
 
 # ---------------------------------------------------------------------------
@@ -234,6 +281,50 @@ class RequestHandler(BaseHTTPRequestHandler):
             err["detail"] = detail
         self._send_json(status, err)
 
+    def _read_raw(self):
+        length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            return b""
+        return self.rfile.read(length)
+
+    def _send_bytes(self, status, data, content_type):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", len(data))
+        self.end_headers()
+        self.wfile.write(data)
+
+    # --- ASR handler (raw audio bytes -> text) ---
+    def _handle_asr(self):
+        try:
+            audio = self._read_raw()
+            if not audio:
+                self._error(400, "Empty audio body")
+                return
+            language = self.headers.get("X-Language", "zh")
+            result = transcribe_audio(audio, language=language)
+            self._send_json(200, result)
+        except ImportError:
+            self._error(500, "faster-whisper not installed; run: pip3 install faster-whisper")
+        except Exception as e:
+            self._error(500, f"ASR failed: {e}", traceback.format_exc())
+
+    # --- TTS handler (JSON {text, voice} -> mp3 bytes) ---
+    def _handle_tts(self):
+        try:
+            body = self._read_body()
+            if not body or not body.get("text"):
+                self._error(400, "Missing text field")
+                return
+            text = body["text"][:500]
+            voice = body.get("voice") or "zh-CN-XiaoxiaoNeural"
+            audio = asyncio.run(synthesize_speech(text, voice))
+            self._send_bytes(200, audio, "audio/mpeg")
+        except ImportError:
+            self._error(500, "edge-tts not installed; run: pip3 install edge-tts")
+        except Exception as e:
+            self._error(500, f"TTS failed: {e}", traceback.format_exc())
+
     # --- Routing ---
 
     def do_GET(self):
@@ -260,6 +351,14 @@ class RequestHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._error(500, str(e), traceback.format_exc())
 
+        elif path == "/models/status":
+            status = {"model_dir": MODEL_DIR}
+            if _asr_model is not None:
+                status["asr"] = {"loaded": True, "size": _asr_model_size}
+            else:
+                status["asr"] = {"loaded": False, "size": None}
+            self._send_json(200, status)
+
         else:
             self._error(404, f"Not found: {path}")
 
@@ -271,6 +370,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._handle_bazi()
         elif path == "/chart/natal":
             self._handle_natal()
+        elif path == "/asr/transcribe":
+            self._handle_asr()
+        elif path == "/tts/synthesize":
+            self._handle_tts()
         else:
             self._error(404, f"Not found: {path}")
 

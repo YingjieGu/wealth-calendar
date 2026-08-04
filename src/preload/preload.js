@@ -47,4 +47,9 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   // Chat
   chatSend: (message) => ipcRenderer.invoke('chat:send', message),
   chatClear: () => ipcRenderer.invoke('chat:clear'),
+
+  // Speech
+  asrTranscribe: (audioArrayBuffer, language) => ipcRenderer.invoke('asr:transcribe', audioArrayBuffer, language),
+  ttsSynthesize: (text) => ipcRenderer.invoke('tts:synthesize', text),
+  modelsStatus: () => ipcRenderer.invoke('models:status'),
 });

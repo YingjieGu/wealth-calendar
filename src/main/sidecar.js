@@ -62,6 +62,34 @@ function requestSidecar(method, urlPath, body) {
   });
 }
 
+// Binary request (raw audio upload / binary response like mp3)
+function requestSidecarBinary(method, urlPath, data, contentType, timeoutMs = 300000) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port: SIDECAR_PORT,
+        path: urlPath,
+        method,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': data.length,
+        },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, buffer: Buffer.concat(chunks) }));
+      }
+    );
+    req.on('error', (e) => reject(e));
+    req.on('timeout', () => req.destroy(new Error('sidecar binary request timeout')));
+    req.write(data);
+    req.end();
+  });
+}
+
 function checkHealth() {
   return new Promise((resolve) => {
     requestSidecar('GET', '/health')
@@ -130,4 +158,4 @@ function isReady() {
   return ready;
 }
 
-module.exports = { startSidecar, stopSidecar, requestSidecar, isReady, SIDECAR_PORT };
+module.exports = { startSidecar, stopSidecar, requestSidecar, requestSidecarBinary, isReady, SIDECAR_PORT };

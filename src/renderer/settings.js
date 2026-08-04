@@ -152,6 +152,8 @@ const SettingsManager = {
       await this.save();
       showToast(`✅ 唤醒口令：${this.settings.wakeWord}`);
     });
+
+    this.applyModelStatus();
   },
 
   applyModelConfig() {
@@ -164,6 +166,22 @@ const SettingsManager = {
 
   applyWakeWord() {
     document.getElementById('wake-word').value = this.settings.wakeWord || '小财小财';
+  },
+
+  async applyModelStatus() {
+    const el = document.getElementById('model-status');
+    try {
+      const r = await window.wealthCalendar.modelsStatus();
+      if (r && r.error) {
+        el.textContent = `❌ 服务不可用：${r.error}`;
+        return;
+      }
+      const asr = r.asr || {};
+      const loaded = asr.loaded ? '✅ 已加载' : '🕐 按需加载（首次语音输入自动下载）';
+      el.textContent = `语音识别(ASR)：${loaded}${asr.size ? ` (${asr.size})` : ''}｜语音合成(TTS)：✅ edge-tts 在线`;
+    } catch (e) {
+      el.textContent = '❌ 获取失败';
+    }
   },
 
   async save() {

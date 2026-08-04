@@ -358,6 +358,42 @@ function setupIPC() {
     chatEngine.clearHistory();
     return { ok: true };
   });
+
+  // --- Speech (ASR / TTS via sidecar) ---
+  ipcMain.handle('asr:transcribe', async (_event, arrayBuffer, language) => {
+    try {
+      const buf = Buffer.from(arrayBuffer);
+      const r = await sidecar.requestSidecarBinary('POST', '/asr/transcribe', buf, 'audio/webm');
+      return JSON.parse(r.buffer.toString('utf-8'));
+    } catch (e) {
+      console.error('[asr] failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('tts:synthesize', async (_event, text) => {
+    try {
+      const body = Buffer.from(JSON.stringify({ text: String(text || '').slice(0, 500) }), 'utf-8');
+      const r = await sidecar.requestSidecarBinary('POST', '/tts/synthesize', body, 'application/json');
+      if (r.status !== 200) {
+        return { error: r.buffer.toString('utf-8') };
+      }
+      return { audioBase64: r.buffer.toString('base64') };
+    } catch (e) {
+      console.error('[tts] failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
+  // --- Model status ---
+  ipcMain.handle('models:status', async () => {
+    try {
+      const r = await sidecar.requestSidecar('GET', '/models/status');
+      return r.data;
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
 }
 
 // --- App lifecycle ---

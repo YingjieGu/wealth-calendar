@@ -212,7 +212,9 @@ const SettingsManager = {
           await PetState.tryVideoPet();
           showToast('🎬 动画宠物已应用！');
         } else {
-          status.textContent = `❌ ${r && r.message ? r.message : '生成失败，请检查 API Key 和网络'}`;
+          const detail = (r && r.error) ? ` (${r.error})` : '';
+          status.textContent = `❌ 生成失败${detail}。请检查凭证（即梦用 AK/SK，可灵用 API Key）和网络`;
+          console.error('[mm] generate failed:', r);
         }
       };
       reader.readAsDataURL(file);

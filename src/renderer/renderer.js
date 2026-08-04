@@ -135,12 +135,15 @@ function convertToPng(dataUrl) {
   btnSettings.addEventListener('click', () => {
     panel.classList.remove('hidden');
     hoverButtons.classList.add('hidden');
+    // Enlarge window like chat/calendar panels
+    window.wealthCalendar.openChatPanel();
   });
 
   btnClose.addEventListener('click', () => {
     panel.classList.add('hidden');
     // Restore hover buttons (settings open hid them)
     hoverButtons.classList.remove('hidden');
+    window.wealthCalendar.closeChatPanel();
   });
 })();
 
@@ -231,6 +234,7 @@ function convertToPng(dataUrl) {
       case 'settings':
         document.getElementById('settings-panel').classList.remove('hidden');
         document.getElementById('hover-buttons').classList.add('hidden');
+        await window.wealthCalendar.openChatPanel();
         break;
       case 'quit':
         window.wealthCalendar.quitApp();

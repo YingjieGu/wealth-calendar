@@ -14,6 +14,20 @@ let stopping = false;
 let ready = false;
 
 function serverScriptPath() {
+  // Windows: prefer a bundled PyInstaller sidecar.exe, else the python script
+  if (process.platform === 'win32') {
+    const exeCandidates = [
+      path.join(app.getAppPath(), 'python', 'server.exe'),
+      path.join(app.getAppPath(), 'resources', 'sidecar', 'server.exe'),
+      path.join(__dirname, '..', '..', 'python', 'server.exe'),
+    ];
+    for (const p of exeCandidates) {
+      try {
+        require('fs').accessSync(p);
+        return p;
+      } catch (e) { /* try next */ }
+    }
+  }
   // dev: project root /python/server.py
   const candidates = [
     path.join(app.getAppPath(), 'python', 'server.py'),
@@ -27,6 +41,18 @@ function serverScriptPath() {
     } catch (e) { /* try next */ }
   }
   return candidates[0];
+}
+
+// Find a usable python interpreter on Windows (python3 / python / py)
+function findPythonCmd() {
+  const { spawnSync } = require('child_process');
+  for (const c of ['python3', 'python', 'py']) {
+    try {
+      const r = spawnSync(c, ['--version'], { timeout: 5000 });
+      if (r.status === 0) return c;
+    } catch (e) { /* try next */ }
+  }
+  return null;
 }
 
 function requestSidecar(method, urlPath, body) {
@@ -103,8 +129,18 @@ function startSidecar() {
     if (ready) return resolve(true);
 
     const script = serverScriptPath();
-    console.log('[sidecar] starting:', script);
-    child = spawn('python3', [script, '--port', String(SIDECAR_PORT)], {
+    let cmd;
+    let args;
+    if (script.toLowerCase().endsWith('.exe')) {
+      cmd = script;
+      args = ['--port', String(SIDECAR_PORT)];
+    } else {
+      // Windows may not have python3 in PATH
+      cmd = process.platform === 'win32' ? (findPythonCmd() || 'python') : 'python3';
+      args = [script, '--port', String(SIDECAR_PORT)];
+    }
+    console.log('[sidecar] starting:', cmd, args.join(' '));
+    child = spawn(cmd, args, {
       cwd: path.dirname(path.dirname(script)),
       env: { ...process.env },
     });

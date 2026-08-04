@@ -1,15 +1,43 @@
 {
   "name": "wealth-calendar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "财神日历 (Wealth Calendar) - 桌面日历+AI命理+桌面宠物",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:linux": "electron-builder --linux AppImage"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^24.13.3"
   },
-  "dependencies": {
-    "lunar-javascript": "^1.7.7"
+  "build": {
+    "appId": "com.wealthcalendar.app",
+    "productName": "财神日历",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "python/server.py",
+      "!python/models/**",
+      "!python/**/__pycache__/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "财神日历"
+    }
   }
 }

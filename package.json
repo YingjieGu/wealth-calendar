@@ -20,9 +20,14 @@
     },
     "files": [
       "src/**/*",
-      "python/server.py",
       "!python/models/**",
       "!python/**/__pycache__/**"
+    ],
+    "extraResources": [
+      {
+        "from": "python/server.py",
+        "to": "python/server.py"
+      }
     ],
     "win": {
       "target": [
@@ -32,7 +37,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

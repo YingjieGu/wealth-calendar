@@ -28,6 +28,13 @@ function serverScriptPath() {
       } catch (e) { /* try next */ }
     }
   }
+  // Packaged: python/server.py lives in resources/ (asar can't be read by python)
+  if (process.resourcesPath) {
+    try {
+      require('fs').accessSync(path.join(process.resourcesPath, 'python', 'server.py'));
+      return path.join(process.resourcesPath, 'python', 'server.py');
+    } catch (e) { /* try next */ }
+  }
   // dev: project root /python/server.py
   const candidates = [
     path.join(app.getAppPath(), 'python', 'server.py'),

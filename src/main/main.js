@@ -4,6 +4,7 @@ const fs = require('fs');
 const { createTray } = require('./tray');
 const calendarStore = require('./calendarStore');
 const { startReminder, stopReminder } = require('./reminder');
+const sidecar = require('./sidecar');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -259,6 +260,38 @@ function setupIPC() {
   ipcMain.handle('calendar:remove', (_event, id) => {
     return calendarStore.remove(id);
   });
+
+  // --- Fortune sidecar ---
+  ipcMain.handle('fortune:paipan', async (_event, birth, gender) => {
+    try {
+      const r = await sidecar.requestSidecar('POST', '/bazi/paipan', { birth, gender });
+      return r.data;
+    } catch (e) {
+      console.error('[fortune] paipan failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('fortune:chart', async (_event, birth) => {
+    try {
+      const r = await sidecar.requestSidecar('POST', '/chart/natal', { birth });
+      return r.data;
+    } catch (e) {
+      console.error('[fortune] chart failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('fortune:almanac', async (_event, dateStr) => {
+    try {
+      const q = dateStr ? `?date=${encodeURIComponent(dateStr)}` : '';
+      const r = await sidecar.requestSidecar('GET', `/almanac/today${q}`);
+      return r.data;
+    } catch (e) {
+      console.error('[fortune] almanac failed:', e.message);
+      return { error: e.message };
+    }
+  });
 }
 
 // --- App lifecycle ---
@@ -270,6 +303,10 @@ app.whenReady().then(() => {
     app.quit();
   });
   startReminder(mainWindow);
+  // Start fortune sidecar (non-blocking on failure)
+  sidecar.startSidecar().then((ok) => {
+    console.log('[main] sidecar ready:', ok);
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -279,6 +316,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   stopReminder();
+  sidecar.stopSidecar();
 });
 
 app.on('activate', () => {

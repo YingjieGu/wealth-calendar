@@ -19,6 +19,47 @@ const SettingsManager = {
     // Update UI buttons
     this.updateThemeUI(theme);
     this.updateActivityUI(activity);
+    this.applyUserInfo();
+  },
+
+  applyUserInfo() {
+    const ui = this.settings.userInfo || {};
+    const birthInput = document.getElementById('user-birth');
+    if (birthInput) {
+      if (ui.birth) {
+        // "YYYY-MM-DD HH:mm" -> datetime-local "YYYY-MM-DDTHH:mm"
+        birthInput.value = ui.birth.replace(' ', 'T');
+      } else {
+        birthInput.value = '';
+      }
+      // gender buttons
+      document.getElementById('gender-male').classList.toggle('active', ui.gender === 'male');
+      document.getElementById('gender-female').classList.toggle('active', ui.gender === 'female');
+      this.updateZodiac(ui.birth);
+    }
+  },
+
+  updateZodiac(birth) {
+    const el = document.getElementById('user-zodiac');
+    if (!el) return;
+    const z = this.getZodiac(birth);
+    el.textContent = z ? `星座：${z}` : '星座：—';
+  },
+
+  getZodiac(birth) {
+    if (!birth) return null;
+    const m = birth.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const month = parseInt(m[2], 10);
+    const day = parseInt(m[3], 10);
+    const signs = [
+      ['摩羯', 19], ['水瓶', 18], ['双鱼', 20], ['白羊', 20], ['金牛', 20],
+      ['双子', 21], ['巨蟹', 22], ['狮子', 22], ['处女', 22], ['天秤', 23],
+      ['天蝎', 23], ['射手', 21], ['摩羯', 22],
+    ];
+    const idx = month - 1;
+    const sign = day <= signs[idx][1] ? signs[idx][0] : signs[idx + 1][0];
+    return sign + '座';
   },
 
   updateThemeUI(theme) {
@@ -60,6 +101,33 @@ const SettingsManager = {
     document.getElementById('btn-restore-position').addEventListener('click', async () => {
       await window.wealthCalendar.restoreDefaultPosition();
       showToast('已恢复默认位置');
+    });
+
+    // User info: birth datetime change -> update zodiac preview
+    document.getElementById('user-birth').addEventListener('change', (e) => {
+      this.updateZodiac(e.target.value ? e.target.value.replace('T', ' ') : null);
+    });
+
+    // Gender selection
+    document.getElementById('gender-male').addEventListener('click', () => {
+      this.settings.userInfo = { ...(this.settings.userInfo || {}), gender: 'male' };
+      document.getElementById('gender-male').classList.add('active');
+      document.getElementById('gender-female').classList.remove('active');
+    });
+    document.getElementById('gender-female').addEventListener('click', () => {
+      this.settings.userInfo = { ...(this.settings.userInfo || {}), gender: 'female' };
+      document.getElementById('gender-female').classList.add('active');
+      document.getElementById('gender-male').classList.remove('active');
+    });
+
+    // Save user info
+    document.getElementById('btn-save-userinfo').addEventListener('click', async () => {
+      const raw = document.getElementById('user-birth').value;
+      const birth = raw ? raw.replace('T', ' ') : null; // datetime-local -> "YYYY-MM-DD HH:mm"
+      this.settings.userInfo = { ...(this.settings.userInfo || {}), birth };
+      await this.save();
+      this.updateZodiac(birth);
+      showToast(birth ? '✅ 用户信息已保存' : '⚠️ 未填写出生时间');
     });
   },
 

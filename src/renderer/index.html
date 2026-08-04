@@ -54,9 +54,15 @@
             <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
           </div>
 
-          <div class="setting-group placeholder-section">
-            <label>用户信息</label>
-            <p class="placeholder-text">（M2 实现）</p>
+          <div class="setting-group">
+            <label>用户信息（命理分析用）</label>
+            <input type="datetime-local" id="user-birth" class="setting-input">
+            <div class="setting-row">
+              <button class="theme-option" data-gender="male" id="gender-male">♂ 男</button>
+              <button class="theme-option" data-gender="female" id="gender-female">♀ 女</button>
+            </div>
+            <p class="placeholder-text" id="user-zodiac">星座：—</p>
+            <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
           </div>
           <div class="setting-group placeholder-section">
             <label>AI 命理</label>

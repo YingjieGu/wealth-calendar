@@ -264,6 +264,28 @@ html, body {
   color: #fff;
 }
 
+/* User info form */
+.setting-input {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #ddd;
+  font-size: 12px;
+  outline: none;
+  color-scheme: dark;
+}
+.setting-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+#user-zodiac {
+  margin-bottom: 8px;
+}
+
 .placeholder-section {
   opacity: 0.5;
 }

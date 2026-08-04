@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   calendarUpdate: (id, updates) => ipcRenderer.invoke('calendar:update', id, updates),
   calendarRemove: (id) => ipcRenderer.invoke('calendar:remove', id),
 
+  // Fortune sidecar
+  paipan: (birth, gender) => ipcRenderer.invoke('fortune:paipan', birth, gender),
+  natalChart: (birth) => ipcRenderer.invoke('fortune:chart', birth),
+  todayAlmanac: (dateStr) => ipcRenderer.invoke('fortune:almanac', dateStr),
+
   // Reminder listener
   onScheduleReminder: (callback) => {
     ipcRenderer.on('schedule-reminder', (_event, schedule) => callback(schedule));

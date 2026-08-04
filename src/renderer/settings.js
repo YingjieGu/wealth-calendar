@@ -135,6 +135,9 @@ const SettingsManager = {
       this.updateZodiac(e.target.value ? e.target.value.replace('T', ' ') : null);
     });
 
+    // Built-in pet assets grid
+    this.loadPets();
+
     // Gender selection
     document.getElementById('gender-male').addEventListener('click', () => {
       this.settings.userInfo = { ...(this.settings.userInfo || {}), gender: 'male' };
@@ -286,6 +289,45 @@ const SettingsManager = {
     document.querySelectorAll('#wish-options .activity-option').forEach((b) => {
       b.classList.toggle('active', b.dataset.wish === wish);
     });
+  },
+
+  // --- Built-in pet assets ---
+  async loadPets() {
+    const grid = document.getElementById('pets-grid');
+    if (!grid) return;
+    let names = [];
+    try {
+      names = await window.wealthCalendar.petsList();
+    } catch (e) { /* ignore */ }
+    if (!names.length) {
+      grid.innerHTML = '<p class="placeholder-text">暂无内置素材</p>';
+      return;
+    }
+    grid.innerHTML = '';
+    for (const n of names) {
+      const dataUrl = await window.wealthCalendar.petsImage(n);
+      if (!dataUrl) continue;
+      const item = document.createElement('div');
+      item.className = 'pets-item';
+      item.title = n;
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = n;
+      item.appendChild(img);
+      item.addEventListener('click', async () => {
+        const r = await window.wealthCalendar.petsApply(n);
+        if (r && r.ok) {
+          this.settings.theme = 'custom';
+          this.updateThemeUI('custom');
+          PetState.setTheme('custom');
+          await this.save();
+          showToast(`✅ 已应用素材：${n}`);
+        } else {
+          showToast('❌ 应用失败');
+        }
+      });
+      grid.appendChild(item);
+    }
   },
 
   // --- Multimodal config ---

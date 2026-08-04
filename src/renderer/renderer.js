@@ -79,20 +79,20 @@ function convertToPng(dataUrl) {
   notifyPanel();
 })();
 
-// --- Custom window drag (drag the pet itself) ---
+// --- Custom window drag (drag anywhere on the pet stage) ---
 (function setupDrag() {
-  const pet = document.getElementById('pet');
+  const stage = document.getElementById('pet-stage');
   let isDragging = false;
   let lastX = 0;
   let lastY = 0;
 
-  pet.addEventListener('mousedown', (e) => {
+  stage.addEventListener('mousedown', (e) => {
     // Don't drag when clicking buttons or inside panels
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     isDragging = true;
     lastX = e.screenX;
     lastY = e.screenY;
-    pet.style.cursor = 'grabbing';
+    stage.style.cursor = 'grabbing';
     e.preventDefault();
   });
 
@@ -110,7 +110,7 @@ function convertToPng(dataUrl) {
   document.addEventListener('mouseup', () => {
     if (isDragging) {
       isDragging = false;
-      pet.style.cursor = '';
+      stage.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
     }
   });
@@ -120,7 +120,7 @@ function convertToPng(dataUrl) {
   window.addEventListener('blur', () => {
     if (isDragging) {
       isDragging = false;
-      pet.style.cursor = '';
+      stage.style.cursor = '';
     }
   });
 })();

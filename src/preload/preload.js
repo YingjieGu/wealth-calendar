@@ -62,6 +62,11 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   saveCustomPetImage: (dataUrl) => ipcRenderer.invoke('pet:save-image', dataUrl),
   loadCustomPetImage: () => ipcRenderer.invoke('pet:load-image').then((r) => (r ? r.dataUrl : null)),
 
+  // Built-in pet assets
+  petsList: () => ipcRenderer.invoke('pets:list'),
+  petsImage: (name) => ipcRenderer.invoke('pets:image', name).then((r) => (r ? r.dataUrl : null)),
+  petsApply: (name) => ipcRenderer.invoke('pets:apply', name),
+
   // Wallpaper calendar
   applyWallpaper: () => ipcRenderer.invoke('wallpaper:apply'),
   setWallpaperAutoRefresh: (enabled) => ipcRenderer.invoke('wallpaper:refresh-timer', enabled),

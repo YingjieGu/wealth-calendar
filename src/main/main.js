@@ -414,6 +414,49 @@ function setupIPC() {
   // --- Custom pet image ---
   const CUSTOM_PET_PATH = path.join(app.getPath('userData'), 'pet-custom.png');
 
+  // Built-in pet assets (bundled transparent PNGs)
+  function petsDir() {
+    const dev = path.join(app.getAppPath(), 'assets', 'pets');
+    try {
+      if (fs.existsSync(dev)) return dev;
+    } catch (e) { /* ignore */ }
+    return path.join(process.resourcesPath || '', 'pets');
+  }
+
+  ipcMain.handle('pets:list', () => {
+    try {
+      return fs.readdirSync(petsDir())
+        .filter((f) => f.endsWith('.png'))
+        .map((f) => f.replace(/\.png$/, ''));
+    } catch (e) {
+      return [];
+    }
+  });
+
+  ipcMain.handle('pets:image', (_event, name) => {
+    try {
+      const p = path.join(petsDir(), `${String(name).replace(/[^\w-]/g, '')}.png`);
+      if (fs.existsSync(p)) {
+        const buf = fs.readFileSync(p);
+        return { dataUrl: `data:image/png;base64,${buf.toString('base64')}` };
+      }
+    } catch (e) { /* ignore */ }
+    return { dataUrl: null };
+  });
+
+  ipcMain.handle('pets:apply', (_event, name) => {
+    try {
+      const p = path.join(petsDir(), `${String(name).replace(/[^\w-]/g, '')}.png`);
+      if (fs.existsSync(p)) {
+        fs.copyFileSync(p, CUSTOM_PET_PATH);
+        return { ok: true };
+      }
+    } catch (e) {
+      return { error: e.message };
+    }
+    return { error: '素材不存在' };
+  });
+
   ipcMain.handle('pet:save-image', (_event, dataUrl) => {
     try {
       const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');

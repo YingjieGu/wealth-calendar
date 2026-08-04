@@ -27,6 +27,14 @@
         <button id="btn-settings" title="设置" class="hover-btn">⚙️</button>
       </div>
 
+      <!-- Context menu (right-click pet) -->
+      <div id="context-menu" class="hidden">
+        <button data-action="fortune">🔮 今日运势</button>
+        <button data-action="calendar">📅 日历</button>
+        <button data-action="settings">⚙️ 设置</button>
+        <button data-action="quit">🚪 退出</button>
+      </div>
+
       <!-- Settings panel -->
       <div id="settings-panel" class="hidden">
         <div class="settings-header">
@@ -64,9 +72,15 @@
             <p class="placeholder-text" id="user-zodiac">星座：—</p>
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
           </div>
-          <div class="setting-group placeholder-section">
-            <label>AI 命理</label>
-            <p class="placeholder-text">（M2 实现）</p>
+          <div class="setting-group">
+            <label>AI 命理（DeepSeek 兼容 API）</label>
+            <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
+            <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com/v1）">
+            <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-chat）">
+            <label class="setting-checkbox">
+              <input type="checkbox" id="fortune-reminder-enabled" checked> 每日运势提醒
+            </label>
+            <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
           </div>
         </div>
       </div>
@@ -88,6 +102,15 @@
 
       <div id="calendar-grid" class="cal-grid">
         <!-- dynamically filled -->
+      </div>
+
+      <!-- Daily fortune section -->
+      <div id="fortune-section" class="hidden">
+        <div class="fortune-header">
+          <span id="fortune-title">✨ 今日运势</span>
+          <button id="btn-refresh-fortune" class="fortune-refresh" title="刷新运势">🔄</button>
+        </div>
+        <div id="fortune-body"><!-- filled by calendar.js --></div>
       </div>
 
       <!-- Schedule detail panel (bottom) -->

@@ -328,6 +328,136 @@ html, body {
   opacity: 0;
 }
 
+/* ===== Fortune section ===== */
+#fortune-section {
+  margin: 8px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.fortune-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: #ffd700;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.fortune-refresh {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #ffd700;
+}
+.fortune-overall {
+  font-size: 13px;
+  color: #eee;
+  margin-bottom: 4px;
+}
+.fortune-overall b {
+  font-size: 18px;
+  color: #ffd700;
+}
+.fortune-source {
+  font-size: 10px;
+  color: #aaa;
+  margin-left: 6px;
+}
+.fortune-line {
+  background: rgba(255, 215, 0, 0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #ffe9a8;
+  margin-bottom: 8px;
+}
+.fortune-dim {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.fortune-dim-label {
+  width: 52px;
+  color: #bbb;
+  flex-shrink: 0;
+}
+.fortune-dim-score {
+  width: 28px;
+  color: #ffd700;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.fortune-dim-summary {
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fortune-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #aaa;
+}
+.fortune-disclaimer {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #666;
+}
+.fortune-empty, .fortune-loading {
+  font-size: 12px;
+  color: #bbb;
+  padding: 6px 0;
+}
+
+/* ===== Context menu ===== */
+#context-menu {
+  position: absolute;
+  z-index: 30;
+  background: rgba(24, 24, 32, 0.95);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 104px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+#context-menu.hidden {
+  display: none;
+}
+#context-menu button {
+  background: none;
+  border: none;
+  color: #ddd;
+  font-size: 12px;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#context-menu button:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
+/* Model config */
+.setting-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #ccc;
+  margin: 6px 0 10px;
+}
+
 /* ===== View containers ===== */
 #pet-view {
   width: 100%;

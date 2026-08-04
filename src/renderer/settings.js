@@ -129,6 +129,28 @@ const SettingsManager = {
       this.updateZodiac(birth);
       showToast(birth ? '✅ 用户信息已保存' : '⚠️ 未填写出生时间');
     });
+
+    // Model config
+    this.applyModelConfig();
+    document.getElementById('btn-save-modelconfig').addEventListener('click', async () => {
+      const key = document.getElementById('llm-api-key').value.trim();
+      this.settings.modelConfig = {
+        llmApiKey: key || '',
+        llmBaseUrl: document.getElementById('llm-base-url').value.trim() || 'https://api.deepseek.com/v1',
+        llmModel: document.getElementById('llm-model').value.trim() || 'deepseek-chat',
+      };
+      this.settings.fortuneReminderEnabled = document.getElementById('fortune-reminder-enabled').checked;
+      await this.save();
+      showToast(key ? '✅ 模型配置已保存（AI 命理已启用）' : '✅ 已保存（未填 Key，使用本地模板推算）');
+    });
+  },
+
+  applyModelConfig() {
+    const mc = this.settings.modelConfig || {};
+    document.getElementById('llm-api-key').value = mc.llmApiKey || '';
+    document.getElementById('llm-base-url').value = mc.llmBaseUrl || 'https://api.deepseek.com/v1';
+    document.getElementById('llm-model').value = mc.llmModel || 'deepseek-chat';
+    document.getElementById('fortune-reminder-enabled').checked = this.settings.fortuneReminderEnabled !== false;
   },
 
   async save() {

@@ -31,9 +31,16 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   paipan: (birth, gender) => ipcRenderer.invoke('fortune:paipan', birth, gender),
   natalChart: (birth) => ipcRenderer.invoke('fortune:chart', birth),
   todayAlmanac: (dateStr) => ipcRenderer.invoke('fortune:almanac', dateStr),
+  getDailyFortune: (dateStr, force) => ipcRenderer.invoke('fortune:daily', dateStr, force),
 
   // Reminder listener
   onScheduleReminder: (callback) => {
     ipcRenderer.on('schedule-reminder', (_event, schedule) => callback(schedule));
   },
+  onFortuneReminder: (callback) => {
+    ipcRenderer.on('fortune-reminder', (_event, data) => callback(data));
+  },
+
+  // Quit app (from context menu)
+  quitApp: () => ipcRenderer.send('app-quit'),
 });

@@ -5,6 +5,7 @@ const { createTray } = require('./tray');
 const calendarStore = require('./calendarStore');
 const { startReminder, stopReminder } = require('./reminder');
 const sidecar = require('./sidecar');
+const fortuneEngine = require('./fortuneEngine');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -292,6 +293,17 @@ function setupIPC() {
       return { error: e.message };
     }
   });
+
+  // --- Daily fortune pipeline ---
+  ipcMain.handle('fortune:daily', (_event, dateStr, force) => {
+    return fortuneEngine.getDailyFortune(dateStr, !!force, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
+  });
+
+  // Quit from renderer context menu
+  ipcMain.on('app-quit', () => {
+    isQuitting = true;
+    app.quit();
+  });
 }
 
 // --- App lifecycle ---
@@ -306,6 +318,12 @@ app.whenReady().then(() => {
   // Start fortune sidecar (non-blocking on failure)
   sidecar.startSidecar().then((ok) => {
     console.log('[main] sidecar ready:', ok);
+    if (ok) {
+      // Startup fortune reminder (5s delay, only if userInfo exists)
+      fortuneEngine.maybeSendStartupFortune(mainWindow, (d, f) =>
+        fortuneEngine.getDailyFortune(d, f, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) })
+      );
+    }
   });
 });
 

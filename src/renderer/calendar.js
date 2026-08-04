@@ -45,6 +45,10 @@ const CalendarView = {
     document.getElementById('btn-close-detail').addEventListener('click', () => {
       this.closeScheduleDetail();
     });
+
+    document.getElementById('btn-refresh-fortune').addEventListener('click', () => {
+      this.loadFortune(true);
+    });
   },
 
   async open() {
@@ -53,6 +57,7 @@ const CalendarView = {
     this.currentYear = new Date().getFullYear();
     this.currentMonth = new Date().getMonth() + 1;
     await this.render();
+    this.loadFortune(false);
   },
 
   async close() {
@@ -259,6 +264,55 @@ const CalendarView = {
     } else {
       almanacEl.innerHTML = '';
     }
+  },
+
+  async loadFortune(force) {
+    const section = document.getElementById('fortune-section');
+    const body = document.getElementById('fortune-body');
+    section.classList.remove('hidden');
+    body.innerHTML = '<div class="fortune-loading">🔮 正在推算今日运势...</div>';
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+    const result = await window.wealthCalendar.getDailyFortune(todayStr, !!force);
+    if (result && result.error) {
+      if (result.error === 'noUserInfo') {
+        body.innerHTML = '<div class="fortune-empty">⚠️ 请先在设置中填写出生信息，才能生成专属运势</div>';
+      } else {
+        body.innerHTML = `<div class="fortune-empty">❌ ${result.message || '运势生成失败，请稍后重试'}</div>`;
+      }
+      return;
+    }
+
+    const f = result.data;
+    const dims = f.dimensions || {};
+    const dimLabels = {
+      wealth: '💰 财运', career: '💼 事业', love: '💘 桃花',
+      health: '💪 健康', study: '📚 学业', travel: '🚗 出行', signing: '✍️ 签约',
+    };
+
+    let dimHtml = '';
+    for (const [key, label] of Object.entries(dimLabels)) {
+      const d = dims[key] || { score: '-', summary: '' };
+      dimHtml += `<div class="fortune-dim">
+        <span class="fortune-dim-label">${label}</span>
+        <span class="fortune-dim-score">${d.score}</span>
+        <span class="fortune-dim-summary">${this.escapeHtml(d.summary || '')}</span>
+      </div>`;
+    }
+
+    const luckyTime = (f.luckyTime || []).join('、') || '—';
+    const dirWealth = (f.directions && f.directions.wealth) || '—';
+    const sourceTag = result.source === 'llm' ? '✨ AI 命理' : '📜 模板推算';
+    const reminderLine = (f.reminderLines && f.reminderLines[0]) || '';
+
+    body.innerHTML = `
+      <div class="fortune-overall">总分 <b>${f.overall}</b> <span class="fortune-source">${sourceTag}</span></div>
+      ${reminderLine ? `<div class="fortune-line">💬 ${this.escapeHtml(reminderLine)}</div>` : ''}
+      <div class="fortune-dims">${dimHtml}</div>
+      <div class="fortune-meta">🕐 吉时：${this.escapeHtml(luckyTime)} ｜ 🧭 财神方位：${this.escapeHtml(dirWealth)}</div>
+      <div class="fortune-disclaimer">${this.escapeHtml(f.disclaimer || '')}</div>`;
   },
 
   closeScheduleDetail() {

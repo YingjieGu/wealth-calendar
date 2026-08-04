@@ -6,6 +6,7 @@ const calendarStore = require('./calendarStore');
 const { startReminder, stopReminder } = require('./reminder');
 const sidecar = require('./sidecar');
 const fortuneEngine = require('./fortuneEngine');
+const chatEngine = require('./chatEngine');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -303,6 +304,59 @@ function setupIPC() {
   ipcMain.on('app-quit', () => {
     isQuitting = true;
     app.quit();
+  });
+
+  // --- Chat ---
+  const executeTool = async (action, params) => {
+    switch (action) {
+      case 'add_schedule': {
+        const s = calendarStore.add({
+          title: params.title || '未命名日程',
+          date: params.date,
+          time: params.time || null,
+          remindBeforeMin: params.remindBeforeMin || null,
+          note: params.note || '',
+        });
+        return { ok: true, id: s.id, title: s.title, date: s.date, time: s.time };
+      }
+      case 'query_schedule': {
+        const date = params.date || new Date().toISOString().slice(0, 10);
+        const list = calendarStore.listByDate(date);
+        return { date, schedules: list.map(({ id, title, time, note }) => ({ id, title, time, note })) };
+      }
+      case 'delete_schedule': {
+        const ok = calendarStore.remove(parseInt(params.id, 10));
+        return { ok, id: params.id };
+      }
+      case 'query_fortune': {
+        const r = await fortuneEngine.getDailyFortune(new Date().toISOString().slice(0, 10), false, {
+          requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
+        });
+        if (r.error) return { error: r.message };
+        const d = r.data;
+        const dims = d.dimensions || {};
+        return {
+          date: d.date,
+          overall: d.overall,
+          wealth: dims.wealth && dims.wealth.score,
+          career: dims.career && dims.career.score,
+          love: dims.love && dims.love.score,
+          luckyTime: d.luckyTime,
+          reminder: (d.reminderLines && d.reminderLines[0]) || '',
+        };
+      }
+      default:
+        return { error: `unknown action: ${action}` };
+    }
+  };
+
+  ipcMain.handle('chat:send', (_event, message) => {
+    return chatEngine.chatSend(String(message || '').slice(0, 500), { executeTool });
+  });
+
+  ipcMain.handle('chat:clear', () => {
+    chatEngine.clearHistory();
+    return { ok: true };
   });
 }
 

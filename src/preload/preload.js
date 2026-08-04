@@ -43,4 +43,8 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
 
   // Quit app (from context menu)
   quitApp: () => ipcRenderer.send('app-quit'),
+
+  // Chat
+  chatSend: (message) => ipcRenderer.invoke('chat:send', message),
+  chatClear: () => ipcRenderer.invoke('chat:clear'),
 });

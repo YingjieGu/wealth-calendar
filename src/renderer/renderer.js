@@ -100,6 +100,14 @@ function showToast(msg) {
   });
 })();
 
+// --- Chat toggle ---
+(function setupChatButton() {
+  const btnChat = document.getElementById('btn-chat');
+  btnChat.addEventListener('click', () => {
+    ChatPanel.open();
+  });
+})();
+
 // --- Reminder listener ---
 (function setupReminderListener() {
   let bubbleTimer = null;

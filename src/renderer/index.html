@@ -35,6 +35,21 @@
         <button data-action="quit">🚪 退出</button>
       </div>
 
+      <!-- Chat panel -->
+      <div id="chat-panel" class="hidden">
+        <div class="chat-header">
+          <span>💬 和小财聊天</span>
+          <button id="btn-close-chat" class="close-btn">✕</button>
+        </div>
+        <div id="chat-messages">
+          <div class="chat-msg chat-assistant">你好呀～我是小财！可以找我聊天、查运势，也可以直接说"明天下午3点开会"帮你记日程哦 ✨</div>
+        </div>
+        <div class="chat-input-row">
+          <input id="chat-input" placeholder="说点什么…（如：明天下午3点开会）" autocomplete="off">
+          <button id="btn-chat-send" class="chat-send-btn">➤</button>
+        </div>
+      </div>
+
       <!-- Settings panel -->
       <div id="settings-panel" class="hidden">
         <div class="settings-header">
@@ -71,6 +86,11 @@
             </div>
             <p class="placeholder-text" id="user-zodiac">星座：—</p>
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
+          </div>
+          <div class="setting-group">
+            <label>唤醒口令（语音对话用）</label>
+            <input type="text" id="wake-word" class="setting-input" placeholder="默认：小财小财">
+            <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
           </div>
           <div class="setting-group">
             <label>AI 命理（DeepSeek 兼容 API）</label>
@@ -166,6 +186,7 @@
 
   <script src="pet.js"></script>
   <script src="calendar.js"></script>
+  <script src="chat.js"></script>
   <script src="settings.js"></script>
   <script src="renderer.js"></script>
 </body>

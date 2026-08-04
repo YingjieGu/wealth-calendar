@@ -143,6 +143,15 @@ const SettingsManager = {
       await this.save();
       showToast(key ? '✅ 模型配置已保存（AI 命理已启用）' : '✅ 已保存（未填 Key，使用本地模板推算）');
     });
+
+    // Wake word
+    this.applyWakeWord();
+    document.getElementById('btn-save-wakeword').addEventListener('click', async () => {
+      const w = document.getElementById('wake-word').value.trim();
+      this.settings.wakeWord = w || '小财小财';
+      await this.save();
+      showToast(`✅ 唤醒口令：${this.settings.wakeWord}`);
+    });
   },
 
   applyModelConfig() {
@@ -151,6 +160,10 @@ const SettingsManager = {
     document.getElementById('llm-base-url').value = mc.llmBaseUrl || 'https://api.deepseek.com/v1';
     document.getElementById('llm-model').value = mc.llmModel || 'deepseek-chat';
     document.getElementById('fortune-reminder-enabled').checked = this.settings.fortuneReminderEnabled !== false;
+  },
+
+  applyWakeWord() {
+    document.getElementById('wake-word').value = this.settings.wakeWord || '小财小财';
   },
 
   async save() {

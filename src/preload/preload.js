@@ -52,4 +52,8 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   asrTranscribe: (audioArrayBuffer, language) => ipcRenderer.invoke('asr:transcribe', audioArrayBuffer, language),
   ttsSynthesize: (text) => ipcRenderer.invoke('tts:synthesize', text),
   modelsStatus: () => ipcRenderer.invoke('models:status'),
+
+  // Custom pet image
+  saveCustomPetImage: (dataUrl) => ipcRenderer.invoke('pet:save-image', dataUrl),
+  loadCustomPetImage: () => ipcRenderer.invoke('pet:load-image').then((r) => (r ? r.dataUrl : null)),
 });

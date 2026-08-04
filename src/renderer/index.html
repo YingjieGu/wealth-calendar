@@ -11,7 +11,10 @@
     <!-- ==================== Pet View ==================== -->
     <div id="pet-view">
       <div id="pet-stage">
-        <div id="pet" class="theme-cat">🐱</div>
+        <div id="pet" class="theme-cat">
+          <span id="pet-emoji">🐱</span>
+          <img id="pet-img" style="display:none;" alt="custom pet">
+        </div>
         <div id="pet-zzz">💤</div>
       </div>
 
@@ -63,7 +66,11 @@
             <div class="setting-options" id="theme-options">
               <button class="theme-option active" data-theme="cat">🐱 萌宠</button>
               <button class="theme-option" data-theme="fortune">🧧 财神</button>
+              <button class="theme-option" data-theme="bagua">☯️ 八卦</button>
+              <button class="theme-option" data-theme="custom">🖼️ 自定义</button>
             </div>
+            <input type="file" id="pet-upload" accept="image/*" style="display:none;">
+            <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>
           </div>
 
           <div class="setting-group">

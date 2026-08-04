@@ -86,6 +86,31 @@ const SettingsManager = {
       this.save();
     });
 
+    // Custom pet image upload
+    document.getElementById('btn-upload-pet').addEventListener('click', () => {
+      document.getElementById('pet-upload').click();
+    });
+    document.getElementById('pet-upload').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result;
+        const r = await window.wealthCalendar.saveCustomPetImage(dataUrl);
+        if (r && r.ok) {
+          this.settings.theme = 'custom';
+          this.updateThemeUI('custom');
+          PetState.setTheme('custom');
+          await this.save();
+          showToast('✅ 自定义宠物已保存，试试走动效果～');
+        } else {
+          showToast('❌ 图片保存失败');
+        }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
     // Activity selection
     document.getElementById('activity-options').addEventListener('click', (e) => {
       const btn = e.target.closest('.activity-option');

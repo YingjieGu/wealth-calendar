@@ -394,6 +394,32 @@ function setupIPC() {
       return { error: e.message };
     }
   });
+
+  // --- Custom pet image ---
+  const CUSTOM_PET_PATH = path.join(app.getPath('userData'), 'pet-custom.png');
+
+  ipcMain.handle('pet:save-image', (_event, dataUrl) => {
+    try {
+      const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      fs.writeFileSync(CUSTOM_PET_PATH, Buffer.from(base64, 'base64'));
+      return { ok: true, path: CUSTOM_PET_PATH };
+    } catch (e) {
+      console.error('[pet] save image failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('pet:load-image', () => {
+    try {
+      if (fs.existsSync(CUSTOM_PET_PATH)) {
+        const buf = fs.readFileSync(CUSTOM_PET_PATH);
+        return { dataUrl: `data:image/png;base64,${buf.toString('base64')}` };
+      }
+    } catch (e) {
+      console.error('[pet] load image failed:', e.message);
+    }
+    return { dataUrl: null };
+  });
 }
 
 // --- App lifecycle ---

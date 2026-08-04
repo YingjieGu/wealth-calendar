@@ -56,6 +56,15 @@ html, body {
   cursor: grabbing;
 }
 
+#pet-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 12px;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Pet idle breathing */
 #pet.idle {
   animation: breathe 2.5s ease-in-out infinite;
@@ -95,6 +104,10 @@ html, body {
 
 #app.theme-fortune {
   background: rgba(80, 20, 20, 0.7);
+}
+
+#app.theme-bagua {
+  background: rgba(10, 30, 40, 0.72);
 }
 
 /* ===== Hover buttons ===== */

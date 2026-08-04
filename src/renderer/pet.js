@@ -130,15 +130,37 @@ const PetState = {
   },
 
   setTheme(theme) {
-    // 'cat' or 'fortune'
-    if (theme === 'fortune') {
-      this.petEl.textContent = '🧧';
-      document.getElementById('app').classList.remove('theme-cat');
-      document.getElementById('app').classList.add('theme-fortune');
+    // 'cat' | 'fortune' | 'bagua' | 'custom'
+    const emojiMap = { cat: '🐱', fortune: '🧧', bagua: '☯️' };
+    const appEl = document.getElementById('app');
+    appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua');
+
+    const img = document.getElementById('pet-img');
+    const emojiSpan = document.getElementById('pet-emoji');
+
+    if (theme === 'custom') {
+      img.style.display = 'block';
+      emojiSpan.style.display = 'none';
+      // Load custom image if not already loaded
+      if (!img.src || img.dataset.customLoaded !== '1') {
+        window.wealthCalendar.loadCustomPetImage().then((dataUrl) => {
+          if (dataUrl) {
+            img.src = dataUrl;
+            img.dataset.customLoaded = '1';
+          } else {
+            // No custom image yet -> fall back to cat
+            img.style.display = 'none';
+            emojiSpan.style.display = 'block';
+            emojiSpan.textContent = '🐱';
+          }
+        });
+      }
+      appEl.classList.add('theme-cat');
     } else {
-      this.petEl.textContent = '🐱';
-      document.getElementById('app').classList.add('theme-cat');
-      document.getElementById('app').classList.remove('theme-fortune');
+      img.style.display = 'none';
+      emojiSpan.style.display = 'block';
+      emojiSpan.textContent = emojiMap[theme] || '🐱';
+      appEl.classList.add(theme === 'fortune' ? 'theme-fortune' : theme === 'bagua' ? 'theme-bagua' : 'theme-cat');
     }
   },
 };

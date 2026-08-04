@@ -125,7 +125,13 @@
               <option value="jimeng">即梦 Seedance（火山引擎，有免费额度）</option>
               <option value="kling">可灵 Kling</option>
             </select>
-            <input type="password" id="mm-api-key" class="setting-input" placeholder="多模态 API Key（即梦/可灵开放平台申请）">
+            <select id="mm-auth-type" class="setting-input">
+              <option value="aksk">AK/SK 签名（火山引擎 AccessKey）</option>
+              <option value="apikey">API Key（Bearer）</option>
+            </select>
+            <input type="text" id="mm-access-key" class="setting-input" placeholder="AccessKeyId（即梦/火山引擎控制台）">
+            <input type="password" id="mm-secret-key" class="setting-input" placeholder="SecretAccessKey">
+            <input type="password" id="mm-api-key" class="setting-input" placeholder="API Key（Bearer 方式，可留空）" style="display:none;">
             <input type="file" id="mm-upload" accept="image/*" style="display:none;">
             <button id="btn-mm-upload" class="action-btn">🖼️ 选择图片 → 生成动画宠物</button>
             <button id="btn-mm-clear" class="action-btn">🗑️ 清除动画宠物</button>

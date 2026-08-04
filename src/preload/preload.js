@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   // Calendar: switch views
   openCalendar: () => ipcRenderer.invoke('open-calendar'),
   closeCalendar: () => ipcRenderer.invoke('close-calendar'),
+  openChatPanel: () => ipcRenderer.invoke('open-chat-panel'),
+  closeChatPanel: () => ipcRenderer.invoke('close-chat-panel'),
 
   // Lunar data
   getMonthLunarData: (year, month) => ipcRenderer.invoke('get-month-lunar-data', year, month),

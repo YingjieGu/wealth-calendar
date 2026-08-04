@@ -50,24 +50,6 @@ html, body {
   border: 1px solid rgba(110, 200, 240, 0.3);
 }
 
-/* ---------- Windows: true see-through pet (DWM compositor) ----------
-   The whole floating window becomes the pet image itself — no boundary box.
-   Panels (settings/chat/calendar) keep their own dark backgrounds. */
-body.platform-win32 #app {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-body.platform-win32 #hover-buttons {
-  background: rgba(20, 18, 36, 0.55);
-  border-radius: 22px;
-  padding: 6px 12px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
 /* ============================================================
    宠物舞台
    ============================================================ */

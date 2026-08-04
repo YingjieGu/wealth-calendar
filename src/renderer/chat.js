@@ -4,6 +4,8 @@ const ChatPanel = {
   open() {
     document.getElementById('chat-panel').classList.remove('hidden');
     document.getElementById('hover-buttons').classList.add('hidden');
+    // Enlarge window for comfortable chat, restore on close
+    window.wealthCalendar.openChatPanel();
     const input = document.getElementById('chat-input');
     setTimeout(() => input.focus(), 50);
   },
@@ -12,6 +14,7 @@ const ChatPanel = {
     document.getElementById('chat-panel').classList.add('hidden');
     // Restore hover buttons (open() hid them)
     document.getElementById('hover-buttons').classList.remove('hidden');
+    window.wealthCalendar.closeChatPanel();
   },
 
   addMessage(role, text) {

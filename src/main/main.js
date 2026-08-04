@@ -201,33 +201,39 @@ function setupIPC() {
     return false;
   });
 
-  // --- Calendar: resize to calendar view ---
-  ipcMain.handle('open-calendar', () => {
+  // --- Panel window mode (calendar/chat share a larger window) ---
+  function setWindowMode(mode) {
     if (!mainWindow) return false;
-    isCalendarMode = true;
-    mainWindow.setResizable(true);
-    mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
-    const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
-    mainWindow.setPosition(pos.x, pos.y);
-    return true;
-  });
-
-  ipcMain.handle('close-calendar', () => {
-    if (!mainWindow) return false;
-    isCalendarMode = false;
-    mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
-    mainWindow.setResizable(false);
-    const saved = loadSettings();
-    const sx = saved.windowX;
-    const sy = saved.windowY;
-    if (typeof sx === 'number' && typeof sy === 'number') {
-      mainWindow.setPosition(sx, sy);
-    } else {
-      const pos = centerWindow(mainWindow, PET_WIDTH, PET_HEIGHT);
+    if (mode === 'panel') {
+      isCalendarMode = true;
+      mainWindow.setResizable(true);
+      mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
+      const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
       mainWindow.setPosition(pos.x, pos.y);
+    } else {
+      isCalendarMode = false;
+      mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
+      mainWindow.setResizable(false);
+      const saved = loadSettings();
+      const sx = saved.windowX;
+      const sy = saved.windowY;
+      if (typeof sx === 'number' && typeof sy === 'number') {
+        mainWindow.setPosition(sx, sy);
+      } else {
+        const pos = centerWindow(mainWindow, PET_WIDTH, PET_HEIGHT);
+        mainWindow.setPosition(pos.x, pos.y);
+      }
     }
     return true;
-  });
+  }
+
+  ipcMain.handle('open-calendar', () => setWindowMode('panel'));
+
+  ipcMain.handle('close-calendar', () => setWindowMode('pet'));
+
+  ipcMain.handle('open-chat-panel', () => setWindowMode('panel'));
+
+  ipcMain.handle('close-chat-panel', () => setWindowMode('pet'));
 
   // --- Lunar data for calendar ---
   ipcMain.handle('get-month-lunar-data', (_event, year, month) => {
@@ -500,22 +506,16 @@ function setupIPC() {
       mode = 'outside';
     } else if (panelOpen || isCalendarMode) {
       mode = 'interactive';
-    } else if (process.platform === 'win32') {
-      // Windows (DWM compositor): true see-through pet with interactive zones
-      const cx = b.x + b.width / 2;
-      const cy = b.y + b.height / 2;
-      const inCenter = Math.abs(cursor.x - cx) <= 82 && Math.abs(cursor.y - cy) <= 82;
-      const inBottom = cursor.y >= b.y + b.height - 60 && cursor.y <= b.y + b.height;
-      mode = inCenter || inBottom ? 'interactive' : 'transparent';
     } else {
-      // Linux/macOS software rendering: whole window interactive
+      // Whole window interactive (no click-through on any platform for now;
+      // see-through pets need per-platform validation first)
       mode = 'interactive';
     }
 
-    const clickThrough = process.platform === 'win32' ? mode !== 'interactive' : false;
-    if (clickThrough !== currentClickThrough) {
-      currentClickThrough = clickThrough;
-      mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
+    // No click-through: the window is always interactive
+    if (currentClickThrough !== false) {
+      currentClickThrough = false;
+      mainWindow.setIgnoreMouseEvents(false);
     }
     if (mode !== lastSentMode) {
       lastSentMode = mode;

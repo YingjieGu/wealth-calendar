@@ -96,7 +96,9 @@ const SettingsManager = {
       const reader = new FileReader();
       reader.onload = async () => {
         const dataUrl = reader.result;
-        const r = await window.wealthCalendar.saveCustomPetImage(dataUrl);
+        // webp/jpeg -> png before saving (webp <img> fails on software-rendered Linux)
+        const pngDataUrl = await convertToPng(dataUrl);
+        const r = await window.wealthCalendar.saveCustomPetImage(pngDataUrl);
         if (r && r.ok) {
           this.settings.theme = 'custom';
           this.updateThemeUI('custom');
@@ -182,15 +184,19 @@ const SettingsManager = {
 
     // Multimodal pet animation
     this.applyMultimodal();
+    document.getElementById('mm-auth-type').addEventListener('change', () => this.toggleMmAuthFields());
     document.getElementById('btn-mm-upload').addEventListener('click', () => {
       document.getElementById('mm-upload').click();
     });
     document.getElementById('mm-upload').addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      // Save provider/key first
+      // Save provider/auth first
       this.settings.multimodalConfig = {
         provider: document.getElementById('mm-provider').value,
+        authType: document.getElementById('mm-auth-type').value,
+        accessKeyId: document.getElementById('mm-access-key').value.trim(),
+        secretAccessKey: document.getElementById('mm-secret-key').value.trim(),
         apiKey: document.getElementById('mm-api-key').value.trim(),
       };
       await this.save();
@@ -284,7 +290,18 @@ const SettingsManager = {
   applyMultimodal() {
     const mc = this.settings.multimodalConfig || {};
     document.getElementById('mm-provider').value = mc.provider || 'jimeng';
+    document.getElementById('mm-auth-type').value = mc.authType || 'aksk';
+    document.getElementById('mm-access-key').value = mc.accessKeyId || '';
+    document.getElementById('mm-secret-key').value = mc.secretAccessKey || '';
     document.getElementById('mm-api-key').value = mc.apiKey || '';
+    this.toggleMmAuthFields();
+  },
+
+  toggleMmAuthFields() {
+    const isAksk = document.getElementById('mm-auth-type').value === 'aksk';
+    document.getElementById('mm-access-key').style.display = isAksk ? '' : 'none';
+    document.getElementById('mm-secret-key').style.display = isAksk ? '' : 'none';
+    document.getElementById('mm-api-key').style.display = isAksk ? 'none' : '';
   },
 
   applyModelConfig() {

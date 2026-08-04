@@ -13,6 +13,32 @@ function showToast(msg) {
   }, 2000);
 }
 
+// Convert any image data URL (webp/jpeg) to PNG via canvas.
+// Software-rendered Linux fails to paint WebP <img>, but canvas works.
+function convertToPng(dataUrl) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 200;
+          canvas.height = img.naturalHeight || 200;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (e) {
+          resolve(dataUrl); // fallback: keep original
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (e) {
+      resolve(dataUrl);
+    }
+  });
+}
+
 // --- Click-through management (transparent pet window) ---
 // Main process polls the cursor and sends 'cursor-state' (interactive/transparent/outside).
 // We just mirror it: interactive -> show hover buttons; outside -> hide.

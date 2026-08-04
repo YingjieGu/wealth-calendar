@@ -1,8 +1,45 @@
 // Multimodal pet animation: image -> animated video via Jimeng (Volcengine Seedance)
 // or Kling API. Task-based: create task -> poll -> download result mp4.
+// Jimeng supports both Bearer API Key and Volcengine V4 signature (AK/SK).
 const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+function sha256Hex(data) {
+  return crypto.createHash('sha256').update(data || '').digest('hex');
+}
+function hmac(key, data) {
+  return crypto.createHmac('sha256', key).update(data || '').digest();
+}
+
+// Volcengine V4 signature (like AWS SigV4)
+function volcSignV4({ method, url, headers, body, accessKeyId, secretAccessKey, region = 'cn-beijing', service = 'ark' }) {
+  const urlObj = new URL(url);
+  const canonicalUri = urlObj.pathname || '/';
+  const canonicalQuery = urlObj.search ? urlObj.search.slice(1) : '';
+  const host = urlObj.host;
+  const xDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const payloadHash = sha256Hex(body || '');
+  const contentType = headers['Content-Type'] || 'application/json';
+  const signedHeaders = ['content-type', 'host', 'x-content-sha256', 'x-date'].join(';');
+  const canonicalHeaders =
+    `content-type:${contentType}\n` +
+    `host:${host}\n` +
+    `x-content-sha256:${payloadHash}\n` +
+    `x-date:${xDate}\n`;
+  const canonicalRequest =
+    `${method}\n${canonicalUri}\n${canonicalQuery}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  const scope = `${xDate.slice(0, 8)}/${region}/${service}/request`;
+  const stringToSign = `HMAC-SHA256\n${xDate}\n${scope}\n${sha256Hex(canonicalRequest)}`;
+  const kDate = hmac(secretAccessKey, xDate.slice(0, 8));
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, 'request');
+  const signature = hmac(kSigning, stringToSign).toString('hex');
+  const authorization = `HMAC-SHA256 Credential=${accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return { authorization, xDate, payloadHash };
+}
 
 function petVideoPath() {
   return path.join(app.getPath('userData'), 'pet-animation.mp4');
@@ -18,6 +55,30 @@ function loadSettings() {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
   } catch (e) { /* ignore */ }
   return {};
+}
+
+// Build auth headers for jimeng (api key or ak/sk)
+function jimengAuthHeaders(url, method, body, mc) {
+  if (mc.authType === 'aksk' && mc.accessKeyId && mc.secretAccessKey) {
+    const { authorization, xDate, payloadHash } = volcSignV4({
+      method,
+      url,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : '',
+      accessKeyId: mc.accessKeyId,
+      secretAccessKey: mc.secretAccessKey,
+    });
+    return {
+      'Content-Type': 'application/json',
+      'x-date': xDate,
+      'x-content-sha256': payloadHash,
+      Authorization: authorization,
+    };
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${mc.apiKey || ''}`,
+  };
 }
 
 async function pollTask(url, headers, intervalMs, timeoutMs, extractDone) {
@@ -45,23 +106,21 @@ async function downloadVideo(url) {
 }
 
 // --- Jimeng / Volcengine Seedance (图生视频) ---
-async function generateWithJimeng(imageDataUrl, apiKey) {
+async function generateWithJimeng(imageDataUrl, mc) {
   const base = 'https://ark.cn-beijing.volces.com/api/v3';
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
+  const taskBody = {
+    model: 'doubao-seedance-1-0-pro-250528',
+    content: [
+      { type: 'image_url', image_url: { url: imageDataUrl } },
+      { type: 'text', text: '让画面中的角色动起来，做成可爱的桌面宠物动画，动作自然有趣，背景保持透明最好' },
+    ],
   };
-  // Create task (image-to-video)
-  const createRes = await fetch(`${base}/contents/generations/tasks`, {
+  // Create task
+  const createUrl = `${base}/contents/generations/tasks`;
+  const createRes = await fetch(createUrl, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: 'doubao-seedance-1-0-pro-250528',
-      content: [
-        { type: 'image_url', image_url: { url: imageDataUrl } },
-        { type: 'text', text: '让画面中的角色动起来，做成可爱的桌面宠物动画，动作自然有趣，背景保持透明最好' },
-      ],
-    }),
+    headers: jimengAuthHeaders(createUrl, 'POST', taskBody, mc),
+    body: JSON.stringify(taskBody),
   });
   const createJson = await createRes.json();
   if (!createRes.ok) {
@@ -70,9 +129,11 @@ async function generateWithJimeng(imageDataUrl, apiKey) {
   const taskId = createJson.id;
   if (!taskId) throw new Error('即梦未返回任务 ID');
 
+  // Poll
+  const pollUrl = `${base}/contents/generations/tasks/${taskId}`;
   const result = await pollTask(
-    `${base}/contents/generations/tasks/${taskId}`,
-    headers,
+    pollUrl,
+    jimengAuthHeaders(pollUrl, 'GET', null, mc),
     5000,
     300000,
     (j) => {
@@ -133,14 +194,16 @@ async function generatePetAnimation(imageDataUrl) {
   const settings = loadSettings();
   const mc = settings.multimodalConfig || {};
   const provider = mc.provider || 'jimeng';
-  const apiKey = mc.apiKey || '';
-  if (!apiKey) {
-    return { error: 'noApiKey', message: '请先在设置中配置多模态 API Key' };
+  const hasAuth = mc.authType === 'aksk'
+    ? !!(mc.accessKeyId && mc.secretAccessKey)
+    : !!(mc.apiKey);
+  if (!hasAuth) {
+    return { error: 'noApiKey', message: '请先在设置中配置多模态 API Key（或 AK/SK）' };
   }
   try {
     const p = provider === 'kling'
-      ? await generateWithKling(imageDataUrl, apiKey)
-      : await generateWithJimeng(imageDataUrl, apiKey);
+      ? await generateWithKling(imageDataUrl, mc.apiKey || '')
+      : await generateWithJimeng(imageDataUrl, mc);
     return { ok: true, path: p };
   } catch (e) {
     console.error('[multimodal] generate failed:', e.message);

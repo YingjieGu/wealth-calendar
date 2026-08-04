@@ -166,22 +166,22 @@ const PetState = {
 
     if (theme === 'custom') {
       // 优先 AI 生成的动画视频，其次上传图片，兜底 emoji
-      this.tryVideoPet().then((usedVideo) => {
+      this.tryVideoPet().then(async (usedVideo) => {
         if (usedVideo) return;
         img.style.display = 'block';
         emojiSpan.style.display = 'none';
         video.style.display = 'none';
         if (!img.src || img.dataset.customLoaded !== '1') {
-          window.wealthCalendar.loadCustomPetImage().then((dataUrl) => {
-            if (dataUrl) {
-              img.src = dataUrl;
-              img.dataset.customLoaded = '1';
-            } else {
-              img.style.display = 'none';
-              emojiSpan.style.display = 'block';
-              emojiSpan.textContent = '🐱';
-            }
-          });
+          const dataUrl = await window.wealthCalendar.loadCustomPetImage();
+          if (dataUrl) {
+            // webp/jpeg -> png (software-rendered Linux can't paint webp <img>)
+            img.src = await convertToPng(dataUrl);
+            img.dataset.customLoaded = '1';
+          } else {
+            img.style.display = 'none';
+            emojiSpan.style.display = 'block';
+            emojiSpan.textContent = '🐱';
+          }
         }
       });
       appEl.classList.add('theme-cat');

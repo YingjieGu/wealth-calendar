@@ -17,6 +17,11 @@ function showToast(msg) {
 // Main process polls the cursor and sends 'cursor-state' (interactive/transparent/outside).
 // We just mirror it: interactive -> show hover buttons; outside -> hide.
 (function setupClickThrough() {
+  // Tag platform for CSS (Windows can do true see-through pets)
+  try {
+    document.body.classList.add('platform-' + (window.wealthCalendar.platform || 'linux'));
+  } catch (e) { /* ignore */ }
+
   function panelOpen() {
     return (
       !document.getElementById('settings-panel').classList.contains('hidden') ||

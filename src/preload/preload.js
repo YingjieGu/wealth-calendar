@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('wealthCalendar', {
+  // Platform (win32/darwin/linux) for per-platform styling
+  platform: process.platform,
+
   // Custom window drag support
   moveWindow: (dx, dy) => ipcRenderer.send('move-window', { dx, dy }),
 

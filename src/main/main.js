@@ -423,7 +423,16 @@ function setupIPC() {
     try {
       if (fs.existsSync(CUSTOM_PET_PATH)) {
         const buf = fs.readFileSync(CUSTOM_PET_PATH);
-        return { dataUrl: `data:image/png;base64,${buf.toString('base64')}` };
+        // Detect real format by magic bytes (saved file may be webp/jpeg/png)
+        let mime = 'image/png';
+        if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+          mime = 'image/webp';
+        } else if (buf[0] === 0xff && buf[1] === 0xd8) {
+          mime = 'image/jpeg';
+        } else if (buf[0] === 0x89 && buf[1] === 0x50) {
+          mime = 'image/png';
+        }
+        return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
       }
     } catch (e) {
       console.error('[pet] load image failed:', e.message);
@@ -486,14 +495,27 @@ function setupIPC() {
       cursor.x >= b.x && cursor.x <= b.x + b.width &&
       cursor.y >= b.y && cursor.y <= b.y + b.height;
 
-    // No click-through: the whole translucent window is interactive
-    // (fully transparent windows render all-alpha-0 on some Linux setups).
-    let mode = inWin ? 'interactive' : 'outside';
-    if (panelOpen || isCalendarMode) mode = 'interactive';
+    let mode;
+    if (!inWin) {
+      mode = 'outside';
+    } else if (panelOpen || isCalendarMode) {
+      mode = 'interactive';
+    } else if (process.platform === 'win32') {
+      // Windows (DWM compositor): true see-through pet with interactive zones
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      const inCenter = Math.abs(cursor.x - cx) <= 82 && Math.abs(cursor.y - cy) <= 82;
+      const inBottom = cursor.y >= b.y + b.height - 60 && cursor.y <= b.y + b.height;
+      mode = inCenter || inBottom ? 'interactive' : 'transparent';
+    } else {
+      // Linux/macOS software rendering: whole window interactive
+      mode = 'interactive';
+    }
 
-    if (currentClickThrough !== false) {
-      currentClickThrough = false;
-      mainWindow.setIgnoreMouseEvents(false);
+    const clickThrough = process.platform === 'win32' ? mode !== 'interactive' : false;
+    if (clickThrough !== currentClickThrough) {
+      currentClickThrough = clickThrough;
+      mainWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
     }
     if (mode !== lastSentMode) {
       lastSentMode = mode;

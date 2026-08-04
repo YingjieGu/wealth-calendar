@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>财神日历</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Pet area -->
+    <div id="pet-stage">
+      <div id="pet" class="theme-cat">🐱</div>
+      <div id="pet-zzz">💤</div>
+    </div>
+
+    <!-- Hover buttons -->
+    <div id="hover-buttons">
+      <button id="btn-chat" title="对话" class="hover-btn">💬</button>
+      <button id="btn-calendar" title="日历" class="hover-btn">📅</button>
+      <button id="btn-settings" title="设置" class="hover-btn">⚙️</button>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel" class="hidden">
+      <div class="settings-header">
+        <span>⚙️ 设置</span>
+        <button id="btn-close-settings" class="close-btn">✕</button>
+      </div>
+      <div class="settings-body">
+        <!-- Theme -->
+        <div class="setting-group">
+          <label>主题</label>
+          <div class="setting-options" id="theme-options">
+            <button class="theme-option active" data-theme="cat">🐱 萌宠</button>
+            <button class="theme-option" data-theme="fortune">🧧 财神</button>
+          </div>
+        </div>
+
+        <!-- Activity -->
+        <div class="setting-group">
+          <label>活跃度</label>
+          <div class="setting-options" id="activity-options">
+            <button class="activity-option active" data-activity="active">🐾 活跃</button>
+            <button class="activity-option" data-activity="quiet">😴 安静</button>
+          </div>
+        </div>
+
+        <!-- Restore position -->
+        <div class="setting-group">
+          <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
+        </div>
+
+        <!-- Placeholder sections -->
+        <div class="setting-group placeholder-section">
+          <label>用户信息</label>
+          <p class="placeholder-text">八字、星座等个人设置（开发中）</p>
+        </div>
+        <div class="setting-group placeholder-section">
+          <label>模型设置</label>
+          <p class="placeholder-text">AI 模型配置（开发中）</p>
+        </div>
+        <div class="setting-group placeholder-section">
+          <label>唤醒口令</label>
+          <p class="placeholder-text">语音唤醒设置（开发中）</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast message -->
+    <div id="toast" class="hidden">开发中...</div>
+  </div>
+
+  <script src="pet.js"></script>
+  <script src="settings.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

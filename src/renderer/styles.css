@@ -1,0 +1,307 @@
+/* ===== Reset & base ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 220px;
+  height: 260px;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ===== App container ===== */
+#app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: 16px;
+  background: rgba(20, 20, 20, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* ===== Pet stage ===== */
+#pet-stage {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#pet {
+  font-size: 64px;
+  position: absolute;
+  transition: left 0.8s ease-in-out, top 0.3s ease;
+  cursor: grab;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+  will-change: left, top, transform;
+}
+
+#pet:active {
+  cursor: grabbing;
+}
+
+/* Pet idle breathing */
+#pet.idle {
+  animation: breathe 2.5s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.08); }
+}
+
+/* Pet sleeping Zzz */
+#pet-zzz {
+  font-size: 20px;
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  top: 20px;
+  right: 50px;
+  animation: none;
+}
+
+#pet-zzz.show {
+  opacity: 1;
+  animation: floatZzz 2s ease-in-out infinite;
+}
+
+@keyframes floatZzz {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(-8px); opacity: 1; }
+}
+
+/* ===== Theme colors ===== */
+#app.theme-cat {
+  background: rgba(40, 30, 50, 0.7);
+}
+
+#app.theme-fortune {
+  background: rgba(80, 20, 20, 0.7);
+}
+
+/* ===== Hover buttons ===== */
+#hover-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0 12px 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+#hover-buttons.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hover-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s;
+  outline: none;
+  line-height: 1;
+}
+
+.hover-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.15);
+}
+
+.hover-btn:active {
+  transform: scale(0.95);
+}
+
+/* ===== Settings panel ===== */
+#settings-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(18, 18, 24, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  transform: scale(1);
+  z-index: 10;
+}
+
+#settings-panel.hidden {
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: #eee;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.close-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255,80,80,0.4);
+  color: #fff;
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.setting-group {
+  margin-bottom: 14px;
+}
+
+.setting-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #aaa;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-options {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-option,
+.activity-option {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #bbb;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.theme-option.active,
+.activity-option.active {
+  background: rgba(100, 140, 255, 0.3);
+  border-color: rgba(100, 140, 255, 0.6);
+  color: #fff;
+}
+
+.theme-option:hover,
+.activity-option:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.action-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #bbb;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+
+.placeholder-section {
+  opacity: 0.5;
+}
+
+.placeholder-text {
+  font-size: 11px;
+  color: #777;
+  font-style: italic;
+}
+
+/* ===== Scrollbar styling ===== */
+.settings-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.settings-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+/* ===== Toast ===== */
+#toast {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#toast.hidden {
+  opacity: 0;
+}

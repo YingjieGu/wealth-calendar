@@ -1,13 +1,9 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage } = require('electron');
 
-// This Linux dev box has a broken GPU stack (viz_main_impl: Exiting GPU process,
-// SharedImage creation fails) which silently drops ALL bitmap painting
-// (<img>/<canvas>/background-image/video). Force pure software compositing so
-// pet images actually render. Harmless on healthy machines (just uses CPU).
+// Software rendering keeps the internal render buffer healthy on this box
+// (without it capturePage turns black). Screen presentation is validated
+// separately (xwd / ffmpeg x11grab) — see git history for the rabbit hole.
 app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('enable-features', 'UseSoftwareCompositor');
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');
@@ -73,10 +69,11 @@ function createWindow() {
     width: PET_WIDTH,
     height: PET_HEIGHT,
     frame: false,
-    // transparent:false — no X11 compositor + broken GPU on this box means
-    // ARGB windows never reach the screen (black/empty window despite content
-    // rendering, proven via xwd). Same issue on the user's Win11 box.
+    // Solid window with opaque background: content paints directly to screen
+    // without relying on any compositor. Transparent windows never reached the
+    // screen on this box (KWin + broken GPU), verified via ffmpeg x11grab.
     transparent: false,
+    backgroundColor: '#1a142e',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,

@@ -114,15 +114,6 @@ function convertToPng(dataUrl) {
       window.wealthCalendar.saveWindowPosition();
     }
   });
-
-  // Safety: if the mouse is released outside the window (drag interrupted),
-  // reset dragging state so the window never gets stuck following the cursor.
-  window.addEventListener('blur', () => {
-    if (isDragging) {
-      isDragging = false;
-      stage.style.cursor = '';
-    }
-  });
 })();
 
 // --- Settings toggle ---

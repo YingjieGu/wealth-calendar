@@ -139,7 +139,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
         temperature: 0.8,
         // v4 series are reasoning models: reasoning_content also consumes tokens,
         // so keep a generous budget or content may come back empty/truncated.
-        max_tokens: 8000,
+        max_tokens: 16000,
         messages: [
           {
             role: 'system',
@@ -213,13 +213,33 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   let source = 'template';
   if (modelConfig.llmApiKey && paipanOk && almanacOk) {
     try {
+      // Compact prompt: keep essential bazi/chart fields to limit reasoning cost
+      const compactPaipan = paipanData.data ? {
+        pillars: paipanData.data.pillars,
+        dayMaster: paipanData.data.dayMaster,
+        wuXingCount: paipanData.data.wuXingCount,
+        qiYunAge: paipanData.data.qiYunAge,
+        daYun: (paipanData.data.daYun || []).slice(0, 5),
+      } : {};
+      const chartData = chart.data || {};
+      const compactChart = {
+        planets: Object.fromEntries(
+          Object.entries(chartData.planets || {}).map(([k, v]) => [k, { sign: v.sign, degree: v.degree, label: v.label, planetLabel: v.planetLabel }])
+        ),
+        ascendant: chartData.ascendant,
+        aspects: chartData.aspects,
+      };
       const userPrompt =
         `日期：${todayKey}\n` +
-        `用户八字排盘：\n${JSON.stringify(paipanData.data, null, 2)}\n` +
-        `用户星盘：\n${JSON.stringify((chart.data || {}), null, 2)}\n` +
+        `用户八字排盘：\n${JSON.stringify(compactPaipan, null, 2)}\n` +
+        `用户星盘：\n${JSON.stringify(compactChart, null, 2)}\n` +
         `当日黄历：\n${JSON.stringify(almanac.data, null, 2)}\n` +
         `请按系统要求输出当日运势 JSON。`;
-      fortune = await callLLM(modelConfig, userPrompt);
+      fortune = await callLLM({
+        apiKey: modelConfig.llmApiKey,
+        baseUrl: modelConfig.llmBaseUrl,
+        model: modelConfig.llmModel,
+      }, userPrompt);
       source = 'llm';
       fortune = normalizeFortune(fortune, todayKey);
     } catch (e) {

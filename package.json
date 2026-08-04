@@ -45,5 +45,8 @@
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "财神日历"
     }
+  },
+  "dependencies": {
+    "lunar-javascript": "^1.7.7"
   }
 }

@@ -179,6 +179,38 @@ const SettingsManager = {
     });
 
     this.applyModelStatus();
+
+    // Calendar mode
+    this.applyCalendarMode();
+    document.querySelectorAll('#calendar-mode-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const mode = btn.dataset.mode;
+        this.settings.calendarMode = mode;
+        document.querySelectorAll('#calendar-mode-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        if (mode === 'wallpaper') {
+          await window.wealthCalendar.applyWallpaper();
+          await window.wealthCalendar.setWallpaperAutoRefresh(true);
+          showToast('🖼️ 桌面背景日历已应用');
+        } else {
+          await window.wealthCalendar.setWallpaperAutoRefresh(false);
+          showToast('🪟 已切换为悬浮日历');
+        }
+      });
+    });
+    document.getElementById('btn-apply-wallpaper').addEventListener('click', async () => {
+      const r = await window.wealthCalendar.applyWallpaper();
+      showToast(r && r.ok ? '🖼️ 壁纸已更新' : '❌ 壁纸生成失败');
+    });
+  },
+
+  applyCalendarMode() {
+    const mode = this.settings.calendarMode || 'floating';
+    document.querySelectorAll('#calendar-mode-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
   },
 
   applyModelConfig() {

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    background: linear-gradient(135deg, #0b1026 0%, #1a1440 55%, #2a1a2e 100%);
+    color: #eee;
+    user-select: none;
+  }
+  #wallpaper {
+    width: 100%; height: 100%;
+    padding: 4vh 5vw;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  #wallpaper::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(255,215,0,0.10), transparent 32%),
+      radial-gradient(circle at 85% 80%, rgba(255,215,0,0.08), transparent 30%);
+    pointer-events: none;
+  }
+  .wp-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 3vh;
+  }
+  .wp-date-block { display: flex; align-items: baseline; gap: 2vw; }
+  .wp-date { font-size: 9vh; font-weight: 800; color: #ffd700; line-height: 1; text-shadow: 0 4px 24px rgba(255,215,0,0.3); }
+  .wp-date-sub { font-size: 2.6vh; color: #cbd0e8; }
+  .wp-lunar { font-size: 2.4vh; color: #9aa3c7; text-align: right; line-height: 1.7; }
+  .wp-lunar b { color: #ffd700; }
+  .wp-body {
+    flex: 1;
+    display: flex;
+    gap: 3vw;
+    min-height: 0;
+  }
+  .wp-panel {
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,215,0,0.18);
+    border-radius: 1.6vh;
+    padding: 2.4vh 1.8vw;
+    backdrop-filter: blur(4px);
+  }
+  .wp-panel h3 {
+    font-size: 2.2vh;
+    color: #ffd700;
+    margin-bottom: 1.6vh;
+    letter-spacing: 0.3em;
+  }
+  .wp-almanac { width: 34%; }
+  .wp-schedules { flex: 1; }
+  .wp-sched-empty { color: #6a7294; font-size: 2vh; margin-top: 2vh; }
+  .wp-sched-item {
+    display: flex; align-items: center; gap: 1vw;
+    padding: 1.1vh 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 2.2vh;
+  }
+  .wp-sched-time { color: #ffd700; font-weight: 700; min-width: 7vw; }
+  .wp-sched-title { color: #e8eaf6; }
+  .wp-yi-ji { font-size: 2.1vh; color: #b9c0dd; line-height: 1.8; }
+  .wp-yi-ji b { color: #7ee2a8; }
+  .wp-yi-ji .ji b { color: #ff9d9d; }
+  .wp-fortune {
+    margin-top: 2.6vh;
+    padding: 1.8vh 1.6vw;
+    background: rgba(255,215,0,0.07);
+    border: 1px solid rgba(255,215,0,0.25);
+    border-radius: 1.4vh;
+    font-size: 2.2vh;
+    color: #ffe9a8;
+    display: flex;
+    align-items: center;
+    gap: 1.2vw;
+  }
+  .wp-fortune .score {
+    font-size: 3.4vh;
+    font-weight: 800;
+    color: #ffd700;
+  }
+  .wp-footer {
+    margin-top: 1.6vh;
+    font-size: 1.7vh;
+    color: #5a6286;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+  <div id="wallpaper">
+    <div class="wp-top">
+      <div class="wp-date-block">
+        <span class="wp-date" id="wp-date">8月4日</span>
+        <span class="wp-date-sub" id="wp-weekday">星期二</span>
+      </div>
+      <div class="wp-lunar" id="wp-lunar"></div>
+    </div>
+    <div class="wp-body">
+      <div class="wp-panel wp-almanac">
+        <h3>今日黄历</h3>
+        <div class="wp-yi-ji" id="wp-yiji"></div>
+      </div>
+      <div class="wp-panel wp-schedules">
+        <h3>今日行程</h3>
+        <div id="wp-sched-list"></div>
+        <div class="wp-fortune" id="wp-fortune"></div>
+      </div>
+    </div>
+    <div class="wp-footer">财神日历 Wealth Calendar · 每日运势 仅供参考</div>
+  </div>
+
+<script>
+  const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+  const MONTHS_CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+
+  window.__renderWallpaper = function (data) {
+    const { dateStr, schedules, fortune } = data;
+    const d = new Date(dateStr + 'T12:00:00');
+
+    document.getElementById('wp-date').textContent = `${d.getMonth() + 1}月${d.getDate()}日`;
+    document.getElementById('wp-weekday').textContent = `星期${WEEKDAYS[d.getDay()]}`;
+
+    // Lunar / almanac
+    const lunarEl = document.getElementById('wp-lunar');
+    const yijiEl = document.getElementById('wp-yiji');
+    if (fortune && fortune.almanac) {
+      const al = fortune.almanac;
+      const lunar = al.lunar || {};
+      let lunarHtml = '';
+      if (lunar.yearGanZhi) lunarHtml += `<b>${lunar.yearGanZhi}</b>年 · `;
+      if (lunar.monthGanZhi) lunarHtml += `${lunar.monthGanZhi}月 `;
+      if (lunar.dayGanZhi) lunarHtml += `${lunar.dayGanZhi}日`;
+      if (lunar.day) lunarHtml += `（农历${MONTHS_CN[lunar.month] || ''}月${lunar.day}）`;
+      lunarEl.innerHTML = lunarHtml || '';
+
+      const yi = (al.yi || []).slice(0, 4).join('、');
+      const ji = (al.ji || []).slice(0, 4).join('、');
+      yijiEl.innerHTML =
+        `<b>宜</b> ${yi || '诸事可行'}<br>` +
+        `<span class="ji"><b>忌</b> ${ji || '无'}</span>` +
+        (al.direction && al.direction.caiShenDesc ? `<br>💰 财神方位：${al.direction.caiShenDesc}` : '');
+    } else {
+      yijiEl.innerHTML = '黄历数据加载中…';
+    }
+
+    // Schedules
+    const schedEl = document.getElementById('wp-sched-list');
+    schedEl.innerHTML = '';
+    const list = (schedules || []).filter((s) => s.date === dateStr);
+    if (list.length === 0) {
+      schedEl.innerHTML = '<div class="wp-sched-empty">今天没有安排，享受从容的一天吧 ✨</div>';
+    } else {
+      list.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+      for (const s of list) {
+        const item = document.createElement('div');
+        item.className = 'wp-sched-item';
+        item.innerHTML = `<span class="wp-sched-time">${s.time || '全天'}</span><span class="wp-sched-title">${escapeHtml(s.title)}</span>`;
+        schedEl.appendChild(item);
+      }
+    }
+
+    // Fortune summary
+    const fortEl = document.getElementById('wp-fortune');
+    if (fortune && fortune.data) {
+      const f = fortune.data;
+      const line = (f.reminderLines && f.reminderLines[0]) || `${f.dimensions.wealth.summary}`;
+      fortEl.innerHTML = `<span class="score">${f.overall}</span><span>${escapeHtml(line)}</span>`;
+    } else {
+      fortEl.style.display = 'none';
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+  };
+</script>
+</body>
+</html>

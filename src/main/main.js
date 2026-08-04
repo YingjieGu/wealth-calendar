@@ -7,6 +7,7 @@ const { startReminder, stopReminder } = require('./reminder');
 const sidecar = require('./sidecar');
 const fortuneEngine = require('./fortuneEngine');
 const chatEngine = require('./chatEngine');
+const wallpaper = require('./wallpaper');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -420,6 +421,45 @@ function setupIPC() {
     }
     return { dataUrl: null };
   });
+
+  // --- Wallpaper calendar ---
+  const buildWallpaperPayload = async (dateStr) => {
+    const today = dateStr || new Date().toISOString().slice(0, 10);
+    const schedules = calendarStore.listByDate(today);
+    const fortune = await fortuneEngine.getDailyFortune(today, false, {
+      requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
+    });
+    let almanac = null;
+    try {
+      const r = await sidecar.requestSidecar('GET', `/almanac/today?date=${encodeURIComponent(today)}`);
+      almanac = r.data;
+    } catch (e) { /* optional */ }
+    return {
+      dateStr: today,
+      schedules,
+      fortune: { data: fortune.data || null, almanac },
+    };
+  };
+
+  ipcMain.handle('wallpaper:apply', async () => {
+    const payload = await buildWallpaperPayload();
+    const result = await wallpaper.applyWallpaper(payload);
+    if (result.ok) {
+      const settings = loadSettings();
+      settings.calendarMode = 'wallpaper';
+      saveSettings(settings);
+    }
+    return result;
+  });
+
+  ipcMain.handle('wallpaper:refresh-timer', (_event, enabled) => {
+    if (enabled) {
+      wallpaper.startAutoRefresh(() => buildWallpaperPayload());
+    } else {
+      wallpaper.stopAutoRefresh();
+    }
+    return { ok: true };
+  });
 }
 
 // --- App lifecycle ---
@@ -439,7 +479,45 @@ app.whenReady().then(() => {
       fortuneEngine.maybeSendStartupFortune(mainWindow, (d, f) =>
         fortuneEngine.getDailyFortune(d, f, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) })
       );
-    }
+
+      // Apply wallpaper calendar mode if previously enabled
+      const settings = loadSettings();
+      if (settings.calendarMode === 'wallpaper') {
+        setTimeout(async () => {
+          try {
+            const payload = await (async () => {
+              const today = new Date().toISOString().slice(0, 10);
+              const schedules = calendarStore.listByDate(today);
+              const fortune = await fortuneEngine.getDailyFortune(today, false, {
+                requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
+              });
+              let almanac = null;
+              try {
+                const r = await sidecar.requestSidecar('GET', `/almanac/today?date=${today}`);
+                almanac = r.data;
+              } catch (e) { /* optional */ }
+              return { dateStr: today, schedules, fortune: { data: fortune.data || null, almanac } };
+            })();
+            await wallpaper.applyWallpaper(payload);
+            wallpaper.startAutoRefresh(async () => {
+              const t = new Date().toISOString().slice(0, 10);
+              const s = calendarStore.listByDate(t);
+              const f = await fortuneEngine.getDailyFortune(t, false, {
+                requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
+              });
+              let alm = null;
+              try {
+                const r = await sidecar.requestSidecar('GET', `/almanac/today?date=${t}`);
+                alm = r.data;
+              } catch (e) { /* optional */ }
+              return { dateStr: t, schedules: s, fortune: { data: f.data || null, almanac: alm } };
+            });
+          } catch (e) {
+            console.error('[main] wallpaper startup failed:', e.message);
+          }
+        }, 8000);
+      }
+  }
   });
 });
 

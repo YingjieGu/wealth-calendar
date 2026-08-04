@@ -1,4 +1,5 @@
-// Main renderer logic: custom drag, hover buttons, settings toggle, toast
+// Main renderer logic: custom drag, hover buttons, settings toggle, toast,
+// calendar integration, reminder bubble
 
 // --- Toast helper ---
 let toastTimer = null;
@@ -16,17 +17,19 @@ function showToast(msg) {
 (function setupDrag() {
   const app = document.getElementById('app');
   let isDragging = false;
-  let startX = 0;
-  let startY = 0;
   let lastX = 0;
   let lastY = 0;
 
   app.addEventListener('mousedown', (e) => {
-    // Don't drag when clicking buttons or settings
-    if (e.target.closest('button') || e.target.closest('#settings-panel')) return;
+    // Don't drag when clicking buttons, inputs, or settings/calendar panels
+    if (e.target.closest('button') ||
+        e.target.closest('input') ||
+        e.target.closest('textarea') ||
+        e.target.closest('#settings-panel') ||
+        e.target.closest('#schedule-detail') ||
+        e.target.closest('#schedule-form-modal') ||
+        e.target.closest('.cal-cell')) return;
     isDragging = true;
-    startX = e.screenX;
-    startY = e.screenY;
     lastX = e.screenX;
     lastY = e.screenY;
     app.style.cursor = 'grabbing';
@@ -42,7 +45,6 @@ function showToast(msg) {
 
     if (dx !== 0 || dy !== 0) {
       window.wealthCalendar.moveWindow(dx, dy);
-      // Keep pet animations running smoothly during drag by preventing text selection
     }
   });
 
@@ -61,77 +63,63 @@ function showToast(msg) {
   const hoverButtons = document.getElementById('hover-buttons');
   let hoverTimeout = null;
 
-  // Show buttons on mousemove within window
   app.addEventListener('mousemove', () => {
     hoverButtons.classList.add('visible');
     if (hoverTimeout) clearTimeout(hoverTimeout);
-    // Keep visible for 1.5s after last movement
     hoverTimeout = setTimeout(() => {
-      // Only hide if mouse is not over buttons
-      if (!hoverButtons.matches(':hover')) {
-        hoverButtons.classList.remove('visible');
-      }
-    }, 1500);
-  });
-
-  // Hide immediately on mouse leave
-  app.addEventListener('mouseleave', () => {
-    hoverButtons.classList.remove('visible');
-  });
-
-  // Keep visible when hovering over buttons
-  hoverButtons.addEventListener('mouseenter', () => {
-    hoverButtons.classList.add('visible');
-    if (hoverTimeout) clearTimeout(hoverTimeout);
-  });
-
-  hoverButtons.addEventListener('mouseleave', () => {
-    hoverButtons.classList.remove('visible');
-  });
-
-  // Button actions
-  document.getElementById('btn-chat').addEventListener('click', (e) => {
-    e.stopPropagation();
-    showToast('💬 对话 — 开发中...');
-  });
-
-  document.getElementById('btn-calendar').addEventListener('click', (e) => {
-    e.stopPropagation();
-    showToast('📅 日历 — 开发中...');
-  });
-
-  document.getElementById('btn-settings').addEventListener('click', (e) => {
-    e.stopPropagation();
-    openSettings();
+      hoverButtons.classList.remove('visible');
+    }, 2000);
   });
 })();
 
-// --- Settings panel toggle ---
-function openSettings() {
-  document.getElementById('settings-panel').classList.remove('hidden');
-}
+// --- Settings toggle ---
+(function setupSettingsToggle() {
+  const btnSettings = document.getElementById('btn-settings');
+  const btnClose = document.getElementById('btn-close-settings');
+  const panel = document.getElementById('settings-panel');
+  const hoverButtons = document.getElementById('hover-buttons');
 
-function closeSettings() {
-  document.getElementById('settings-panel').classList.add('hidden');
-}
+  btnSettings.addEventListener('click', () => {
+    panel.classList.remove('hidden');
+    hoverButtons.classList.add('hidden');
+  });
 
-document.getElementById('btn-close-settings').addEventListener('click', () => {
-  closeSettings();
-});
+  btnClose.addEventListener('click', () => {
+    panel.classList.add('hidden');
+  });
+})();
 
-// Click outside settings to close
-document.getElementById('settings-panel').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('settings-panel')) {
-    closeSettings();
-  }
-});
+// --- Calendar toggle ---
+(function setupCalendarButton() {
+  const btnCalendar = document.getElementById('btn-calendar');
 
-// --- Initialization ---
-async function init() {
-  // NOTE: PetState.start() must run BEFORE SettingsManager.init() because
-  // applyAll() → PetState.setTheme()/setActivity() need this.petEl to exist.
+  btnCalendar.addEventListener('click', async () => {
+    await window.wealthCalendar.openCalendar();
+    CalendarView.open();
+  });
+})();
+
+// --- Reminder listener ---
+(function setupReminderListener() {
+  let bubbleTimer = null;
+  const bubble = document.getElementById('reminder-bubble');
+  const bubbleText = document.getElementById('reminder-bubble-text');
+
+  window.wealthCalendar.onScheduleReminder((schedule) => {
+    const timeStr = schedule.time ? ` ${schedule.time}` : '';
+    bubbleText.textContent = `🔔 ${schedule.title}${timeStr}`;
+    bubble.classList.remove('hidden');
+
+    if (bubbleTimer) clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => {
+      bubble.classList.add('hidden');
+    }, 5000);
+  });
+})();
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
   PetState.start();
-  await SettingsManager.init();
-}
-
-init();
+  SettingsManager.init();
+  CalendarView.init();
+});

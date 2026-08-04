@@ -8,70 +8,135 @@
 </head>
 <body>
   <div id="app">
-    <!-- Pet area -->
-    <div id="pet-stage">
-      <div id="pet" class="theme-cat">🐱</div>
-      <div id="pet-zzz">💤</div>
-    </div>
-
-    <!-- Hover buttons -->
-    <div id="hover-buttons">
-      <button id="btn-chat" title="对话" class="hover-btn">💬</button>
-      <button id="btn-calendar" title="日历" class="hover-btn">📅</button>
-      <button id="btn-settings" title="设置" class="hover-btn">⚙️</button>
-    </div>
-
-    <!-- Settings panel -->
-    <div id="settings-panel" class="hidden">
-      <div class="settings-header">
-        <span>⚙️ 设置</span>
-        <button id="btn-close-settings" class="close-btn">✕</button>
+    <!-- ==================== Pet View ==================== -->
+    <div id="pet-view">
+      <div id="pet-stage">
+        <div id="pet" class="theme-cat">🐱</div>
+        <div id="pet-zzz">💤</div>
       </div>
-      <div class="settings-body">
-        <!-- Theme -->
-        <div class="setting-group">
-          <label>主题</label>
-          <div class="setting-options" id="theme-options">
-            <button class="theme-option active" data-theme="cat">🐱 萌宠</button>
-            <button class="theme-option" data-theme="fortune">🧧 财神</button>
+
+      <!-- Reminder speech bubble -->
+      <div id="reminder-bubble" class="hidden">
+        <div id="reminder-bubble-text"></div>
+      </div>
+
+      <!-- Hover buttons -->
+      <div id="hover-buttons">
+        <button id="btn-chat" title="对话" class="hover-btn">💬</button>
+        <button id="btn-calendar" title="日历" class="hover-btn">📅</button>
+        <button id="btn-settings" title="设置" class="hover-btn">⚙️</button>
+      </div>
+
+      <!-- Settings panel -->
+      <div id="settings-panel" class="hidden">
+        <div class="settings-header">
+          <span>⚙️ 设置</span>
+          <button id="btn-close-settings" class="close-btn">✕</button>
+        </div>
+        <div class="settings-body">
+          <div class="setting-group">
+            <label>主题</label>
+            <div class="setting-options" id="theme-options">
+              <button class="theme-option active" data-theme="cat">🐱 萌宠</button>
+              <button class="theme-option" data-theme="fortune">🧧 财神</button>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <label>活跃度</label>
+            <div class="setting-options" id="activity-options">
+              <button class="activity-option active" data-activity="active">🐾 活跃</button>
+              <button class="activity-option" data-activity="quiet">😴 安静</button>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
+          </div>
+
+          <div class="setting-group placeholder-section">
+            <label>用户信息</label>
+            <p class="placeholder-text">（M2 实现）</p>
+          </div>
+          <div class="setting-group placeholder-section">
+            <label>AI 命理</label>
+            <p class="placeholder-text">（M2 实现）</p>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Activity -->
-        <div class="setting-group">
-          <label>活跃度</label>
-          <div class="setting-options" id="activity-options">
-            <button class="activity-option active" data-activity="active">🐾 活跃</button>
-            <button class="activity-option" data-activity="quiet">😴 安静</button>
-          </div>
-        </div>
+    <!-- ==================== Calendar View ==================== -->
+    <div id="calendar-view" style="display:none;">
+      <div class="cal-header">
+        <button id="btn-calendar-close" class="close-btn" title="关闭日历">✕</button>
+        <button id="btn-prev-month">◀</button>
+        <span id="cal-month-label">2026年8月</span>
+        <button id="btn-next-month">▶</button>
+        <button id="btn-today">今天</button>
+      </div>
 
-        <!-- Restore position -->
-        <div class="setting-group">
-          <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
-        </div>
+      <div class="cal-weekdays">
+        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+      </div>
 
-        <!-- Placeholder sections -->
-        <div class="setting-group placeholder-section">
-          <label>用户信息</label>
-          <p class="placeholder-text">八字、星座等个人设置（开发中）</p>
+      <div id="calendar-grid" class="cal-grid">
+        <!-- dynamically filled -->
+      </div>
+
+      <!-- Schedule detail panel (bottom) -->
+      <div id="schedule-detail" class="hidden">
+        <div class="detail-header">
+          <span id="detail-date-label">2026-08-04</span>
+          <button id="btn-close-detail" class="close-btn">✕</button>
         </div>
-        <div class="setting-group placeholder-section">
-          <label>模型设置</label>
-          <p class="placeholder-text">AI 模型配置（开发中）</p>
-        </div>
-        <div class="setting-group placeholder-section">
-          <label>唤醒口令</label>
-          <p class="placeholder-text">语音唤醒设置（开发中）</p>
+        <div id="detail-almanac" class="detail-almanac"></div>
+        <div id="schedule-list" class="schedule-list"></div>
+        <button id="btn-add-schedule" class="action-btn">＋ 添加日程</button>
+      </div>
+    </div>
+
+    <!-- ==================== Schedule Form Modal ==================== -->
+    <div id="schedule-form-modal" class="hidden">
+      <div class="modal-backdrop">
+        <div class="modal-content">
+          <h3 id="form-title">添加日程</h3>
+          <form id="schedule-form">
+            <div class="form-group">
+              <label>标题 *</label>
+              <input type="text" id="form-schedule-title" required placeholder="日程标题">
+            </div>
+            <div class="form-group">
+              <label>日期</label>
+              <input type="date" id="form-schedule-date" required>
+            </div>
+            <div class="form-group">
+              <label>时间（可选）</label>
+              <input type="time" id="form-schedule-time">
+            </div>
+            <div class="form-group">
+              <label>提前提醒（分钟）</label>
+              <input type="number" id="form-schedule-remind" min="0" placeholder="0 = 准时提醒">
+            </div>
+            <div class="form-group">
+              <label>备注</label>
+              <textarea id="form-schedule-note" rows="2" placeholder="备注内容"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-cancel-form" class="action-btn">取消</button>
+              <button type="submit" class="action-btn primary">保存</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
 
-    <!-- Toast message -->
-    <div id="toast" class="hidden">开发中...</div>
+    <!-- Toast -->
+    <div id="toast" class="hidden"></div>
   </div>
 
   <script src="pet.js"></script>
+  <script src="calendar.js"></script>
   <script src="settings.js"></script>
   <script src="renderer.js"></script>
 </body>

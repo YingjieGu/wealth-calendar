@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "lunar-javascript": "^1.7.7"
   }
 }

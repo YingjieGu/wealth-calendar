@@ -2,10 +2,21 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');
+const calendarStore = require('./calendarStore');
+const { startReminder, stopReminder } = require('./reminder');
+
+// lunar-javascript (runs in main process)
+const { Solar } = require('lunar-javascript');
 
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let isCalendarMode = false;
+
+const PET_WIDTH = 220;
+const PET_HEIGHT = 260;
+const CAL_WIDTH = 420;
+const CAL_HEIGHT = 560;
 
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
 
@@ -29,6 +40,15 @@ function saveSettings(settings) {
   }
 }
 
+function centerWindow(win, width, height) {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+  return {
+    x: Math.round((screenW - width) / 2),
+    y: Math.round((screenH - height) / 2),
+  };
+}
+
 // --- Create the main transparent floating window ---
 function createWindow() {
   const saved = loadSettings();
@@ -36,8 +56,8 @@ function createWindow() {
   const savedY = saved.windowY;
 
   const windowOptions = {
-    width: 220,
-    height: 260,
+    width: PET_WIDTH,
+    height: PET_HEIGHT,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -52,32 +72,30 @@ function createWindow() {
     },
   };
 
-  // Restore saved position if available
   if (typeof savedX === 'number' && typeof savedY === 'number') {
     windowOptions.x = savedX;
     windowOptions.y = savedY;
   } else {
-    // Default: center of primary display
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
-    windowOptions.x = Math.round((screenW - 220) / 2);
-    windowOptions.y = Math.round((screenH - 260) / 2);
+    const pos = centerWindow(null, PET_WIDTH, PET_HEIGHT);
+    windowOptions.x = pos.x;
+    windowOptions.y = pos.y;
   }
 
   mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  // Save window position when moving stops
   let moveTimeout = null;
   mainWindow.on('move', () => {
     if (moveTimeout) clearTimeout(moveTimeout);
     moveTimeout = setTimeout(() => {
-      const [x, y] = mainWindow.getPosition();
-      const settings = loadSettings();
-      settings.windowX = x;
-      settings.windowY = y;
-      saveSettings(settings);
+      if (!isCalendarMode) {
+        const [x, y] = mainWindow.getPosition();
+        const settings = loadSettings();
+        settings.windowX = x;
+        settings.windowY = y;
+        saveSettings(settings);
+      }
     }, 500);
   });
 
@@ -85,7 +103,6 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Prevent the window from being closed, just hide it (unless quitting)
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -94,9 +111,34 @@ function createWindow() {
   });
 }
 
+// --- Lunar data helpers ---
+function getDateLunarInfo(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  try {
+    const solar = Solar.fromYmd(y, m, d);
+    const lunar = solar.getLunar();
+    const festivals = lunar.getFestivals() || [];
+    const solarFestivals = solar.getFestivals() || [];
+    const combined = [...festivals, ...solarFestivals];
+    return {
+      lunarYear: lunar.getYear(),
+      lunarMonth: lunar.getMonth(),
+      lunarDay: lunar.getDayInChinese(),
+      jieQi: lunar.getJieQi() || '',
+      yi: lunar.getDayYi() || [],
+      ji: lunar.getDayJi() || [],
+      festivals: combined,
+      festival: combined.length > 0 ? combined[0] : '',
+    };
+  } catch (e) {
+    console.error('Lunar error for', dateStr, e);
+    return { lunarDay: '', jieQi: '', yi: [], ji: [], festivals: [], solarFestivals: [] };
+  }
+}
+
 // --- IPC handlers ---
 function setupIPC() {
-  // Move window by delta (for custom drag)
+  // Move window by delta
   ipcMain.on('move-window', (_event, { dx, dy }) => {
     if (mainWindow) {
       const [x, y] = mainWindow.getPosition();
@@ -104,22 +146,17 @@ function setupIPC() {
     }
   });
 
-  // Save settings from renderer
+  // Settings
   ipcMain.handle('save-settings', (_event, settings) => {
     const current = loadSettings();
-    const merged = { ...current, ...settings };
-    saveSettings(merged);
+    saveSettings({ ...current, ...settings });
     return { success: true };
   });
 
-  // Load settings for renderer
-  ipcMain.handle('load-settings', () => {
-    return loadSettings();
-  });
+  ipcMain.handle('load-settings', () => loadSettings());
 
-  // Force-save current window position
   ipcMain.on('save-window-position', () => {
-    if (mainWindow) {
+    if (mainWindow && !isCalendarMode) {
       const [x, y] = mainWindow.getPosition();
       const settings = loadSettings();
       settings.windowX = x;
@@ -128,20 +165,16 @@ function setupIPC() {
     }
   });
 
-  // Restore default window position
   ipcMain.handle('restore-default-position', () => {
     if (mainWindow) {
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
-      const defaultX = Math.round((screenW - 220) / 2);
-      const defaultY = Math.round((screenH - 260) / 2);
-      mainWindow.setPosition(defaultX, defaultY);
-      return { x: defaultX, y: defaultY };
+      const pos = centerWindow(mainWindow, PET_WIDTH, PET_HEIGHT);
+      mainWindow.setPosition(pos.x, pos.y);
+      return pos;
     }
     return { x: 0, y: 0 };
   });
 
-  // Show/hide window from tray
+  // Toggle window (tray)
   ipcMain.handle('toggle-window', () => {
     if (mainWindow) {
       if (mainWindow.isVisible()) {
@@ -154,6 +187,78 @@ function setupIPC() {
     }
     return false;
   });
+
+  // --- Calendar: resize to calendar view ---
+  ipcMain.handle('open-calendar', () => {
+    if (!mainWindow) return false;
+    isCalendarMode = true;
+    mainWindow.setResizable(true);
+    mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
+    const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
+    mainWindow.setPosition(pos.x, pos.y);
+    return true;
+  });
+
+  ipcMain.handle('close-calendar', () => {
+    if (!mainWindow) return false;
+    isCalendarMode = false;
+    mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
+    mainWindow.setResizable(false);
+    const saved = loadSettings();
+    const sx = saved.windowX;
+    const sy = saved.windowY;
+    if (typeof sx === 'number' && typeof sy === 'number') {
+      mainWindow.setPosition(sx, sy);
+    } else {
+      const pos = centerWindow(mainWindow, PET_WIDTH, PET_HEIGHT);
+      mainWindow.setPosition(pos.x, pos.y);
+    }
+    return true;
+  });
+
+  // --- Lunar data for calendar ---
+  ipcMain.handle('get-month-lunar-data', (_event, year, month) => {
+    const data = {};
+    const totalDays = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      data[d] = getDateLunarInfo(dateStr);
+    }
+    return data;
+  });
+
+  ipcMain.handle('get-date-lunar-data', (_event, dateStr) => {
+    return getDateLunarInfo(dateStr);
+  });
+
+  // --- Calendar schedule CRUD ---
+  ipcMain.handle('calendar:list', (_event, dateStr) => {
+    return calendarStore.listByDate(dateStr);
+  });
+
+  ipcMain.handle('calendar:list-all', () => {
+    try {
+      const p = path.join(app.getPath('userData'), 'calendar.json');
+      if (fs.existsSync(p)) {
+        return JSON.parse(fs.readFileSync(p, 'utf-8')).schedules || [];
+      }
+    } catch (e) {
+      console.error('Failed to list all schedules:', e);
+    }
+    return [];
+  });
+
+  ipcMain.handle('calendar:add', (_event, schedule) => {
+    return calendarStore.add(schedule);
+  });
+
+  ipcMain.handle('calendar:update', (_event, id, updates) => {
+    return calendarStore.update(id, updates);
+  });
+
+  ipcMain.handle('calendar:remove', (_event, id) => {
+    return calendarStore.remove(id);
+  });
 }
 
 // --- App lifecycle ---
@@ -164,6 +269,7 @@ app.whenReady().then(() => {
     isQuitting = true;
     app.quit();
   });
+  startReminder(mainWindow);
 });
 
 app.on('window-all-closed', () => {
@@ -172,6 +278,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  stopReminder();
 });
 
 app.on('activate', () => {

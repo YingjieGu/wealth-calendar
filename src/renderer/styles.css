@@ -28,24 +28,26 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Very light translucent backdrop: Linux software-rendered transparent
-     windows render all-alpha-0 (invisible content), so keep a faint
-     background instead of fully transparent. */
-  background: rgba(18, 16, 32, 0.42);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   transition: background 0.4s ease;
 }
 
-/* ---------- 主题配色（淡色背景 + 光晕） ---------- */
+/* ---------- 主题配色（高不透明度，软件渲染兼容） ---------- */
 #app.theme-cat {
-  background: rgba(36, 28, 56, 0.45);
+  background: linear-gradient(160deg, rgba(60, 42, 84, 0.82) 0%, rgba(30, 24, 58, 0.86) 60%, rgba(16, 14, 40, 0.88) 100%);
+  border: 1px solid rgba(168, 130, 255, 0.25);
 }
 #app.theme-fortune {
-  background: rgba(64, 22, 20, 0.5);
+  background: linear-gradient(160deg, rgba(122, 30, 24, 0.85) 0%, rgba(88, 18, 22, 0.88) 55%, rgba(40, 10, 16, 0.9) 100%);
+  border: 1px solid rgba(255, 190, 90, 0.35);
 }
 #app.theme-bagua {
-  background: rgba(14, 36, 52, 0.5);
+  background: linear-gradient(160deg, rgba(16, 46, 60, 0.85) 0%, rgba(10, 30, 48, 0.88) 55%, rgba(6, 18, 34, 0.92) 100%);
+  border: 1px solid rgba(110, 200, 240, 0.3);
 }
 
 /* ============================================================

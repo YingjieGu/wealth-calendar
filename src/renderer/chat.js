@@ -10,6 +10,8 @@ const ChatPanel = {
 
   close() {
     document.getElementById('chat-panel').classList.add('hidden');
+    // Restore hover buttons (open() hid them)
+    document.getElementById('hover-buttons').classList.remove('hidden');
   },
 
   addMessage(role, text) {

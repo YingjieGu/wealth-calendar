@@ -83,6 +83,15 @@ function showToast(msg) {
       window.wealthCalendar.saveWindowPosition();
     }
   });
+
+  // Safety: if the mouse is released outside the window (drag interrupted),
+  // reset dragging state so the window never gets stuck following the cursor.
+  window.addEventListener('blur', () => {
+    if (isDragging) {
+      isDragging = false;
+      pet.style.cursor = '';
+    }
+  });
 })();
 
 // --- Settings toggle ---
@@ -99,6 +108,8 @@ function showToast(msg) {
 
   btnClose.addEventListener('click', () => {
     panel.classList.add('hidden');
+    // Restore hover buttons (settings open hid them)
+    hoverButtons.classList.remove('hidden');
   });
 })();
 

@@ -180,6 +180,65 @@ const SettingsManager = {
 
     this.applyModelStatus();
 
+    // Multimodal pet animation
+    this.applyMultimodal();
+    document.getElementById('btn-mm-upload').addEventListener('click', () => {
+      document.getElementById('mm-upload').click();
+    });
+    document.getElementById('mm-upload').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      // Save provider/key first
+      this.settings.multimodalConfig = {
+        provider: document.getElementById('mm-provider').value,
+        apiKey: document.getElementById('mm-api-key').value.trim(),
+      };
+      await this.save();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const status = document.getElementById('mm-status');
+        status.textContent = '⏳ 正在生成动画（约 1-3 分钟），请稍候…';
+        const r = await window.wealthCalendar.multimodalGenerate(reader.result);
+        if (r && r.ok) {
+          status.textContent = '✅ 动画宠物已生成并应用！';
+          this.settings.theme = 'custom';
+          this.updateThemeUI('custom');
+          await PetState.tryVideoPet();
+          showToast('🎬 动画宠物已应用！');
+        } else {
+          status.textContent = `❌ ${r && r.message ? r.message : '生成失败，请检查 API Key 和网络'}`;
+        }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+    document.getElementById('btn-mm-clear').addEventListener('click', async () => {
+      await window.wealthCalendar.multimodalClear();
+      document.getElementById('mm-status').textContent = '已清除动画宠物';
+      PetState.setTheme(this.settings.theme === 'custom' ? 'custom' : this.settings.theme || 'cat');
+      showToast('🗑️ 动画宠物已清除');
+    });
+
+    // Main wish (主求方向)
+    this.applyWish();
+    document.querySelectorAll('#wish-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const wish = btn.dataset.wish;
+        this.settings.mainWish = wish;
+        document.querySelectorAll('#wish-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b.dataset.wish === wish)
+        );
+        await this.save();
+        showToast(`🎯 主求方向已设为：${btn.textContent.trim()}`);
+      });
+    });
+    document.getElementById('btn-clear-wish').addEventListener('click', async () => {
+      this.settings.mainWish = '';
+      document.querySelectorAll('#wish-options .activity-option').forEach((b) => b.classList.remove('active'));
+      await this.save();
+      showToast('✖️ 已清除主求，全面提醒');
+    });
+
     // Calendar mode
     this.applyCalendarMode();
     document.querySelectorAll('#calendar-mode-options .activity-option').forEach((btn) => {
@@ -211,6 +270,21 @@ const SettingsManager = {
     document.querySelectorAll('#calendar-mode-options .activity-option').forEach((b) => {
       b.classList.toggle('active', b.dataset.mode === mode);
     });
+  },
+
+  // --- Main wish (主求方向) ---
+  applyWish() {
+    const wish = this.settings.mainWish || '';
+    document.querySelectorAll('#wish-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', b.dataset.wish === wish);
+    });
+  },
+
+  // --- Multimodal config ---
+  applyMultimodal() {
+    const mc = this.settings.multimodalConfig || {};
+    document.getElementById('mm-provider').value = mc.provider || 'jimeng';
+    document.getElementById('mm-api-key').value = mc.apiKey || '';
   },
 
   applyModelConfig() {

@@ -13,27 +13,65 @@ function showToast(msg) {
   }, 2000);
 }
 
-// --- Custom window drag ---
+// --- Click-through management (transparent pet window) ---
+(function setupClickThrough() {
+  let lastValue = null;
+
+  function refresh() {
+    const panelOpen =
+      !document.getElementById('settings-panel').classList.contains('hidden') ||
+      !document.getElementById('chat-panel').classList.contains('hidden') ||
+      document.getElementById('calendar-view').style.display !== 'none';
+
+    const value = !panelOpen;
+    if (value !== lastValue) {
+      lastValue = value;
+      window.wealthCalendar.setClickThrough(value);
+    }
+  }
+
+  // Hovering interactive elements keeps the window clickable
+  document.addEventListener('mouseover', (e) => {
+    const interactive = e.target.closest(
+      '#pet, #pet-emoji, #pet-img, #hover-buttons, #context-menu, #chat-panel, #settings-panel, #calendar-view, #schedule-form-modal'
+    );
+    const panelOpen =
+      !document.getElementById('settings-panel').classList.contains('hidden') ||
+      !document.getElementById('chat-panel').classList.contains('hidden') ||
+      document.getElementById('calendar-view').style.display !== 'none';
+    const value = !(interactive || panelOpen);
+    if (value !== lastValue) {
+      lastValue = value;
+      window.wealthCalendar.setClickThrough(value);
+    }
+  });
+
+  // Panels toggling changes click-through state
+  const observer = new MutationObserver(() => refresh());
+  ['settings-panel', 'chat-panel', 'context-menu'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+  });
+  const calView = document.getElementById('calendar-view');
+  if (calView) observer.observe(calView, { attributes: true, attributeFilter: ['style'] });
+
+  refresh();
+})();
+
+// --- Custom window drag (drag the pet itself) ---
 (function setupDrag() {
-  const app = document.getElementById('app');
+  const pet = document.getElementById('pet');
   let isDragging = false;
   let lastX = 0;
   let lastY = 0;
 
-  app.addEventListener('mousedown', (e) => {
-    // Don't drag when clicking buttons, inputs, or settings/calendar panels
-    if (e.target.closest('button') ||
-        e.target.closest('input') ||
-        e.target.closest('textarea') ||
-        e.target.closest('#settings-panel') ||
-        e.target.closest('#schedule-detail') ||
-        e.target.closest('#schedule-form-modal') ||
-        e.target.closest('#context-menu') ||
-        e.target.closest('.cal-cell')) return;
+  pet.addEventListener('mousedown', (e) => {
+    // Don't drag when clicking buttons or inside panels
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     isDragging = true;
     lastX = e.screenX;
     lastY = e.screenY;
-    app.style.cursor = 'grabbing';
+    pet.style.cursor = 'grabbing';
     e.preventDefault();
   });
 
@@ -43,7 +81,6 @@ function showToast(msg) {
     const dy = e.screenY - lastY;
     lastX = e.screenX;
     lastY = e.screenY;
-
     if (dx !== 0 || dy !== 0) {
       window.wealthCalendar.moveWindow(dx, dy);
     }
@@ -52,7 +89,7 @@ function showToast(msg) {
   document.addEventListener('mouseup', () => {
     if (isDragging) {
       isDragging = false;
-      app.style.cursor = '';
+      pet.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
     }
   });

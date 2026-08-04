@@ -28,26 +28,23 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* Transparent pet window: only the pet + its glow are visible on desktop.
+     Panels (settings/chat/calendar) carry their own backgrounds. */
+  background: transparent;
+  border: none;
+  box-shadow: none;
   transition: background 0.4s ease;
 }
 
-/* ---------- 主题配色 ---------- */
+/* ---------- 主题配色（体现在宠物光晕，窗口本身透明） ---------- */
 #app.theme-cat {
-  background: linear-gradient(160deg, rgba(60, 42, 84, 0.82) 0%, rgba(30, 24, 58, 0.86) 60%, rgba(16, 14, 40, 0.88) 100%);
-  border: 1px solid rgba(168, 130, 255, 0.25);
+  background: transparent;
 }
 #app.theme-fortune {
-  background: linear-gradient(160deg, rgba(122, 30, 24, 0.85) 0%, rgba(88, 18, 22, 0.88) 55%, rgba(40, 10, 16, 0.9) 100%);
-  border: 1px solid rgba(255, 190, 90, 0.35);
+  background: transparent;
 }
 #app.theme-bagua {
-  background: linear-gradient(160deg, rgba(16, 46, 60, 0.85) 0%, rgba(10, 30, 48, 0.88) 55%, rgba(6, 18, 34, 0.92) 100%);
-  border: 1px solid rgba(110, 200, 240, 0.3);
+  background: transparent;
 }
 
 /* ============================================================
@@ -106,6 +103,16 @@ html, body {
 #pet-img {
   width: 84px;
   height: 84px;
+  object-fit: contain;
+  border-radius: 16px;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+}
+
+#pet-video {
+  width: 96px;
+  height: 96px;
   object-fit: contain;
   border-radius: 16px;
   pointer-events: none;
@@ -173,6 +180,7 @@ html, body {
   transition: opacity 0.3s ease, transform 0.3s ease;
   animation: bubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   word-break: break-word;
+  pointer-events: none; /* don't block click-through */
 }
 #reminder-bubble.hidden {
   opacity: 0;

@@ -34,10 +34,19 @@ function saveJson(p, data) {
 
 const WUXING = { 甲: '木', 乙: '木', 丙: '火', 丁: '火', 戊: '土', 己: '土', 庚: '金', 辛: '金', 壬: '水', 癸: '水' };
 
+const WISH_LABELS = {
+  wealth: '求财（提醒侧重财运：赚钱机会、偏财、投资、财神方位）',
+  love: '求姻缘（提醒侧重姻缘：桃花、人缘、约会吉时）',
+  career: '求事业（提醒侧重事业：工作、晋升、贵人、签约）',
+  health: '求健康（提醒侧重健康：作息、运动、养生）',
+  study: '求学业（提醒侧重学业：考试、学习、记忆）',
+  peace: '求平安（提醒侧重平安：出行安全、避凶、是非）',
+};
+
 // ---------------------------------------------------------------------------
 // Template fallback (pure, testable)
 // ---------------------------------------------------------------------------
-function buildTemplateFortune(paipan, almanac, dateStr) {
+function buildTemplateFortune(paipan, almanac, dateStr, wish) {
   const almanacYi = (almanac && almanac.yi) || [];
   const almanacJi = (almanac && almanac.ji) || [];
   const caiShen = (almanac && almanac.direction && almanac.direction.caiShenDesc) || '';
@@ -92,10 +101,41 @@ function buildTemplateFortune(paipan, almanac, dateStr) {
 
   const yiText = almanacYi.length ? almanacYi.slice(0, 3).join('、') : '诸事顺遂';
   const jiText = almanacJi.length ? almanacJi.slice(0, 3).join('、') : '无';
-  const reminderLines = [
-    `小财发现，今日宜${yiText}，整体运势 ${overall} 分，${dims.wealth.advice}~`,
-    `今日忌${jiText}，${dims.career.advice}，小财会一直陪着你哦～`,
-  ];
+
+  // 主求方向侧重提醒语
+  const wishLines = {
+    wealth: [
+      `小财发现，今日你财运${dims.wealth.score >= 75 ? '很不错' : '平稳'}（${dims.wealth.score}分），${dims.wealth.advice}~`,
+      `今日宜${yiText}，财神在${caiShen || '吉位'}，重要求财之事可安排在这个方位~`,
+    ],
+    love: [
+      `小财发现，今日你桃花运${dims.love.score >= 75 ? '旺盛' : '温温的'}（${dims.love.score}分），${dims.love.advice}~`,
+      `今日宜${yiText}，${dims.love.summary}，主动一点会有意外惊喜哦~`,
+    ],
+    career: [
+      `小财发现，今日你事业运${dims.career.score >= 75 ? '稳中有升' : '平稳'}（${dims.career.score}分），${dims.career.advice}~`,
+      `今日宜${yiText}，重要工作安排在这个时段效率更高~`,
+    ],
+    health: [
+      `小财发现，今日你健康运势${dims.health.score}分，${dims.health.advice}，小财会提醒你按时休息的~`,
+      `今日宜${yiText}，忌${jiText}，注意劳逸结合~`,
+    ],
+    study: [
+      `小财发现，今日你学业运势${dims.study.score}分，${dims.study.advice}~`,
+      `今日宜${yiText}，专注力不错的时段要抓住哦~`,
+    ],
+    peace: [
+      `小财发现，今日宜${yiText}，忌${jiText}，出行留意安全，小财保佑你平平安安~`,
+      `今日诸事${dims.travel.score >= 70 ? '顺遂' : '多留心'}，遇事不急，稳字当头~`,
+    ],
+  };
+  const lines = wish && wishLines[wish]
+    ? wishLines[wish]
+    : [
+        `小财发现，今日宜${yiText}，整体运势 ${overall} 分，${dims.wealth.advice}~`,
+        `今日忌${jiText}，${dims.career.advice}，小财会一直陪着你哦～`,
+      ];
+  const reminderLines = lines;
 
   return {
     date: dateStr,
@@ -207,6 +247,12 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   const paipanOk = paipanData.data && !paipanData.data.error;
   const almanacOk = almanac.data && !almanac.data.error;
 
+  // LLM prompt: 主求方向侧重提醒
+  const wish = settings.mainWish || '';
+  const wishPrompt = wish && WISH_LABELS[wish]
+    ? `\n用户主求方向：${WISH_LABELS[wish]}。提醒语(reminderLines)和吉时应侧重此方向，其他维度仍全量输出。`
+    : '\n用户未设主求方向，提醒语全面覆盖各维度。';
+
   // Try LLM
   const modelConfig = settings.modelConfig || {};
   let fortune = null;
@@ -234,6 +280,7 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
         `用户八字排盘：\n${JSON.stringify(compactPaipan, null, 2)}\n` +
         `用户星盘：\n${JSON.stringify(compactChart, null, 2)}\n` +
         `当日黄历：\n${JSON.stringify(almanac.data, null, 2)}\n` +
+        wishPrompt +
         `请按系统要求输出当日运势 JSON。`;
       fortune = await callLLM({
         apiKey: modelConfig.llmApiKey,
@@ -249,7 +296,7 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   }
 
   if (!fortune) {
-    fortune = buildTemplateFortune(paipanData.data || {}, almanac.data || {}, todayKey);
+    fortune = buildTemplateFortune(paipanData.data || {}, almanac.data || {}, todayKey, wish);
     source = 'template';
   }
 

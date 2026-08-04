@@ -162,30 +162,57 @@ const PetState = {
 
     const img = document.getElementById('pet-img');
     const emojiSpan = document.getElementById('pet-emoji');
+    const video = document.getElementById('pet-video');
 
     if (theme === 'custom') {
-      img.style.display = 'block';
-      emojiSpan.style.display = 'none';
-      // Load custom image if not already loaded
-      if (!img.src || img.dataset.customLoaded !== '1') {
-        window.wealthCalendar.loadCustomPetImage().then((dataUrl) => {
-          if (dataUrl) {
-            img.src = dataUrl;
-            img.dataset.customLoaded = '1';
-          } else {
-            // No custom image yet -> fall back to cat
-            img.style.display = 'none';
-            emojiSpan.style.display = 'block';
-            emojiSpan.textContent = '🐱';
-          }
-        });
-      }
+      // 优先 AI 生成的动画视频，其次上传图片，兜底 emoji
+      this.tryVideoPet().then((usedVideo) => {
+        if (usedVideo) return;
+        img.style.display = 'block';
+        emojiSpan.style.display = 'none';
+        video.style.display = 'none';
+        if (!img.src || img.dataset.customLoaded !== '1') {
+          window.wealthCalendar.loadCustomPetImage().then((dataUrl) => {
+            if (dataUrl) {
+              img.src = dataUrl;
+              img.dataset.customLoaded = '1';
+            } else {
+              img.style.display = 'none';
+              emojiSpan.style.display = 'block';
+              emojiSpan.textContent = '🐱';
+            }
+          });
+        }
+      });
       appEl.classList.add('theme-cat');
     } else {
+      video.style.display = 'none';
+      video.pause();
       img.style.display = 'none';
       emojiSpan.style.display = 'block';
       emojiSpan.textContent = emojiMap[theme] || '🐱';
       appEl.classList.add(theme === 'fortune' ? 'theme-fortune' : theme === 'bagua' ? 'theme-bagua' : 'theme-cat');
+    }
+  },
+
+  // AI-generated animated pet (mp4 from multimodal API)
+  async tryVideoPet() {
+    try {
+      const has = await window.wealthCalendar.multimodalHasVideo();
+      if (!has) return false;
+      const dataUrl = await window.wealthCalendar.multimodalVideo();
+      if (!dataUrl) return false;
+      const video = document.getElementById('pet-video');
+      const img = document.getElementById('pet-img');
+      const emojiSpan = document.getElementById('pet-emoji');
+      video.src = dataUrl;
+      video.style.display = 'block';
+      img.style.display = 'none';
+      emojiSpan.style.display = 'none';
+      video.play().catch(() => {});
+      return true;
+    } catch (e) {
+      return false;
     }
   },
 };

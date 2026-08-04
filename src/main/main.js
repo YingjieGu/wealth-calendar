@@ -8,6 +8,7 @@ const sidecar = require('./sidecar');
 const fortuneEngine = require('./fortuneEngine');
 const chatEngine = require('./chatEngine');
 const wallpaper = require('./wallpaper');
+const multimodal = require('./multimodal');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -459,6 +460,32 @@ function setupIPC() {
       wallpaper.stopAutoRefresh();
     }
     return { ok: true };
+  });
+
+  // --- Click-through for transparent pet window ---
+  ipcMain.on('set-click-through', (_event, value) => {
+    if (mainWindow) {
+      mainWindow.setIgnoreMouseEvents(!!value, { forward: true });
+    }
+  });
+
+  // --- Multimodal pet animation (image -> video) ---
+  ipcMain.handle('multimodal:generate', (_event, imageDataUrl) => {
+    return multimodal.generatePetAnimation(String(imageDataUrl || '').slice(0, 10_000_000));
+  });
+  ipcMain.handle('multimodal:clear', () => multimodal.clearPetAnimation());
+  ipcMain.handle('multimodal:has-video', () => multimodal.hasPetVideo());
+  ipcMain.handle('multimodal:video-path', () => {
+    try {
+      const p = multimodal.petVideoPath();
+      if (fs.existsSync(p)) {
+        const buf = fs.readFileSync(p);
+        return { dataUrl: `data:video/mp4;base64,${buf.toString('base64')}` };
+      }
+    } catch (e) {
+      console.error('[multimodal] load video failed:', e.message);
+    }
+    return { dataUrl: null };
   });
 }
 

@@ -60,4 +60,13 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   // Wallpaper calendar
   applyWallpaper: () => ipcRenderer.invoke('wallpaper:apply'),
   setWallpaperAutoRefresh: (enabled) => ipcRenderer.invoke('wallpaper:refresh-timer', enabled),
+
+  // Click-through (transparent pet window)
+  setClickThrough: (value) => ipcRenderer.send('set-click-through', value),
+
+  // Multimodal pet animation
+  multimodalGenerate: (imageDataUrl) => ipcRenderer.invoke('multimodal:generate', imageDataUrl),
+  multimodalClear: () => ipcRenderer.invoke('multimodal:clear'),
+  multimodalHasVideo: () => ipcRenderer.invoke('multimodal:has-video'),
+  multimodalVideo: () => ipcRenderer.invoke('multimodal:video-path').then((r) => (r ? r.dataUrl : null)),
 });

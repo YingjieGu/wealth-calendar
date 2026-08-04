@@ -10,7 +10,7 @@ const SettingsManager = {
   applyAll() {
     // Theme
     const theme = this.settings.theme || 'cat';
-    PetState.setTheme(theme);
+    PetState.setTheme(theme, this.settings.petEmoji);
 
     // Activity
     const activity = this.settings.activity || 'active';
@@ -82,7 +82,7 @@ const SettingsManager = {
       const theme = btn.dataset.theme;
       this.settings.theme = theme;
       this.updateThemeUI(theme);
-      PetState.setTheme(theme);
+      PetState.setTheme(theme, this.settings.petEmoji);
       this.save();
     });
 
@@ -102,7 +102,7 @@ const SettingsManager = {
         if (r && r.ok) {
           this.settings.theme = 'custom';
           this.updateThemeUI('custom');
-          PetState.setTheme('custom');
+          PetState.setTheme('custom', this.settings.petEmoji);
           await this.save();
           showToast('✅ 自定义宠物已保存，试试走动效果～');
         } else {
@@ -226,7 +226,7 @@ const SettingsManager = {
     document.getElementById('btn-mm-clear').addEventListener('click', async () => {
       await window.wealthCalendar.multimodalClear();
       document.getElementById('mm-status').textContent = '已清除动画宠物';
-      PetState.setTheme(this.settings.theme === 'custom' ? 'custom' : this.settings.theme || 'cat');
+      PetState.setTheme(this.settings.theme === 'custom' ? 'custom' : this.settings.theme || 'cat', this.settings.petEmoji);
       showToast('🗑️ 动画宠物已清除');
     });
 
@@ -292,9 +292,17 @@ const SettingsManager = {
   },
 
   // --- Built-in pet assets ---
+  // Linux dev box (software rendering) can't paint bitmaps at all, so the grid
+  // shows emoji stand-ins there; real PNGs are used on Windows/macOS.
+  EMOJI_FOR: {
+    cat: '🐱', dog: '🐶', rabbit: '🐰', panda: '🐼', tiger: '🐯',
+    fox: '🦊', pig: '🐷', koala: '🐨', moneybag: '💰', hongbao: '🧧',
+  },
+
   async loadPets() {
     const grid = document.getElementById('pets-grid');
     if (!grid) return;
+    const isLinux = window.wealthCalendar.platform === 'linux';
     let names = [];
     try {
       names = await window.wealthCalendar.petsList();
@@ -305,26 +313,41 @@ const SettingsManager = {
     }
     grid.innerHTML = '';
     for (const n of names) {
-      const dataUrl = await window.wealthCalendar.petsImage(n);
-      if (!dataUrl) continue;
       const item = document.createElement('div');
       item.className = 'pets-item';
       item.title = n;
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.alt = n;
-      item.appendChild(img);
+      if (isLinux) {
+        // emoji stand-in (bitmap rendering is broken on this box)
+        const emoji = SettingsManager.EMOJI_FOR[n] || '🐱';
+        item.textContent = emoji;
+        item.style.fontSize = '40px';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.justifyContent = 'center';
+      } else {
+        const dataUrl = await window.wealthCalendar.petsImage(n);
+        if (!dataUrl) continue;
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = n;
+        item.appendChild(img);
+      }
       item.addEventListener('click', async () => {
-        const r = await window.wealthCalendar.petsApply(n);
-        if (r && r.ok) {
-          this.settings.theme = 'custom';
-          this.updateThemeUI('custom');
-          PetState.setTheme('custom');
-          await this.save();
-          showToast(`✅ 已应用素材：${n}`);
+        this.settings.theme = 'custom';
+        if (isLinux) {
+          // save emoji choice instead of copying a png
+          this.settings.petEmoji = SettingsManager.EMOJI_FOR[n] || '🐱';
         } else {
-          showToast('❌ 应用失败');
+          const r = await window.wealthCalendar.petsApply(n);
+          if (!r || !r.ok) {
+            showToast('❌ 应用失败');
+            return;
+          }
         }
+        this.updateThemeUI('custom');
+        PetState.setTheme('custom', this.settings.petEmoji);
+        await this.save();
+        showToast(`✅ 已应用：${n}`);
       });
       grid.appendChild(item);
     }

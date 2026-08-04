@@ -110,17 +110,30 @@ html, body {
   border-radius: 16px;
   pointer-events: none;
   user-select: none;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+  /* NOTE: no CSS filter here — filter forces GPU compositing which fails on
+     software-rendered Linux (image would not paint at all). */
 }
 
 #pet-video {
-  width: 96px;
-  height: 96px;
+  width: 84px;
+  height: 84px;
   object-fit: contain;
   border-radius: 16px;
   pointer-events: none;
   user-select: none;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+  /* no CSS filter, same reason as #pet-img */
+}
+
+#pet-canvas {
+  pointer-events: none;
+  user-select: none;
+}
+
+#pet-bg {
+  width: 84px;
+  height: 84px;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* 呼吸 */

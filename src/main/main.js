@@ -1,4 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage } = require('electron');
+
+// This Linux dev box has a broken GPU stack (viz_main_impl: Exiting GPU process,
+// SharedImage creation fails) which silently drops ALL bitmap painting
+// (<img>/<canvas>/background-image/video). Force pure software compositing so
+// pet images actually render. Harmless on healthy machines (just uses CPU).
+app.disableHardwareAcceleration();
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');

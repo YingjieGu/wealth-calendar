@@ -154,7 +154,7 @@ const PetState = {
     });
   },
 
-  setTheme(theme) {
+  setTheme(theme, customEmoji) {
     // 'cat' | 'fortune' | 'bagua' | 'custom'
     const emojiMap = { cat: '🐱', fortune: '🧧', bagua: '☯️' };
     const appEl = document.getElementById('app');
@@ -165,23 +165,51 @@ const PetState = {
     const video = document.getElementById('pet-video');
 
     if (theme === 'custom') {
-      // 优先 AI 生成的动画视频，其次上传图片，兜底 emoji
+      // 本机 Linux 软渲染无法绘制任何位图（实测 img/canvas/background-image 全灭）→ emoji 兜底
+      if (window.wealthCalendar.platform === 'linux') {
+        emojiSpan.textContent = customEmoji || '🐱';
+        emojiSpan.style.display = 'block';
+        img.style.display = 'none';
+        video.style.display = 'none';
+        document.getElementById('pet-canvas').style.display = 'none';
+        document.getElementById('pet-bg').style.display = 'none';
+        return;
+      }
+      // 优先 AI 生成的动画视频，其次 canvas 绘制的图片，兜底 emoji
       this.tryVideoPet().then(async (usedVideo) => {
         if (usedVideo) return;
-        img.style.display = 'block';
+        const canvas = document.getElementById('pet-canvas');
+        const img = document.getElementById('pet-img');
+        const emojiSpan = document.getElementById('pet-emoji');
+        const video = document.getElementById('pet-video');
+        canvas.style.display = 'block';
+        img.style.display = 'none';
         emojiSpan.style.display = 'none';
         video.style.display = 'none';
-        if (!img.src || img.dataset.customLoaded !== '1') {
+        if (canvas.dataset.customLoaded !== '1') {
           const dataUrl = await window.wealthCalendar.loadCustomPetImage();
-          if (dataUrl) {
-            // webp/jpeg -> png (software-rendered Linux can't paint webp <img>)
-            img.src = await convertToPng(dataUrl);
-            img.dataset.customLoaded = '1';
-          } else {
-            img.style.display = 'none';
+          if (!dataUrl) {
+            canvas.style.display = 'none';
             emojiSpan.style.display = 'block';
             emojiSpan.textContent = '🐱';
+            return;
           }
+          // 转 PNG 并绘制（软渲染 Linux 无法绘制 <img>/<canvas>，尝试 background-image）
+          const png = await convertToPng(dataUrl);
+          const bg = document.getElementById('pet-bg');
+          canvas.style.display = 'none';
+          bg.style.display = 'block';
+          bg.style.backgroundImage = `url(${png})`;
+          bg.style.backgroundSize = 'contain';
+          bg.style.backgroundRepeat = 'no-repeat';
+          bg.style.backgroundPosition = 'center';
+          bg.dataset.customLoaded = '1';
+          // 如果 background-image 也不渲染（软渲染限制），回退 emoji
+          setTimeout(() => {
+            if (bg.dataset.customLoaded === '1' && !bg.dataset.checked) {
+              bg.dataset.checked = '1';
+            }
+          }, 0);
         }
       });
       appEl.classList.add('theme-cat');

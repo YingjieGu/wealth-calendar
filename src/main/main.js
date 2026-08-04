@@ -5,6 +5,9 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage } = require
 // (<img>/<canvas>/background-image/video). Force pure software compositing so
 // pet images actually render. Harmless on healthy machines (just uses CPU).
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('enable-features', 'UseSoftwareCompositor');
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');
@@ -70,12 +73,14 @@ function createWindow() {
     width: PET_WIDTH,
     height: PET_HEIGHT,
     frame: false,
-    transparent: true,
+    // transparent:false — no X11 compositor + broken GPU on this box means
+    // ARGB windows never reach the screen (black/empty window despite content
+    // rendering, proven via xwd). Same issue on the user's Win11 box.
+    transparent: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
     hasShadow: false,
-    type: 'toolbar',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,

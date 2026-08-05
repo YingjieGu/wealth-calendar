@@ -143,6 +143,8 @@ const SettingsManager = {
         );
         await this.save();
         if (window.wealthCalendar.roamSet) window.wealthCalendar.roamSet(on);
+        // 行为状态机按新开关重新调度（关闭→只休息循环，开启→漫游↔休息交替）
+        if (window.PetState && PetState.onRoamSettingChange) PetState.onRoamSettingChange(on);
         showToast(on ? '🚶 已开启全屏漫游' : '🚫 已关闭漫游');
       });
     });

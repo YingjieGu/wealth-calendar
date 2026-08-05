@@ -31,9 +31,9 @@ let tray = null;
 let isQuitting = false;
 let isCalendarMode = false;
 
-// 宠物窗口：紧凑贴合宠物的尺寸（给宠物走动 + 气泡 + 底部按钮留空间）
+// 宠物窗口：紧凑贴合宠物的尺寸（宠物固定在中心 ~150px + 顶部气泡 + 底部按钮）
 const PET_WIDTH = 200;
-const PET_HEIGHT = 220;
+const PET_HEIGHT = 250;
 const CAL_WIDTH = 420;
 const CAL_HEIGHT = 560;
 
@@ -418,7 +418,10 @@ function setupIPC() {
       isCalendarMode = false;
       mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
       mainWindow.setResizable(false);
-      startRoaming(); // 回到宠物模式恢复漫游
+      // 漫游由渲染进程行为状态机驱动；面板关闭后通知渲染进程恢复行为循环
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('pet-resume');
+      }
       const saved = loadSettings();
       const sx = saved.windowX;
       const sy = saved.windowY;
@@ -655,6 +658,36 @@ function setupIPC() {
   // Linux 软渲染位图全灭，设置页用 emoji 兜底展示）
   const PET_EXTS = ['.png', '.gif'];
 
+  // --- 主题素材系统（assets/themes/<theme>，打包 extraResources → resources/themes）---
+  // 财神素材（webp 动图）与 Q版猫咪素材（gif 动图）按状态动作映射，由渲染进程
+  // 按「当前状态」请求对应文件渲染成 <img> 动图（Windows/macOS 位图正常）；
+  // Linux 软渲染位图全灭，渲染进程用内联 SVG 兜底，不走本 IPC 的图片。
+  function themesDir(theme) {
+    const dev = path.join(app.getAppPath(), 'assets', 'themes', String(theme || ''));
+    try {
+      if (fs.existsSync(dev)) return dev;
+    } catch (e) { /* ignore */ }
+    return path.join(process.resourcesPath || '', 'themes', String(theme || ''));
+  }
+
+  const THEME_EXT_MIME = { '.gif': 'image/gif', '.webp': 'image/webp', '.png': 'image/png' };
+
+  ipcMain.handle('themes:asset', (_event, theme, file) => {
+    try {
+      const dir = themesDir(theme);
+      const base = path.resolve(dir);
+      const target = path.resolve(dir, String(file || ''));
+      if (!target.startsWith(base + path.sep)) return { dataUrl: null }; // 防目录穿越
+      if (!fs.existsSync(target) || !fs.statSync(target).isFile()) return { dataUrl: null };
+      const buf = fs.readFileSync(target);
+      const ext = path.extname(target).toLowerCase();
+      const mime = THEME_EXT_MIME[ext] || 'image/webp';
+      return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+    } catch (e) {
+      return { dataUrl: null };
+    }
+  });
+
   ipcMain.handle('pets:list', () => {
     try {
       const names = new Set();
@@ -841,20 +874,30 @@ function setupIPC() {
     }
   });
 
-  // --- 漫游 IPC：拖动暂停/恢复、设置开关 ---
+  // --- 漫游 IPC ---
+  // 漫游由渲染进程的「随机行为状态机」驱动：roam-start（开始漫游阶段）/
+  // roam-stop（停下进入休息状态）。拖动仍用 roam-pause/resume 临时暂停。
   ipcMain.on('roam-pause', () => {
     roamPaused = true; // 只暂停移动，保持宠物走路视觉
   });
   ipcMain.on('roam-resume', () => {
     roamPaused = false;
-    if (!isCalendarMode && roamEnabled()) startRoaming();
+    // 若窗口漫游器（ticker）仍在运行，解除暂停即自动恢复移动；不主动重启，
+    // 由渲染进程行为状态机决定何时进入/退出漫游阶段
+  });
+  ipcMain.on('roam-start', () => {
+    // 渲染进程行为状态机：进入「漫游」阶段（拖动中/面板打开/漫游关闭时不启动）
+    if (!roamPaused && !isCalendarMode && roamEnabled()) startRoaming();
+  });
+  ipcMain.on('roam-stop', () => {
+    stopRoaming();
   });
   ipcMain.on('roam-set', (_event, enabled) => {
     const s = loadSettings();
     s.petRoam = !!enabled;
     saveSettings(s);
-    if (enabled) startRoaming();
-    else stopRoaming();
+    if (!enabled) stopRoaming();
+    // 开启漫游时由渲染进程行为状态机决定何时开始（roamStart），这里不主动启动
   });
 
   // Start cursor watch (guarded until mainWindow exists)
@@ -888,8 +931,8 @@ app.whenReady().then(() => {
   );
   setupIPC();
   createWindow();
-  // 豆包式全屏漫游（settings.petRoam 默认开启；面板/拖动时自动暂停）
-  startRoaming();
+  // 豆包式全屏漫游：由渲染进程「随机行为状态机」驱动（roam-start/roam-stop），
+  // 启动时窗口先停在原位展示休息状态，行为循环到漫游阶段才移动
   tray = createTray(mainWindow, () => {
     isQuitting = true;
     app.quit();

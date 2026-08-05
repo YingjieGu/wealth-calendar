@@ -85,13 +85,22 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
     ipcRenderer.on('cursor-state', (_event, state) => callback(state));
   },
 
-  // 全屏漫游：拖动时暂停/恢复，设置开关，监听漫游状态（窗口移动↔宠物走路）
+  // 全屏漫游：行为状态机驱动（roam-start/roam-stop），拖动暂停/恢复，设置开关，
+  // 监听漫游状态（窗口移动↔宠物走路）与面板关闭恢复（pet-resume）
+  roamStart: () => ipcRenderer.send('roam-start'),
+  roamStop: () => ipcRenderer.send('roam-stop'),
   roamPause: () => ipcRenderer.send('roam-pause'),
   roamResume: () => ipcRenderer.send('roam-resume'),
   roamSet: (enabled) => ipcRenderer.send('roam-set', enabled),
   onPetRoam: (callback) => {
     ipcRenderer.on('pet-roam', (_event, roaming) => callback(roaming));
   },
+  onPetResume: (callback) => {
+    ipcRenderer.on('pet-resume', () => callback && callback());
+  },
+
+  // 主题素材系统：按主题+动作文件名取动图 data URL（财神 webp / 猫咪 gif）
+  themeAsset: (theme, file) => ipcRenderer.invoke('themes:asset', theme, file).then((r) => (r ? r.dataUrl : null)),
 
   // Multimodal pet animation
   multimodalGenerate: (imageDataUrl) => ipcRenderer.invoke('multimodal:generate', imageDataUrl),

@@ -128,8 +128,8 @@ body.platform-win32 #pet-stage::before {
 
 /* 内联 SVG 宠物（软渲染安全：矢量 path 不走位图/字体） */
 #pet-svg {
-  width: 104px;
-  height: 104px;
+  width: 132px;
+  height: 132px;
   display: block;
   overflow: visible;
   pointer-events: none;
@@ -162,11 +162,31 @@ body.platform-win32 #pet-stage::before {
   user-select: none;
 }
 
+/* 主题素材动作图（财神 webp / 猫咪 gif 动图，Windows/macOS 用）：
+   object-fit contain 缩放到窗口内，实际显示 ~150px */
+#pet-action {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 12px;
+  /* 不用 CSS filter（软渲染下 filter 强制 GPU 合成整层不渲染） */
+}
+
 #pet-bg {
   width: 84px;
   height: 84px;
   pointer-events: none;
   user-select: none;
+}
+
+/* 素材主题动作图动画：漫游走跳 + 停留呼吸 */
+#pet.walking #pet-action {
+  animation: walkBob 0.5s ease-in-out infinite;
+}
+#pet.idle #pet-action {
+  animation: breathe 2.6s ease-in-out infinite;
 }
 
 /* 呼吸 */
@@ -327,6 +347,8 @@ body.platform-win32 #pet-stage::before {
   display: flex;
   gap: 14px;
   padding: 6px 0;
+  /* 容器本身完全透明，仅按钮是半透明胶囊（win32 透明桌宠纯动图可见） */
+  background: transparent;
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.3s ease, transform 0.3s ease;

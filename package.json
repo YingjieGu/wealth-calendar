@@ -31,6 +31,10 @@
       {
         "from": "assets/pets",
         "to": "pets"
+      },
+      {
+        "from": "assets/themes",
+        "to": "themes"
       }
     ],
     "win": {

@@ -1,5 +1,5 @@
-// Pet state machine: idle, walk, sleep
-// Uses DOM + CSS animation for the pet emoji
+// Pet: 随机行为状态机（漫游 walk ↔ 休息 sleep/play/happy/sad）+ 主题动作素材
+// 宠物固定在窗口中心，移动完全靠全屏漫游（窗口移动），不再有窗口内小范围走动
 
 const PetState = {
   init() {
@@ -8,154 +8,185 @@ const PetState = {
     this.stageEl = document.getElementById('pet-stage');
     this.currentState = 'idle';
     this.activityMode = 'active'; // 'active' or 'quiet'
-    this.walkTimer = null;
-    this.stateTimer = null;
-    this.walkDir = 1; // 1 = right, -1 = left
-    this.walkSpeed = 0.5; // px per frame
-    this.petX = 0; // current logical x relative to center
-    this.petY = 0;
-    this.rafId = null;
-    this._walking = false;
+    // 随机行为状态机：漫游阶段(roam) 与 休息阶段(rest) 交替
+    this._currentPhase = null;      // 'roam' | 'rest'
+    this._behaviorTimer = null;    // 阶段切换定时器
     // 豆包式玩法状态
-    this._idleBucket = undefined; // 空闲感知上次区间：active/idle/rest/sleep
-    this._idleWatchTimer = null;  // 空闲检查定时器
-    this._waterTimer = null;      // 喝水提醒定时器
-    this._clicks = [];            // 连击计数（1 秒内的点击时间戳）
-    this._clickTimer = null;      // 单击反应的延迟定时器（用于区分单击/双击）
-    this._roaming = false;        // 全屏漫游中（窗口移动 ↔ 宠物走路动画）
+    this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/caishen）
+    this._platform = (window.wealthCalendar && window.wealthCalendar.platform) || 'linux';
+    this._roaming = false;         // 全屏漫游中（窗口移动 ↔ 宠物走路动画）
+    this._idleBucket = undefined;  // 空闲感知上次区间：active/idle/rest/sleep
+    this._idleWatchTimer = null;   // 空闲检查定时器
+    this._waterTimer = null;       // 喝水提醒定时器
+    this._clicks = [];             // 连击计数（1 秒内的点击时间戳）
+    this._clickTimer = null;       // 单击反应的延迟定时器（用于区分单击/双击）
   },
 
   start() {
     this.init();
-    this.enterState(this.currentState);
-    this.walkLoop();
-    this.scheduleStateChange();
+    this.enterState('idle');
     this.setupInteraction();
     this.startProactive();
     // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒
     this.sayTimeGreeting();
     this.startIdleWatch();
     this.startWaterReminder();
-    // 全屏漫游：窗口移动时宠物持续走路，漫游停止恢复随机状态机
+    // 全屏漫游：窗口实际移动时宠物持续走路视觉（漫游由下方行为状态机驱动）
     try {
       window.wealthCalendar.onPetRoam((roaming) => {
-        if (roaming) {
-          this._roaming = true;
-          this._pauseStateMachine();
-          if (this.currentState !== 'walk') this.enterState('walk');
-        } else {
-          this._roaming = false;
-          this._resumeStateMachine();
+        this._roaming = !!roaming;
+        // 若主进程因面板关闭等原因恢复漫游，且当前处于漫游阶段，确保走路视觉
+        if (roaming && this._currentPhase === 'roam' && this.currentState !== 'walk') {
+          this.enterState('walk');
         }
       });
     } catch (e) { /* ignore */ }
+    // 面板/聊天/日历关闭后，主进程通知恢复行为循环（重新进入当前阶段）
+    try {
+      window.wealthCalendar.onPetResume(() => this._rearmCurrentPhase());
+    } catch (e) { /* ignore */ }
+    // 随机行为状态机启动：先停留展示一个休息状态，再进入漫游阶段
+    this._currentPhase = null;
+    this._behaviorTimer = null;
+    setTimeout(() => this._beginRestPhase(), 1200);
   },
 
   setActivity(mode) {
     this.activityMode = mode;
-    // If switching to quiet, transition to idle
+    // If switching to quiet, transition to a resting state
     if (mode === 'quiet' && this.currentState === 'walk') {
-      this.enterState('idle');
+      this.enterState('sleep');
     }
   },
 
-  scheduleStateChange() {
-    if (this.stateTimer) clearTimeout(this.stateTimer);
-    // Active: switch every 3-7s; Quiet: switch every 10-20s
-    const min = this.activityMode === 'active' ? 3000 : 10000;
-    const max = this.activityMode === 'active' ? 7000 : 20000;
-    const delay = min + Math.random() * (max - min);
-    this.stateTimer = setTimeout(() => {
-      this.pickNextState();
-      this.scheduleStateChange();
-    }, delay);
+  // ============ 随机行为状态机 ============
+  // 漫游走动一段时间 → 停下随机进入休息状态(sleep/play/happy/sad)停留 10-40s
+  // → 继续漫游。漫游关闭时只做休息状态的循环，窗口始终停在原位。
+  // 阶段切换统一走这里：休息(rest) 结束 → 漫游(roam)，漫游结束 → 休息。
+  _scheduleNextPhase() {
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    // 漫游开关：settings.petRoam 默认开启（SettingsManager 尚未初始化时视为开启）
+    let roamOn = true;
+    try {
+      roamOn = !(SettingsManager.settings && SettingsManager.settings.petRoam === false);
+    } catch (e) { /* ignore */ }
+    if (!roamOn) { this._beginRestPhase(); return; }
+    if (this._currentPhase === 'roam') this._beginRestPhase();
+    else this._beginRoamPhase();
   },
 
-  pickNextState() {
-    if (this.activityMode === 'quiet') {
-      // In quiet mode, only idle or sleep
-      this.enterState(Math.random() < 0.3 ? 'sleep' : 'idle');
-    } else {
-      const roll = Math.random();
-      if (roll < 0.35) this.enterState('idle');
-      else if (roll < 0.75) this.enterState('walk');
-      else this.enterState('sleep');
-    }
+  // 漫游阶段：让主进程开始移动窗口，宠物显示 walk 动作图，持续 15-45 秒
+  _beginRoamPhase() {
+    this._currentPhase = 'roam';
+    try { window.wealthCalendar.roamStart(); } catch (e) { /* ignore */ }
+    this.enterState('walk');
+    const dur = 15000 + Math.random() * 30000;
+    this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
   },
 
+  // 休息阶段：停下窗口，随机进入 sleep/play/happy/sad，停留 10-40 秒
+  _beginRestPhase() {
+    this._currentPhase = 'rest';
+    try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
+    let pool = ['sleep', 'play', 'happy', 'sad'];
+    if (this.activityMode === 'quiet') pool = Math.random() < 0.5 ? ['sleep'] : pool;
+    this.enterState(pool[Math.floor(Math.random() * pool.length)]);
+    const dur = 10000 + Math.random() * 30000;
+    this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
+  },
+
+  // 重新进入当前阶段（拖动松手 / 面板关闭恢复时调用，重排阶段计时器）
+  _rearmCurrentPhase() {
+    if (this._currentPhase === 'roam') this._beginRoamPhase();
+    else if (this._currentPhase === 'rest') this._beginRestPhase();
+    else this._scheduleNextPhase();
+  },
+
+  // 设置页切换漫游开关：立即按新开关重新调度
+  onRoamSettingChange() {
+    this._scheduleNextPhase();
+  },
+
+  // 拖动中暂停行为状态机（不切阶段），松手恢复
+  onDragStart() {
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+  },
+  onDragEnd() {
+    this._rearmCurrentPhase();
+  },
+
+  // ============ 状态展示 ============
+  // 宠物固定在窗口中心；移动完全靠全屏漫游（窗口移动），这里不再有 petX/petY
   enterState(state) {
     this.currentState = state;
     this.petEl.className = ''; // clear all state classes
+    this.petEl.style.left = '50%';
+    this.petEl.style.top = '50%';
+    this.petEl.style.transform = 'translate(-50%, -50%)';
     this.zzzEl.classList.remove('show');
-
-    switch (state) {
-      case 'idle':
-        this.petEl.classList.add('idle');
-        // Center the pet
-        this.petX = 0;
-        this.petY = 0;
-        this.updatePetPosition();
-        break;
-      case 'walk':
-        // Start walking from current position
-        this.petEl.classList.add('walking');
-        break;
-      case 'sleep':
-        // Sleep: still position, show Zzz
-        this.petEl.classList.add('idle');
-        this.zzzEl.classList.add('show');
-        this.petX = 0;
-        this.petY = 0;
-        this.updatePetPosition();
-        break;
-    }
+    if (state === 'sleep') this.zzzEl.classList.add('show');
+    this._applyStateVisual(state);
   },
 
-  walkLoop() {
-    const loop = () => {
-      if (this.currentState === 'walk') {
-        this.doWalkStep();
+  // 主题动作映射：各状态 → 动作素材文件名（随机取一张；素材少的状态复用）
+  THEME_ACTIONS: {
+    cat1: {
+      walk: ['抬头看看.gif'],                       // 素材无走路图，用 play 图循环
+      sleep: ['睡觉.gif'],
+      happy: ['爱了爱了.gif', '哇我真好看.gif'],     // 随机
+      sad: ['伤心.gif'],
+      play: ['抓你哦.gif', '打屁股.gif', '抬头看看.gif', '偷看.gif'], // 随机
+    },
+    caishen: {
+      walk: ['财神到.webp'],
+      sleep: ['马上有钱.webp'],
+      happy: ['马上有钱.webp'],
+      sad: ['财神到.webp'],
+      play: ['财神到.webp'],
+    },
+  },
+
+  // 按状态展示宠物视觉：素材主题(Windows/macOS) → 动作动图；其余 → SVG/emoji
+  _applyStateVisual(state) {
+    const theme = this._theme || 'cat';
+    const isMaterial = theme === 'cat1' || theme === 'caishen';
+    const svgEl = document.getElementById('pet-svg');
+    if (isMaterial) {
+      if (this._platform === 'linux') {
+        // Linux 软渲染位图全灭：SVG 兜底（萌猫/财神），仅切 idle/walk 动画类
+        this._showPetElement(svgEl);
+        this.petEl.classList.add(state === 'walk' ? 'walking' : 'idle');
+        return;
       }
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
+      // Windows/macOS：加载当前状态的动图素材（walk 加弹跳动画）
+      this.petEl.classList.add(state === 'walk' ? 'walking' : 'idle');
+      this._loadActionImage(state);
+      return;
+    }
+    // 内置 SVG 主题（cat/fortune/bagua/custom 兜底）
+    this._showPetElement(svgEl);
+    this.petEl.classList.add(state === 'walk' ? 'walking' : 'idle');
   },
 
-  doWalkStep() {
-    const stageW = this.stageEl.clientWidth;
-    const petW = 64;
-    const maxX = (stageW - petW) / 2;
-    const speed = 0.6;
-
-    this.petX += speed * this.walkDir;
-
-    // Bounce at edges
-    if (this.petX >= maxX) {
-      this.petX = maxX;
-      this.walkDir = -1;
-    } else if (this.petX <= -maxX) {
-      this.petX = -maxX;
-      this.walkDir = 1;
-    }
-
-    // Add slight vertical bob
-    this.petY = Math.sin(Date.now() / 300) * 4;
-
-    this.updatePetPosition();
-  },
-
-  updatePetPosition() {
-    if (!this.petEl) return;
-    // Walk: smooth follow + face the direction of travel; else gentle transition
-    if (this.currentState === 'walk') {
-      this.petEl.style.transition = 'left 0.06s linear, top 0.2s ease';
-      this.petEl.style.transform = `translate(-50%, -50%) rotateY(${this.walkDir < 0 ? 180 : 0}deg)`;
-    } else {
-      this.petEl.style.transition = 'left 0.8s ease-in-out, top 0.3s ease';
-      this.petEl.style.transform = 'translate(-50%, -50%)';
-    }
-    this.petEl.style.left = `calc(50% + ${this.petX}px)`;
-    this.petEl.style.top = `calc(50% + ${this.petY}px)`;
+  async _loadActionImage(state) {
+    const theme = this._theme || 'cat1';
+    const map = PetState.THEME_ACTIONS[theme];
+    const list = (map && map[state]) || (map && map.play) || null;
+    if (!list) return;
+    const file = list[Math.floor(Math.random() * list.length)];
+    try {
+      const dataUrl = await window.wealthCalendar.themeAsset(theme, file);
+      if (!dataUrl) {
+        // 素材缺失：退回 SVG 兜底
+        this._showPetElement(document.getElementById('pet-svg'));
+        return;
+      }
+      if (this.currentState !== state) return; // 状态已切换，丢弃过期素材
+      const img = document.getElementById('pet-action');
+      this._showPetElement(img);
+      img.src = dataUrl;
+      img.alt = file;
+    } catch (e) { /* ignore */ }
   },
 
   // ---- Click / double-click / combo interaction ----
@@ -317,15 +348,15 @@ const PetState = {
     }
   },
 
-  // 暂停随机状态机（空闲睡觉时保持 sleep，不被 scheduleStateChange 打断）
+  // 暂停行为状态机（空闲睡觉时保持 sleep：停止阶段切换 + 停下窗口漫游）
   _pauseStateMachine() {
-    if (this.stateTimer) { clearTimeout(this.stateTimer); this.stateTimer = null; }
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
   },
 
-  // 恢复随机状态机（按当前活跃度节奏继续切换 idle/walk/sleep）
+  // 恢复行为状态机（按当前阶段重新调度：rest→继续休息，roam→继续漫游）
   _resumeStateMachine() {
-    this._pauseStateMachine();
-    this.scheduleStateChange();
+    this._scheduleNextPhase();
   },
 
   // 用户主动互动时（单击/双击/摇签），若宠物正因空闲睡着则立即恢复活力
@@ -541,9 +572,9 @@ const PetState = {
     return this.svgCat();
   },
 
-  // 隐藏 pet 内除指定元素外的所有子内容（SVG/emoji/img/video/canvas/bg 互斥显示）
+  // 隐藏 pet 内除指定元素外的所有子内容（SVG/emoji/img/video/canvas/bg/action 互斥显示）
   _showPetElement(el) {
-    ['pet-svg', 'pet-emoji', 'pet-img', 'pet-video', 'pet-canvas', 'pet-bg'].forEach((id) => {
+    ['pet-svg', 'pet-emoji', 'pet-img', 'pet-video', 'pet-canvas', 'pet-bg', 'pet-action'].forEach((id) => {
       const e = document.getElementById(id);
       if (e) e.style.display = 'none';
     });
@@ -551,14 +582,29 @@ const PetState = {
   },
 
   setTheme(theme, customEmoji) {
-    // 'cat' | 'fortune' | 'bagua' | 'custom'
+    // 'cat' | 'fortune' | 'bagua' | 'custom' | 'cat1'(素材) | 'caishen'(素材)
     const appEl = document.getElementById('app');
     appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua');
+    this._theme = theme;
 
     const svgEl = document.getElementById('pet-svg');
     const img = document.getElementById('pet-img');
     const emojiSpan = document.getElementById('pet-emoji');
     const video = document.getElementById('pet-video');
+
+    // 素材主题：Windows/macOS 显示动作动图（webp/gif），Linux 软渲染兜底为对应 SVG
+    if (theme === 'cat1' || theme === 'caishen') {
+      appEl.classList.add(theme === 'cat1' ? 'theme-cat' : 'theme-fortune');
+      if (this._platform === 'linux') {
+        this._showPetElement(svgEl);
+        svgEl.innerHTML = theme === 'cat1' ? this.svgCat() : this.svgFortune();
+        this._applyStateVisual(this.currentState || 'idle');
+      } else {
+        // 动作图：由 _applyStateVisual 按当前状态加载对应素材
+        this._applyStateVisual(this.currentState || 'idle');
+      }
+      return;
+    }
 
     // 内置三主题：全平台渲染内联 SVG（软渲染安全，比 emoji 好看且统一，
     // 彻底解决软渲染下 emoji 灰色剪影 / 消失的问题）
@@ -566,6 +612,7 @@ const PetState = {
       this._showPetElement(svgEl);
       svgEl.innerHTML = this.svgPet(theme);
       appEl.classList.add(theme === 'cat' ? 'theme-cat' : theme === 'fortune' ? 'theme-fortune' : 'theme-bagua');
+      this._applyStateVisual(this.currentState || 'idle');
       return;
     }
 
@@ -576,6 +623,7 @@ const PetState = {
       if (window.wealthCalendar.platform === 'linux') {
         this._showPetElement(svgEl);
         svgEl.innerHTML = this.svgPet('cat', customEmoji);
+        this._applyStateVisual(this.currentState || 'idle');
         return;
       }
       // 优先 AI 生成的动画视频，其次 canvas 绘制的图片，兜底 emoji

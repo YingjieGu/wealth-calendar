@@ -588,11 +588,17 @@ function setupIPC() {
     return path.join(process.resourcesPath || '', 'pets');
   }
 
+  // 内置素材支持 PNG 与 GIF（GIF 动图主要用于 Windows 上作为会动的宠物，
+  // Linux 软渲染位图全灭，设置页用 emoji 兜底展示）
+  const PET_EXTS = ['.png', '.gif'];
+
   ipcMain.handle('pets:list', () => {
     try {
-      return fs.readdirSync(petsDir())
-        .filter((f) => f.endsWith('.png'))
-        .map((f) => f.replace(/\.png$/, ''));
+      const names = new Set();
+      fs.readdirSync(petsDir())
+        .filter((f) => PET_EXTS.some((ext) => f.toLowerCase().endsWith(ext)))
+        .forEach((f) => names.add(f.replace(/\.(png|gif)$/i, '')));
+      return Array.from(names);
     } catch (e) {
       return [];
     }
@@ -600,10 +606,14 @@ function setupIPC() {
 
   ipcMain.handle('pets:image', (_event, name) => {
     try {
-      const p = path.join(petsDir(), `${String(name).replace(/[^\w-]/g, '')}.png`);
-      if (fs.existsSync(p)) {
-        const buf = fs.readFileSync(p);
-        return { dataUrl: `data:image/png;base64,${buf.toString('base64')}` };
+      const base = String(name).replace(/[^\w-]/g, '');
+      for (const ext of PET_EXTS) {
+        const p = path.join(petsDir(), `${base}${ext}`);
+        if (fs.existsSync(p)) {
+          const buf = fs.readFileSync(p);
+          const mime = ext === '.gif' ? 'image/gif' : 'image/png';
+          return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+        }
       }
     } catch (e) { /* ignore */ }
     return { dataUrl: null };
@@ -637,7 +647,7 @@ function setupIPC() {
     try {
       if (fs.existsSync(CUSTOM_PET_PATH)) {
         const buf = fs.readFileSync(CUSTOM_PET_PATH);
-        // Detect real format by magic bytes (saved file may be webp/jpeg/png)
+        // Detect real format by magic bytes (saved file may be webp/jpeg/png/gif)
         let mime = 'image/png';
         if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
           mime = 'image/webp';
@@ -645,6 +655,8 @@ function setupIPC() {
           mime = 'image/jpeg';
         } else if (buf[0] === 0x89 && buf[1] === 0x50) {
           mime = 'image/png';
+        } else if (buf.length > 4 && buf.toString('ascii', 0, 4) === 'GIF8') {
+          mime = 'image/gif';
         }
         return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
       }

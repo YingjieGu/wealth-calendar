@@ -297,6 +297,7 @@ const SettingsManager = {
   EMOJI_FOR: {
     cat: '🐱', dog: '🐶', rabbit: '🐰', panda: '🐼', tiger: '🐯',
     fox: '🦊', pig: '🐷', koala: '🐨', moneybag: '💰', hongbao: '🧧',
+    coin: '💰', heart: '💗',
   },
 
   async loadPets() {

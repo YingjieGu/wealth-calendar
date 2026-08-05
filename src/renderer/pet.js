@@ -431,34 +431,143 @@ const PetState = {
     } catch (e) { /* ignore */ }
   },
 
+  // ---- 内联 SVG 宠物（软渲染安全：纯矢量 path，不依赖位图/emoji 字体，
+  //        彻底规避软渲染下 emoji 灰色剪影/消失的问题） ----
+  svgCat() {
+    // 可爱橘猫：圆脸 + 尖耳 + 绿眼睛 + 胡须 + 会摇的尾巴
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="104" height="104" aria-hidden="true">
+  <g class="tail"><path d="M95 86 C112 82 116 68 110 56 C107 50 100 52 102 60 C106 70 102 78 88 78" stroke="#e89b3f" stroke-width="9" stroke-linecap="round" fill="none"/></g>
+  <ellipse class="body" cx="60" cy="92" rx="32" ry="24" fill="#f2a83b"/>
+  <ellipse cx="60" cy="96" rx="20" ry="15" fill="#ffe9c9"/>
+  <ellipse cx="42" cy="106" rx="9" ry="6" fill="#f7c06a"/>
+  <ellipse cx="78" cy="106" rx="9" ry="6" fill="#f7c06a"/>
+  <circle class="head" cx="60" cy="52" r="31" fill="#f2a83b"/>
+  <path d="M33 37 L27 12 L51 30 Z" fill="#f2a83b"/>
+  <path d="M87 37 L93 12 L69 30 Z" fill="#f2a83b"/>
+  <path d="M35 34 L30 17 L48 29 Z" fill="#f7b7a3"/>
+  <path d="M85 34 L90 17 L72 29 Z" fill="#f7b7a3"/>
+  <path d="M52 22 Q60 13 68 22" stroke="#d9802b" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <g class="eyes">
+    <ellipse cx="48" cy="52" rx="6" ry="8" fill="#2f7d46"/>
+    <circle cx="49" cy="53" r="3" fill="#12301e"/>
+    <ellipse cx="72" cy="52" rx="6" ry="8" fill="#2f7d46"/>
+    <circle cx="73" cy="53" r="3" fill="#12301e"/>
+  </g>
+  <path d="M58 63 L62 63 L60 66 Z" fill="#e06f5f"/>
+  <path d="M60 66 Q54 72 48 70" stroke="#c96a52" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M60 66 Q66 72 72 70" stroke="#c96a52" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <g stroke="#f7e9cf" stroke-width="2" stroke-linecap="round" fill="none">
+    <path d="M33 57 L13 53"/><path d="M33 64 L13 66"/>
+    <path d="M87 57 L107 53"/><path d="M87 64 L107 66"/>
+  </g>
+  <ellipse cx="33" cy="66" rx="6" ry="4" fill="#f7b7a3" opacity="0.7"/>
+  <ellipse cx="87" cy="66" rx="6" ry="4" fill="#f7b7a3" opacity="0.7"/>
+</svg>`;
+  },
+
+  svgFortune() {
+    // Q版财神：红袍 + 金官帽 + 微笑 + 会浮动的金元宝
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="104" height="104" aria-hidden="true">
+  <g class="ingot">
+    <path d="M42 40 Q60 24 78 40 Q88 45 86 54 L34 54 Q32 45 42 40 Z" fill="#ffd23f"/>
+    <ellipse cx="60" cy="54" rx="26" ry="7" fill="#ffc21a"/>
+    <ellipse cx="60" cy="53" rx="26" ry="3.5" fill="#ffe488"/>
+  </g>
+  <path class="body" d="M38 62 Q33 104 45 108 L75 108 Q87 104 82 62 Z" fill="#d8402e"/>
+  <path d="M52 58 Q60 66 68 58 L66 50 Q60 54 54 50 Z" fill="#ffe9a8"/>
+  <rect x="38" y="86" width="44" height="8" rx="4" fill="#ffd23f"/>
+  <circle class="head" cx="60" cy="42" r="23" fill="#ffd9b0"/>
+  <path d="M37 38 Q37 12 60 12 Q83 12 83 38 Z" fill="#8e2f28"/>
+  <rect x="37" y="31" width="46" height="7" rx="3.5" fill="#ffd23f"/>
+  <path d="M43 18 L41 4 Q48 0 55 2 L49 20 Z" fill="#ffd23f"/>
+  <circle cx="60" cy="20" r="5" fill="#ffe488"/>
+  <g class="eyes">
+    <circle cx="52" cy="44" r="3.5" fill="#3a1f14"/>
+    <circle cx="68" cy="44" r="3.5" fill="#3a1f14"/>
+  </g>
+  <path d="M54 52 Q60 58 66 52" stroke="#a34a2e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="46" cy="50" rx="5" ry="3.5" fill="#f7a58f" opacity="0.8"/>
+  <ellipse cx="74" cy="50" rx="5" ry="3.5" fill="#f7a58f" opacity="0.8"/>
+  <path d="M42 44 Q34 46 30 42" stroke="#5a3a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M78 44 Q86 46 90 42" stroke="#5a3a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>`;
+  },
+
+  svgBagua() {
+    // 八卦太极：外圈八卦刻度 + 阴阳鱼 + 中央财气金元宝
+    const ticks = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i * 45) * Math.PI / 180;
+      const x1 = 60 + 44 * Math.cos(a);
+      const y1 = 60 + 44 * Math.sin(a);
+      const x2 = 60 + 52 * Math.cos(a);
+      const y2 = 60 + 52 * Math.sin(a);
+      ticks.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#7dd3fc" stroke-width="4" stroke-linecap="round"/>`);
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="104" height="104" aria-hidden="true">
+  <circle cx="60" cy="60" r="44" fill="none" stroke="#7dd3fc" stroke-width="5" opacity="0.9"/>
+  ${ticks.join('\n  ')}
+  <circle cx="60" cy="60" r="34" fill="#f5f7fa"/>
+  <path d="M60 26 A34 34 0 0 1 60 94 A17 17 0 0 1 60 60 A17 17 0 0 1 60 26 Z" fill="#2b3a5e"/>
+  <circle cx="60" cy="43" r="9" fill="#f5f7fa"/>
+  <circle cx="60" cy="77" r="9" fill="#2b3a5e"/>
+  <g class="ingot">
+    <ellipse cx="60" cy="60" rx="13" ry="9" fill="#ffd23f"/>
+    <ellipse cx="60" cy="58" rx="13" ry="4.5" fill="#ffe488"/>
+    <rect x="56" y="60" width="8" height="6" rx="2" fill="#d9a51e"/>
+  </g>
+</svg>`;
+  },
+
+  svgPet(theme, customEmoji) {
+    // 内置主题 → 对应 SVG；custom 在软渲染 Linux 下兜底为萌猫
+    if (theme === 'fortune') return this.svgFortune();
+    if (theme === 'bagua') return this.svgBagua();
+    return this.svgCat();
+  },
+
+  // 隐藏 pet 内除指定元素外的所有子内容（SVG/emoji/img/video/canvas/bg 互斥显示）
+  _showPetElement(el) {
+    ['pet-svg', 'pet-emoji', 'pet-img', 'pet-video', 'pet-canvas', 'pet-bg'].forEach((id) => {
+      const e = document.getElementById(id);
+      if (e) e.style.display = 'none';
+    });
+    if (el) el.style.display = 'block';
+  },
+
   setTheme(theme, customEmoji) {
     // 'cat' | 'fortune' | 'bagua' | 'custom'
-    const emojiMap = { cat: '🐱', fortune: '🧧', bagua: '☯️' };
     const appEl = document.getElementById('app');
     appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua');
 
+    const svgEl = document.getElementById('pet-svg');
     const img = document.getElementById('pet-img');
     const emojiSpan = document.getElementById('pet-emoji');
     const video = document.getElementById('pet-video');
 
+    // 内置三主题：全平台渲染内联 SVG（软渲染安全，比 emoji 好看且统一，
+    // 彻底解决软渲染下 emoji 灰色剪影 / 消失的问题）
+    if (theme === 'cat' || theme === 'fortune' || theme === 'bagua') {
+      this._showPetElement(svgEl);
+      svgEl.innerHTML = this.svgPet(theme);
+      appEl.classList.add(theme === 'cat' ? 'theme-cat' : theme === 'fortune' ? 'theme-fortune' : 'theme-bagua');
+      return;
+    }
+
+    // custom：Linux 软渲染位图全灭 → SVG 萌猫兜底（替代灰色 emoji）；
+    // 其余平台沿用原「AI 动画视频 → canvas 图片 → emoji」逻辑
     if (theme === 'custom') {
-      // 本机 Linux 软渲染无法绘制任何位图（实测 img/canvas/background-image 全灭）→ emoji 兜底
+      appEl.classList.add('theme-cat'); // 视觉兜底背景（原来 custom+linux 提前 return 丢了背景）
       if (window.wealthCalendar.platform === 'linux') {
-        emojiSpan.textContent = customEmoji || '🐱';
-        emojiSpan.style.display = 'block';
-        img.style.display = 'none';
-        video.style.display = 'none';
-        document.getElementById('pet-canvas').style.display = 'none';
-        document.getElementById('pet-bg').style.display = 'none';
+        this._showPetElement(svgEl);
+        svgEl.innerHTML = this.svgPet('cat', customEmoji);
         return;
       }
       // 优先 AI 生成的动画视频，其次 canvas 绘制的图片，兜底 emoji
       this.tryVideoPet().then(async (usedVideo) => {
         if (usedVideo) return;
         const canvas = document.getElementById('pet-canvas');
-        const img = document.getElementById('pet-img');
         const emojiSpan = document.getElementById('pet-emoji');
-        const video = document.getElementById('pet-video');
         canvas.style.display = 'block';
         img.style.display = 'none';
         emojiSpan.style.display = 'none';
@@ -471,6 +580,13 @@ const PetState = {
             emojiSpan.textContent = '🐱';
             return;
           }
+          // GIF 动图直接用 <img> 显示（保留动画），不转静态 PNG
+          if (dataUrl.startsWith('data:image/gif')) {
+            img.src = dataUrl;
+            img.style.display = 'block';
+            canvas.style.display = 'none';
+            return;
+          }
           // 转 PNG 并绘制（软渲染 Linux 无法绘制 <img>/<canvas>，尝试 background-image）
           const png = await convertToPng(dataUrl);
           const bg = document.getElementById('pet-bg');
@@ -481,22 +597,8 @@ const PetState = {
           bg.style.backgroundRepeat = 'no-repeat';
           bg.style.backgroundPosition = 'center';
           bg.dataset.customLoaded = '1';
-          // 如果 background-image 也不渲染（软渲染限制），回退 emoji
-          setTimeout(() => {
-            if (bg.dataset.customLoaded === '1' && !bg.dataset.checked) {
-              bg.dataset.checked = '1';
-            }
-          }, 0);
         }
       });
-      appEl.classList.add('theme-cat');
-    } else {
-      video.style.display = 'none';
-      video.pause();
-      img.style.display = 'none';
-      emojiSpan.style.display = 'block';
-      emojiSpan.textContent = emojiMap[theme] || '🐱';
-      appEl.classList.add(theme === 'fortune' ? 'theme-fortune' : theme === 'bagua' ? 'theme-bagua' : 'theme-cat');
     }
   },
 

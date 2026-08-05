@@ -53,9 +53,19 @@ html, body {
 /* ============================================================
    宠物舞台
    ============================================================ */
+/* #pet-view 必须撑满窗口并成为纵向 flex 容器，#pet-stage 的 flex:1
+   才能真正把舞台撑高。之前 #pet-view 是 block，flex:1 失效导致
+   #pet-stage 高度塌陷为 0，宠物被顶到视口外（宠物不可见根因①）。 */
+#pet-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 #pet-stage {
   flex: 1;
   width: 100%;
+  min-height: 0;
   position: relative;
   display: flex;
   align-items: center;
@@ -84,12 +94,12 @@ html, body {
 }
 
 #pet {
-  font-size: 68px;
   position: absolute;
   left: 50%;
   top: 50%;
   cursor: grab;
-  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45));
+  /* 注意：这里不加 CSS filter —— 软渲染 Linux 上 filter 会强制 GPU
+     合成导致整层不渲染（详见 git history 位图/filter 兔子洞）。 */
   will-change: left, top, transform;
   z-index: 2;
   line-height: 1;
@@ -101,6 +111,16 @@ html, body {
 #pet-emoji {
   display: inline-block;
   transition: transform 0.3s ease;
+}
+
+/* 内联 SVG 宠物（软渲染安全：矢量 path 不走位图/字体） */
+#pet-svg {
+  width: 104px;
+  height: 104px;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
 }
 
 #pet-img {
@@ -152,6 +172,74 @@ html, body {
 @keyframes walkBob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
+}
+
+/* ===== 内联 SVG 宠物动画（全部用 transform/opacity，软渲染兼容，
+       不用 filter / 位图） ===== */
+/* 整体摇摆 */
+#pet.idle #pet-svg {
+  animation: petSway 4s ease-in-out infinite;
+}
+@keyframes petSway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+
+/* 身体呼吸 */
+#pet.idle #pet-svg .body,
+#pet.idle #pet-svg .head {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: svgBreathe 2.6s ease-in-out infinite;
+}
+@keyframes svgBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* 尾巴摇 */
+#pet-svg .tail {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: tailWag 1.1s ease-in-out infinite;
+}
+@keyframes tailWag {
+  0%, 100% { transform: rotate(6deg); }
+  50% { transform: rotate(-12deg); }
+}
+
+/* 眨眼 */
+#pet-svg .eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: svgBlink 4.2s ease-in-out infinite;
+}
+@keyframes svgBlink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+}
+
+/* 财神金元宝浮动 */
+#pet-svg .ingot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ingotFloat 2s ease-in-out infinite;
+}
+@keyframes ingotFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* 走路：整体弹跳 + 尾巴加速 */
+#pet.walking #pet-svg {
+  animation: walkSvgBounce 0.45s ease-in-out infinite;
+}
+@keyframes walkSvgBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+#pet.walking #pet-svg .tail {
+  animation-duration: 0.5s;
 }
 
 /* 睡觉 */
@@ -213,9 +301,19 @@ html, body {
    悬浮按钮组
    ============================================================ */
 #hover-buttons {
+  /* 绝对定位到底部，脱离 #pet-stage 的 flow —— 否则它会被当作
+     #pet-stage 唯一 flow 内容，把舞台高度撑成自身高度（布局塌陷，
+     见 #pet-view 注释）。 */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  width: fit-content;
+  margin: 0 auto;
+  z-index: 5;
   display: flex;
   gap: 14px;
-  padding: 6px 0 14px 0;
+  padding: 6px 0;
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.3s ease, transform 0.3s ease;

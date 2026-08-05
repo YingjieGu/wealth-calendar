@@ -211,39 +211,42 @@
     <!-- ==================== Calendar View ==================== -->
     <div id="calendar-view" style="display:none;">
       <div class="cal-header">
-        <button id="btn-calendar-close" class="close-btn" title="关闭日历">✕</button>
         <button id="btn-prev-month">◀</button>
         <span id="cal-month-label">2026年8月</span>
         <button id="btn-next-month">▶</button>
         <button id="btn-today">今天</button>
+        <button id="btn-calendar-close" class="close-btn" title="关闭日历">✕</button>
       </div>
 
-      <div class="cal-weekdays">
-        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-      </div>
-
-      <div id="calendar-grid" class="cal-grid">
-        <!-- dynamically filled -->
-      </div>
-
-      <!-- Daily fortune section -->
-      <div id="fortune-section" class="hidden">
-        <div class="fortune-header">
-          <span id="fortune-title">✨ 今日运势</span>
-          <button id="btn-refresh-fortune" class="fortune-refresh" title="刷新运势">🔄</button>
+      <!-- 统一单滚动容器：月历/运势/雷达图/日程详情合并，只保留一个上下滚动条 -->
+      <div class="cal-scroll">
+        <div class="cal-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
         </div>
-        <div id="fortune-body"><!-- filled by calendar.js --></div>
-      </div>
 
-      <!-- Schedule detail panel (bottom) -->
-      <div id="schedule-detail" class="hidden">
-        <div class="detail-header">
-          <span id="detail-date-label">2026-08-04</span>
-          <button id="btn-close-detail" class="close-btn">✕</button>
+        <div id="calendar-grid" class="cal-grid">
+          <!-- dynamically filled -->
         </div>
-        <div id="detail-almanac" class="detail-almanac"></div>
-        <div id="schedule-list" class="schedule-list"></div>
-        <button id="btn-add-schedule" class="action-btn">＋ 添加日程</button>
+
+        <!-- Daily fortune section -->
+        <div id="fortune-section" class="hidden">
+          <div class="fortune-header">
+            <span id="fortune-title">✨ 今日运势</span>
+            <button id="btn-refresh-fortune" class="fortune-refresh" title="刷新运势">🔄</button>
+          </div>
+          <div id="fortune-body"><!-- filled by calendar.js --></div>
+        </div>
+
+        <!-- Schedule detail panel -->
+        <div id="schedule-detail" class="hidden">
+          <div class="detail-header">
+            <span id="detail-date-label">2026-08-04</span>
+            <button id="btn-close-detail" class="close-btn">✕</button>
+          </div>
+          <div id="detail-almanac" class="detail-almanac"></div>
+          <div id="schedule-list" class="schedule-list"></div>
+          <button id="btn-add-schedule" class="action-btn">＋ 添加日程</button>
+        </div>
       </div>
     </div>
 

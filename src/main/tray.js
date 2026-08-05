@@ -4,6 +4,7 @@ function createTray(mainWindow, onQuit, providedIcon) {
   // 优先用主进程生成的托盘图标（睡觉.gif 首帧 PNG）；否则退回金色硬币占位图
   let trayIcon = providedIcon;
   if (!trayIcon || trayIcon.isEmpty()) {
+    console.error('[tray] 主进程未提供有效托盘图标，退回占位图');
     // A simple 16x16 icon using nativeImage from a data URL (gold coin)
     const iconDataUrl =
       'data:image/png;base64,' +

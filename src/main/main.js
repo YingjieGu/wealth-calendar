@@ -69,30 +69,44 @@ function centerWindow(win, width, height) {
 }
 
 // --- 托盘图标：用 萌宠1 睡觉.gif 首帧转 PNG（python PIL），存 userData/tray-icon.png ---
+// win 托盘用 16x16，其余平台用 64x64；生成失败记录日志并返回 null（tray.js 退回占位图）。
 function ensureTrayIcon() {
   try {
     const dev = path.join(app.getAppPath(), 'assets', 'themes', 'cat1', '睡觉.gif');
     const gifPath = fs.existsSync(dev)
       ? dev
       : path.join(process.resourcesPath || '', 'themes', 'cat1', '睡觉.gif');
-    if (!fs.existsSync(gifPath)) return null;
-    const pngPath = path.join(app.getPath('userData'), 'tray-icon.png');
-    if (fs.existsSync(pngPath)) {
-      const cached = nativeImage.createFromPath(pngPath);
-      if (!cached.isEmpty()) return cached;
+    if (!fs.existsSync(gifPath)) {
+      appendStartupLog('tray-icon: 睡觉.gif 不存在', gifPath);
+      return null;
     }
-    const script = [
-      'from PIL import Image',
-      `im = Image.open(${JSON.stringify(gifPath)})`,
-      'im.seek(0)',
-      "im = im.convert('RGBA')",
-      'im.thumbnail((64, 64))',
-      `im.save(${JSON.stringify(pngPath)}, 'PNG')`,
-    ].join('\n');
-    execFileSync('python3', ['-c', script], { timeout: 6000 });
-    const icon = nativeImage.createFromPath(pngPath);
-    return icon.isEmpty() ? null : icon;
+    const png64 = path.join(app.getPath('userData'), 'tray-icon.png');
+    const png16 = path.join(app.getPath('userData'), 'tray-icon-16.png');
+    const need64 = !fs.existsSync(png64);
+    const need16 = process.platform === 'win32' && !fs.existsSync(png16);
+    if (need64 || need16) {
+      const script = [
+        'from PIL import Image',
+        `im = Image.open(${JSON.stringify(gifPath)})`,
+        'im.seek(0)',
+        "im = im.convert('RGBA')",
+        'im.thumbnail((64, 64))',
+        `im.save(${JSON.stringify(png64)}, 'PNG')`,
+        `im16 = im.copy(); im16.thumbnail((16, 16)); im16.save(${JSON.stringify(png16)}, 'PNG')`,
+      ].join('\n');
+      execFileSync('python3', ['-c', script], { timeout: 6000 });
+    }
+    // win 托盘要求 16x16；其余平台用 64x64
+    const usePath = process.platform === 'win32' ? png16 : png64;
+    const icon = nativeImage.createFromPath(usePath);
+    if (icon.isEmpty()) {
+      appendStartupLog('tray-icon: nativeImage 为空', usePath);
+      return null;
+    }
+    appendStartupLog(`tray-icon: ok ${usePath} size=${icon.getSize().width}x${icon.getSize().height}`);
+    return icon;
   } catch (e) {
+    appendStartupLog('tray-icon: 生成失败', String((e && e.message) || e));
     return null;
   }
 }
@@ -375,11 +389,11 @@ function randomPos() {
   };
 }
 
-// 模式 → 位置池权重
+// 模式 → 位置池权重（active 出去溜达 70%，clingy 出去 50%）
 const POSITION_WEIGHTS = {
   quiet: { homeBase: 100 },
-  clingy: { homeBase: 75, workEdge: 25 },
-  active: { homeBase: 55, workEdge: 15, taskbar: 15, random: 15 },
+  clingy: { homeBase: 50, workEdge: 50 },
+  active: { homeBase: 30, workEdge: 20, taskbar: 25, random: 25 },
 };
 
 function pickPositionType(mode) {

@@ -213,9 +213,9 @@ function convertToPng(dataUrl) {
     const rect = petStage.getBoundingClientRect();
     let x = e.clientX - rect.left;
     let y = e.clientY - rect.top;
-    // Clamp inside window
-    x = Math.max(4, Math.min(x, rect.width - 110));
-    y = Math.max(4, Math.min(y, rect.height - 170));
+    // 200x250 悬浮窗内保证全部菜单项可见（紧凑菜单约 190px 高，clamp 到底部留白）
+    x = Math.max(4, Math.min(x, rect.width - 112));
+    y = Math.max(4, Math.min(y, rect.height - 196));
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.classList.remove('hidden');

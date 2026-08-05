@@ -116,9 +116,9 @@ const PetState = {
     this._armActionTimer();
   },
 
-  // 每阶段停留时长：10-20 分钟随机（猫咪作息）
+  // 每阶段停留时长：5-10 分钟随机
   _phaseDuration() {
-    return 600000 + Math.random() * 600000;
+    return 300000 + Math.random() * 300000;
   },
 
   // 进入新阶段：按模式权重瞬移到下一个位置，并按位置类型展示状态动作。

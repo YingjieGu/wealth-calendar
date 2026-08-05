@@ -12,12 +12,12 @@ const SettingsManager = {
     const theme = this.settings.theme || 'cat';
     PetState.setTheme(theme, this.settings.petEmoji);
 
-    // Activity
-    const activity = this.settings.activity || 'active';
+    // Activity（默认粘人 clingy）
+    const activity = this.settings.activity || 'clingy';
     PetState.setActivity(activity);
 
-    // 界面主题（深色默认 / 浅色）
-    const uiTheme = this.settings.uiTheme || 'dark';
+    // 界面主题（默认浅色）
+    const uiTheme = this.settings.uiTheme || 'light';
     this.applyUiTheme(uiTheme);
 
     // Update UI buttons

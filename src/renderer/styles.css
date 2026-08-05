@@ -41,7 +41,8 @@ html, body {
   --border-soft: rgba(255, 255, 255, 0.07);
   --btn-bg: rgba(255, 255, 255, 0.06);
   --btn-hover: rgba(255, 255, 255, 0.12);
-  --scrollbar: rgba(255, 255, 255, 0.14);
+  --scrollbar: rgba(255, 255, 255, 0.16);
+  --scrollbar-hover: rgba(255, 255, 255, 0.32);
   --schedule-item: rgba(255, 255, 255, 0.06);
   /* 金色主题点缀（深色下亮金，浅色下暗金保证对比度） */
   --accent: #ffd700;
@@ -63,10 +64,27 @@ body.theme-light {
   --border-soft: rgba(120, 100, 60, 0.14);
   --btn-bg: rgba(120, 100, 60, 0.06);
   --btn-hover: rgba(120, 100, 60, 0.14);
-  --scrollbar: rgba(120, 100, 60, 0.2);
+  --scrollbar: rgba(120, 100, 60, 0.24);
+  --scrollbar-hover: rgba(120, 100, 60, 0.42);
   --schedule-item: rgba(120, 100, 60, 0.06);
   --accent: #a06a00;
   --accent-dim: #8a5a10;
+}
+
+/* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
 }
 
 /* 悬浮窗本体：全平台无边框/描边/阴影（仅宠物动图可见；面板/日历/聊天/设置
@@ -477,10 +495,13 @@ body.platform-win32 #pet-stage::before {
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 215, 0, 0.22);
   border-radius: 14px;
-  padding: 6px;
+  padding: 5px;
   display: flex;
   flex-direction: column;
   min-width: 112px;
+  /* 200x250 悬浮窗内保证全部菜单项可见：超出时容器滚动 */
+  max-height: calc(100% - 8px);
+  overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   animation: menuIn 0.2s ease;
 }
@@ -495,10 +516,10 @@ body.platform-win32 #pet-stage::before {
   background: none;
   border: none;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
-  padding: 9px 12px;
-  border-radius: 9px;
+  padding: 6px 10px;
+  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
@@ -711,13 +732,6 @@ body.platform-win32 #pet-stage::before {
   color: var(--text-mid);
   font-size: 12px;
 }
-.settings-body::-webkit-scrollbar {
-  width: 5px;
-}
-.settings-body::-webkit-scrollbar-thumb {
-  background: var(--scrollbar);
-  border-radius: 3px;
-}
 .setting-group {
   margin-bottom: 16px;
   padding: 12px;
@@ -876,6 +890,13 @@ body.platform-win32 #pet-stage::before {
 #calendar-view[style*="display: none"] {
   display: none !important;
 }
+/* 统一单滚动容器：月历/运势/雷达图/日程详情合并，只保留一个上下滚动条（同设置页） */
+.cal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
 .cal-header {
   display: flex;
   align-items: center;
@@ -908,7 +929,7 @@ body.platform-win32 #pet-stage::before {
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: 8px 10px 4px;
+  padding: 8px 0 4px;
   color: var(--text-dim);
   font-size: 11px;
   text-align: center;
@@ -918,9 +939,7 @@ body.platform-win32 #pet-stage::before {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
-  padding: 4px 10px;
-  flex: 1;
-  overflow-y: auto;
+  padding: 4px 0;
 }
 .cal-cell {
   min-height: 52px;
@@ -995,13 +1014,11 @@ body.platform-win32 #pet-stage::before {
 
 /* ---------- 日程详情 ---------- */
 #schedule-detail {
-  margin: 8px 10px;
+  margin: 8px 0;
   padding: 12px;
   border-radius: 16px;
   background: var(--card);
   border: 1px solid rgba(255, 215, 0, 0.18);
-  max-height: 46%;
-  overflow-y: auto;
   animation: slideUp 0.3s ease;
 }
 #schedule-detail.hidden {
@@ -1099,13 +1116,11 @@ body.platform-win32 #pet-stage::before {
 
 /* ---------- 运势区块 ---------- */
 #fortune-section {
-  margin: 8px 10px;
+  margin: 8px 0;
   padding: 12px 14px;
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(240, 168, 48, 0.05));
   border: 1px solid rgba(255, 215, 0, 0.28);
-  max-height: 240px;
-  overflow-y: auto;
   animation: slideUp 0.35s ease;
 }
 .fortune-header {

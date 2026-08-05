@@ -16,6 +16,18 @@ function settingsPath() {
   return path.join(dataDir(), 'settings.json');
 }
 
+// LLM 调用详细诊断日志（win 连不上命理模型排查用）: debug/llm-error.log
+function llmDebugPath() {
+  return path.join(dataDir(), 'debug', 'llm-error.log');
+}
+function appendLLMDebug(msg) {
+  try {
+    const p = llmDebugPath();
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.appendFileSync(p, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch (e) { /* 日志失败不影响主流程 */ }
+}
+
 function loadJson(p, fallback) {
   try {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf-8'));
@@ -168,32 +180,58 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
   const url = `${(baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
+  // 代理环境信息（Electron 主进程 fetch 走 Chromium 网络栈，win 上默认受系统代理影响）
+  const proxyInfo = {
+    HTTP_PROXY: process.env.HTTP_PROXY || '',
+    HTTPS_PROXY: process.env.HTTPS_PROXY || '',
+    NO_PROXY: process.env.NO_PROXY || '',
+  };
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || 'deepseek-chat',
-        temperature: 0.8,
-        // v4 series are reasoning models: reasoning_content also consumes tokens,
-        // so keep a generous budget or content may come back empty/truncated.
-        max_tokens: 16000,
-        messages: [
-          {
-            role: 'system',
-            content:
-              '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
-          },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 2000,
-      }),
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model || 'deepseek-chat',
+          temperature: 0.8,
+          // v4 series are reasoning models: reasoning_content also consumes tokens,
+          // so keep a generous budget or content may come back empty/truncated.
+          max_tokens: 16000,
+          messages: [
+            {
+              role: 'system',
+              content:
+                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
+            },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 2000,
+        }),
+      });
+    } catch (fetchErr) {
+      // 记录完整诊断：错误类型 / 是否超时 / 代理信息 / baseUrl
+      const detail = {
+        type: 'fetch_failed',
+        errorName: fetchErr && fetchErr.name,
+        errorMessage: String((fetchErr && fetchErr.message) || fetchErr),
+        cause: fetchErr && fetchErr.cause ? String(fetchErr.cause) : undefined,
+        timedOut: !!(fetchErr && fetchErr.name === 'AbortError'),
+        url,
+        apiKeyTail: (apiKey || '').slice(-4),
+        baseUrl,
+        model,
+        proxyEnv: proxyInfo,
+      };
+      appendLLMDebug(`LLM fetch 失败:\n${JSON.stringify(detail, null, 2)}`);
+      throw new Error(`LLM fetch failed: ${fetchErr && fetchErr.message}`);
+    }
     if (!res.ok) {
-      const errText = await res.text();
+      const errText = await res.text().catch(() => '');
+      appendLLMDebug(`LLM HTTP ${res.status} url=${url} keyTail=${(apiKey || '').slice(-4)} body=${errText.slice(0, 300)}`);
       console.error(`[fortune] LLM HTTP ${res.status} url=${url} keyTail=${(apiKey || '').slice(-4)} err=${errText.slice(0, 200)}`);
       throw new Error(`LLM HTTP ${res.status}: ${errText.slice(0, 200)}`);
     }
@@ -201,8 +239,15 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
     const content = json.choices && json.choices[0] && json.choices[0].message
       ? json.choices[0].message.content
       : '';
-    if (!content) throw new Error('LLM empty response');
+    if (!content) {
+      appendLLMDebug(`LLM 空响应 url=${url}`);
+      throw new Error('LLM empty response');
+    }
     return parseLLMJson(content);
+  } catch (e) {
+    // 降级保证：由 getDailyFortune 的 catch 回退到 buildTemplateFortune
+    appendLLMDebug(`LLM 调用失败(将降级模板): ${e.message}`);
+    throw e;
   } finally {
     clearTimeout(timer);
   }

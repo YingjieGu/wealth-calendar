@@ -84,6 +84,16 @@ npx electron-builder --win nsis
 - **今日运势雷达图**: calendar.js `buildRadarSVG(dims)` — 纯 SVG 7 维(财运/事业/桃花/健康/学业/出行/签约)七边形雷达图, 同心网格+数据多边形(金色线性渐变 url(#radarGold))+7 顶点+7 标签(颜色 var(--accent)); 插入 #fortune-body 的 `.fortune-radar`; 无维度数据时显示占位文案
 - **内置宠物素材板块已移除**: 设置页 pets-grid UI 与 settings.js loadPets/EMOJI_FOR 删除(与主题功能冲突); 素材主题(cat1/cat2/caishen)仍保留在主题选择中
 
+### 5. win 问题排查与调参
+- **win 托盘图标**: ensureTrayIcon 同时生成 tray-icon.png(64) 与 tray-icon-16.png(16, win 托盘用), PIL 转 睡觉.gif 首帧; Tray 创建时 setImage, 图标缺失 console.error + appendStartupLog 记录(`tray-icon: ok/failed`)
+- **win LLM 连不上诊断**: callLLM 失败写 `debug/llm-error.log`(错误类型/状态码/响应体前300字符/是否超时/代理 env HTTP_PROXY/HTTPS_PROXY/NO_PROXY/baseUrl/key 尾4位); Electron 主进程 fetch 走 Chromium 网络栈, win 默认受系统代理影响; LLM 失败自动降级 buildTemplateFortune 保证运势/播报/雷达图有数据
+- **默认设置**: activity 默认 clingy(粘人), uiTheme 默认 light(浅色)
+- **阶段时长**: 10-20 分钟 → **5-10 分钟**(300000-600000ms)
+- **位置权重**: active homeBase30+workEdge20+taskbar25+random25(出去溜达70%); clingy homeBase50+workEdge50(出去50%); quiet homeBase100
+- **右键菜单**: 紧凑样式(font 12px / padding 6px 10px) + max-height calc(100%-8px) 滚动, 200x250 内 6 项全可见; 定位 clamp 改 rect.height-196
+- **全局细滚动条**: `*::-webkit-scrollbar` 宽 4px 圆角半透明, hover 用 --scrollbar-hover 变亮, 对话/日历/设置统一
+- **日历布局**: 关闭按钮移到右上角(参照对话/设置面板); 月历/运势/雷达图/日程详情合并到 `.cal-scroll` 单滚动容器(移除各板块独立滚动, 同设置页)
+
 ### 5. 其他约定
 - LLM: deepseek-v4-flash, max_tokens ≥16000 (推理模型 reasoning 吃 token)
 - 主求方向: settings.mainWish (wealth/love/career/health/study/peace)

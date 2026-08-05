@@ -60,8 +60,13 @@ npx electron-builder --win nsis
 ### 4. 拖拽/交互 / 透明桌宠 (豆包式)
 - 拖拽: #pet-stage mousedown → moveWindow IPC; **不要加 window blur 重置** (会导致拖不动); 拖动时 roamPause 暂停漫游, 松手 roamResume
 - **win32 真透明桌宠**: 窗口 `transparent:true` + `backgroundColor` 透明; CSS `body.platform-win32 #app` 透明/无边框/无阴影/去光晕; 点击穿透 = 主进程光标轮询(120ms)发窗口内相对坐标 → 渲染进程 `elementFromPoint` 命中测试(交互元素: pet/按钮/气泡/面板) → `set-click-through` → `setIgnoreMouseEvents(value, {forward:true})`; **Linux 软渲染透明不上屏, 保持不透明调试模式**
-- **全屏漫游(随机行为状态机驱动)**: 宠物固定在窗口中心, 移动完全靠窗口漫游(不再有窗口内 petX/petY 走动)。渲染进程 pet.js 行为状态机交替: 漫游阶段(roamStart→窗口 40ms/tick ~40px/s 随机方向+边缘反弹, 宠物 walk 动图 15-45s) ↔ 休息阶段(roamStop→窗口停下, 随机 sleep/play/happy/sad 动图 10-40s)。漫游由渲染进程经 `roam-start`/`roam-stop` IPC 驱动, 拖动用 roam-pause/resume 临时暂停; `pet-roam` 事件同步宠物走路视觉; `pet-resume` 事件在面板关闭后让行为机重排; 设置 `petRoam` 关闭时只做休息状态循环
-- **粘人模式(第三宠物模式, settings.activity='clingy')**: 行为状态机新增 sit 阶段 — 漫游 30-90s → 趴到当前活跃窗口顶边居中(sit 20-60s, 显示"趴着玩耍" play 动作/SVG 蹲伏动画) → 继续漫游。主进程 `getActiveWindowRect()` 平台适配器(Linux xdotool→xprop+xwininfo 退化, Win PowerShell GetForegroundWindow, macOS osascript; 全部 try/catch, 失败返回 null; 自动排除宠物窗口自身); `pet-sit` IPC 定位(目标窗口 y - 宠物高 + 20, 水平居中, clamp 屏幕内, target=null 时随机屏幕位置趴下即降级); `pet-snap` IPC 拖动松手吸附(鼠标在活跃窗口内→趴上); 渲染进程 `_beginSitPhase`/`onDragRelease` 驱动
+- **三种宠物模式(settings.activity)与行为状态机** (宠物固定在窗口中心, 移动靠窗口位置管理):
+  - **active 活跃**: 全屏漫游(roamStart→窗口 40ms/tick ~40px/s 随机方向+边缘反弹, 宠物 walk 动图 15-45s) ↔ 休息(roamStop→窗口停下, 随机 sleep/play/happy/sad 10-40s), 随机动或不动
+  - **quiet 安静**: 只在屏幕右下角据点(workArea 右下角留 20px, `pet-corner` IPC), 不漫游, 状态只 sleep/idle; 拖动后停在新位置不再回角(本阶段不重复 dock)
+  - **clingy 粘人**: 默认右下角据点休息(sleep/sad 等, 切粘人先强制在角落睡一轮); 抽到 happy/play → 趴到当前活跃窗口上沿居中(`sitWindowOn`: y=工作窗y-宠物高+10, 顶部空间不足贴下沿 y=工作窗y+高+10), 玩耍 20-60s 后回右下角; 鼠标在工作窗口内快速移动时概率性跟过去(`pet-follow-mouse` 挪到鼠标上方~100px, `pet-mouse-fast` 事件限流, 渲染概率 35%+冷却 15s)
+  - 漫游仅 active 模式启用; 拖动 roam-pause/resume 临时暂停; `pet-roam` 事件同步走路视觉; `pet-resume` 事件面板关闭后重排; `petRoam` 关闭时 active 只休息循环
+- **主进程行为支撑**: `getActiveWindowRect()` 平台适配器(Linux xdotool→xprop+xwininfo 退化, Win PowerShell GetForegroundWindow, macOS osascript; 全 try/catch 失败返 null; 自动排除宠物窗口自身); IPC: `pet-sit`(趴窗定位) / `pet-snap`(拖动松手吸附) / `pet-corner`(右下角停靠) / `pet-follow-mouse`(跟鼠标) / `get-active-window-rect`; 渲染进程 `_beginQuietPhase`/`_beginClingyRest`/`_beginSitPhase`/`_handleMouseFast`/`onDragRelease` 驱动
+- **悬浮窗无边框(全平台)**: `#app` 无 border/outline/box-shadow; 各主题背景也去边框; `body.theme-light #app.theme-*` 不再设边框(曾因 specificity 高于 `body.platform-win32 #app` 在 win32+浅色下残留 1px 边框); win32 透明规则全部 `!important`
 - 气泡 #reminder-bubble 可点击 → 打开聊天
 
 ### 5. 界面主题 (浅色)

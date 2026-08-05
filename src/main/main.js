@@ -399,14 +399,22 @@ function getActiveWindowRect() {
 }
 
 // 把宠物窗口摆到目标窗口顶边居中趴着；target 为 null 时用随机屏幕位置（降级）。
-// y = 工作窗口 y - 宠物高 + 20，位置偏上避免挡内容；结果 clamp 到显示器 workArea。
+// 粘人趴窗口: 顶边 y = 工作窗口 y - 宠物高 + 10, 水平居中; 若顶部空间不足(超出屏幕顶)
+// 则贴下沿 y = 工作窗口 y + 高 + 10; 结果 clamp 到显示器 workArea。
 function sitWindowOn(target) {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
   let x;
   let y;
   if (target && [target.x, target.y, target.width, target.height].every((n) => typeof n === 'number')) {
     x = target.x + (target.width - PET_WIDTH) / 2;
-    y = target.y - PET_HEIGHT + 20;
+    y = target.y - PET_HEIGHT + 10;
+    try {
+      const wa = screen.getDisplayNearestPoint({ x: Math.round(target.x), y: Math.round(target.y) }).workArea;
+      if (y < wa.y) {
+        // 顶部空间不足 → 贴到工作窗口下沿
+        y = target.y + target.height + 10;
+      }
+    } catch (e) { /* ignore */ }
   } else {
     const wa = screen.getPrimaryDisplay().workArea;
     x = wa.x + Math.random() * Math.max(0, wa.width - PET_WIDTH);
@@ -419,6 +427,15 @@ function sitWindowOn(target) {
   } catch (e) { /* ignore */ }
   mainWindow.setPosition(Math.round(x), Math.round(y));
   return { x: Math.round(x), y: Math.round(y) };
+}
+
+// 右下角停靠位置(安静/粘人模式的默认据点): workArea 右下角, 留 20px 边距
+function cornerPosition() {
+  const wa = screen.getPrimaryDisplay().workArea;
+  return {
+    x: Math.round(wa.x + wa.width - PET_WIDTH - 20),
+    y: Math.round(wa.y + wa.height - PET_HEIGHT - 20),
+  };
 }
 
 // --- Lunar data helpers ---
@@ -916,10 +933,26 @@ function setupIPC() {
   let lastSentMode = null;
   let lastRelX = null;
   let lastRelY = null;
+  // 粘人「跟鼠标」：追踪光标速度，快速移动时向渲染进程发 pet-mouse-fast 事件(限流)
+  let lastCursorPt = null;
+  let lastCursorTs = 0;
+  let lastMouseFastSent = 0;
 
   function updateCursorState() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const cursor = screen.getCursorScreenPoint();
+    const now = Date.now();
+    // 光标快速移动检测（粘人跟鼠标事件；渲染进程按模式+概率决定是否跟随）
+    if (lastCursorPt && now - lastCursorTs > 0) {
+      const dist = Math.hypot(cursor.x - lastCursorPt.x, cursor.y - lastCursorPt.y);
+      const speed = dist / ((now - lastCursorTs) / 1000); // px/s
+      if (speed > 600 && now - lastMouseFastSent > 800) {
+        lastMouseFastSent = now;
+        mainWindow.webContents.send('pet-mouse-fast', { x: cursor.x, y: cursor.y });
+      }
+    }
+    lastCursorPt = cursor;
+    lastCursorTs = now;
     const b = mainWindow.getBounds();
     const inWin =
       cursor.x >= b.x && cursor.x <= b.x + b.width &&
@@ -1025,6 +1058,26 @@ function setupIPC() {
       return { sitting: true, target: rect };
     }
     return { sitting: false };
+  });
+
+  // 停靠到屏幕右下角（安静/粘人模式的默认据点，workArea 右下角留 20px 边距）
+  ipcMain.handle('pet-corner', () => {
+    const p = cornerPosition();
+    mainWindow.setPosition(p.x, p.y);
+    return { ok: true, x: p.x, y: p.y };
+  });
+
+  // 粘人「跟鼠标」：把宠物窗口移到鼠标上方约 100px 处（clamp 到显示器 workArea）
+  ipcMain.handle('pet-follow-mouse', (_event, mx, my) => {
+    let x = Number(mx) - PET_WIDTH / 2;
+    let y = Number(my) - PET_HEIGHT - 100;
+    try {
+      const wa = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+      x = Math.max(wa.x + 4, Math.min(x, wa.x + wa.width - PET_WIDTH - 4));
+      y = Math.max(wa.y + 4, Math.min(y, wa.y + wa.height - PET_HEIGHT - 4));
+    } catch (e) { /* ignore */ }
+    mainWindow.setPosition(Math.round(x), Math.round(y));
+    return { ok: true, x: Math.round(x), y: Math.round(y) };
   });
 
   // Start cursor watch (guarded until mainWindow exists)

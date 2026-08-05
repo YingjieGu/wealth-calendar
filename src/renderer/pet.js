@@ -7,10 +7,11 @@ const PetState = {
     this.zzzEl = document.getElementById('pet-zzz');
     this.stageEl = document.getElementById('pet-stage');
     this.currentState = 'idle';
-    this.activityMode = 'active'; // 'active' or 'quiet'
-    // 随机行为状态机：漫游阶段(roam) 与 休息阶段(rest) 交替
-    this._currentPhase = null;      // 'roam' | 'rest'
+    this.activityMode = 'active'; // 'active' | 'quiet' | 'clingy'
+    // 随机行为状态机：各模式的阶段(active: roam/rest, quiet: quiet, clingy: clingy/sit)
+    this._currentPhase = null;      // 'roam' | 'rest' | 'quiet' | 'clingy' | 'sit'
     this._behaviorTimer = null;    // 阶段切换定时器
+    this._lastMouseFollow = 0;     // 粘人「跟鼠标」上次跟随时间(冷却 15s)
     // 豆包式玩法状态
     this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/cat2/caishen）
     this._platform = (window.wealthCalendar && window.wealthCalendar.platform) || 'linux';
@@ -45,11 +46,17 @@ const PetState = {
     try {
       window.wealthCalendar.onPetResume(() => this._rearmCurrentPhase());
     } catch (e) { /* ignore */ }
-    // 随机行为状态机启动：活跃/安静先停留展示休息状态；粘人先漫游(30-90s 后去趴)
+    // 粘人「跟鼠标」：鼠标在工作窗口内快速移动时概率性挪过去互动
+    try {
+      window.wealthCalendar.onPetMouseFast((evt) => this._handleMouseFast(evt));
+    } catch (e) { /* ignore */ }
+    // 随机行为状态机启动：active 先休息展示状态；quiet 右下角据点；clingy 右下角/趴窗口
     this._currentPhase = null;
     this._behaviorTimer = null;
     setTimeout(() => {
-      if (this._activityMode() === 'clingy') this._beginRoamPhase();
+      const mode = this._activityMode();
+      if (mode === 'quiet') this._beginQuietPhase();
+      else if (mode === 'clingy') this._beginClingyRest('sleep');
       else this._beginRestPhase();
     }, 1200);
   },
@@ -63,61 +70,101 @@ const PetState = {
     const changed = mode !== this.activityMode;
     this.activityMode = mode;
     if (!changed) return; // 启动默认模式不变时不重排（避免启动即漫游的抖动）
-    // 切到粘人：立即进入粘人循环（未在漫游/趴着时先开始漫游）
-    if (mode === 'clingy') {
-      if (this._currentPhase !== 'roam' && this._currentPhase !== 'sit') this._beginRoamPhase();
-      return;
+    // 只有活跃模式才漫游；切到安静/粘人先停漫游并停靠右下角据点
+    try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
+    if (mode === 'quiet') {
+      this._dockCorner();          // 安静：右下角据点
+      this._beginQuietPhase();
+    } else if (mode === 'clingy') {
+      this._dockCorner();          // 粘人：默认右下角据点
+      this._beginClingyRest('sleep'); // 先安心在角落睡一轮，再随状态决定是否趴窗
+    } else {
+      this._beginRoamPhase();      // 活跃：全屏漫游循环
     }
-    // 离开粘人：若正趴着则离开继续漫游；其余让当前阶段自然结束
-    if (this._currentPhase === 'sit') this._beginRoamPhase();
   },
 
   // ============ 随机行为状态机 ============
-  // 活跃/安静：漫游(walk) ↔ 休息(sleep/play/happy/sad)。
-  // 粘人：漫游(walk, 30-90s) → 趴到活跃工作窗口顶边(sit, 20-60s) → 继续漫游。
-  // 漫游关闭时只做休息状态的循环，窗口始终停在原位。
-  // 阶段切换统一走这里。
+  // active: 全屏随机漫游(walk) ↔ 休息(sleep/play/happy/sad)，随机动或不动。
+  // quiet: 右下角据点(workArea 右下角留 20px)，状态只 sleep/idle，不漫游；
+  //        拖动后停在新位置不再回角（本阶段不重复 dock）。
+  // clingy: 默认右下角休息(sleep/sad 等)；抽到 happy/play → 趴到活跃工作窗口
+  //        上沿居中(空间不足贴下沿)，玩耍 20-60s 后回右下角；鼠标快速移动时概率性跟随。
   _scheduleNextPhase() {
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
-    // 漫游开关：settings.petRoam 默认开启（SettingsManager 尚未初始化时视为开启）
+    const mode = this._activityMode();
+    if (mode === 'quiet') { this._beginQuietPhase(); return; }
+    if (mode === 'clingy') {
+      if (this._currentPhase === 'sit') {
+        this._dockCorner();        // 趴完回右下角
+        this._beginClingyRest();
+      } else {
+        this._beginClingyRest();   // 右下角休息决策：抽到 happy/play → 去趴窗口
+      }
+      return;
+    }
+    // active：漫游开关默认开启（关闭则只休息循环，窗口停原位）
     let roamOn = true;
     try {
       roamOn = !(SettingsManager.settings && SettingsManager.settings.petRoam === false);
     } catch (e) { /* ignore */ }
     if (!roamOn) { this._beginRestPhase(); return; }
-    if (this._activityMode() === 'clingy') {
-      // 粘人：趴完离开继续漫游；漫游结束去趴活跃窗口（检测不到则随机屏幕位置趴下）
-      if (this._currentPhase === 'sit') this._beginRoamPhase();
-      else this._beginSitPhase();
-      return;
-    }
     if (this._currentPhase === 'roam') this._beginRestPhase();
     else this._beginRoamPhase();
   },
 
-  // 漫游阶段：让主进程开始移动窗口，宠物显示 walk 动作图。
-  // 活跃/安静持续 15-45s；粘人持续 30-90s（每 30-90s 决定去趴一次）
+  // 漫游阶段（仅活跃模式）：主进程移动窗口，宠物 walk 动作图，持续 15-45s
   _beginRoamPhase() {
     this._currentPhase = 'roam';
     try { window.wealthCalendar.roamStart(); } catch (e) { /* ignore */ }
     this.enterState('walk');
-    const clingy = this._activityMode() === 'clingy';
-    const dur = clingy ? (30000 + Math.random() * 60000) : (15000 + Math.random() * 30000);
+    const dur = 15000 + Math.random() * 30000;
     this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
   },
 
-  // 休息阶段：停下窗口，随机进入 sleep/play/happy/sad，停留 10-40 秒
+  // 休息阶段（活跃模式）：停下窗口，随机 sleep/play/happy/sad，10-40s
   _beginRestPhase() {
     this._currentPhase = 'rest';
     try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
-    let pool = ['sleep', 'play', 'happy', 'sad'];
-    if (this.activityMode === 'quiet') pool = Math.random() < 0.5 ? ['sleep'] : pool;
+    const pool = ['sleep', 'play', 'happy', 'sad'];
     this.enterState(pool[Math.floor(Math.random() * pool.length)]);
     const dur = 10000 + Math.random() * 30000;
     this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
   },
 
-  // 趴着阶段（粘人）：窗口停到活跃窗口顶边居中，显示"趴着玩耍"动作，停留 20-60s。
+  // 安静模式阶段：右下角据点，状态只 sleep/idle，不漫游；拖动后停新位置（不重复 dock）
+  _beginQuietPhase() {
+    this._currentPhase = 'quiet';
+    try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
+    this.enterState(Math.random() < 0.4 ? 'sleep' : 'idle');
+    const dur = 20000 + Math.random() * 20000;
+    this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
+  },
+
+  // 粘人模式阶段：右下角休息(sleep/sad 等)；抽到 happy/play → 去趴工作窗口。
+  // forcedState 传入时强制该休息状态（切粘人后先安心在角落睡一轮）。
+  _beginClingyRest(forcedState) {
+    this._currentPhase = 'clingy';
+    try { window.wealthCalendar.roamStop(); } catch (e) { /* ignore */ }
+    let state = forcedState;
+    if (!state) {
+      const pool = ['sleep', 'sad', 'happy', 'play'];
+      state = pool[Math.floor(Math.random() * pool.length)];
+      if (state === 'happy' || state === 'play') {
+        this._beginSitPhase();      // 心情好/玩耍 → 趴到工作窗口玩耍
+        return;
+      }
+    }
+    this.enterState(state);
+    const dur = 20000 + Math.random() * 20000;
+    this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
+  },
+
+  // 停靠屏幕右下角据点（安静/粘人模式）
+  async _dockCorner() {
+    try { await window.wealthCalendar.petCorner(); } catch (e) { /* ignore */ }
+  },
+
+  // 趴着阶段（粘人）：窗口停到活跃窗口上沿居中（空间不足贴下沿），显示"趴着玩耍"，停留 20-60s。
   // targetRect 传入时直接用于定位（拖动吸附场景）；skipMove 为 true 时窗口已就位不再移动。
   async _beginSitPhase(targetRect, skipMove) {
     this._currentPhase = 'sit';
@@ -135,11 +182,31 @@ const PetState = {
     this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), dur);
   },
 
-  // 重新进入当前阶段（面板关闭恢复时调用）。sit 阶段在拖动离开后不再趴回，改为继续漫游。
+  // 粘人「跟鼠标」：鼠标在工作窗口内快速移动时, 概率性挪到鼠标上方约 100px 处互动
+  async _handleMouseFast(evt) {
+    if (this._activityMode() !== 'clingy') return;
+    if (!evt || Math.random() > 0.35) return;     // 概率性
+    const now = Date.now();
+    if (this._lastMouseFollow && now - this._lastMouseFollow < 15000) return; // 冷却 15s
+    this._lastMouseFollow = now;
+    let rect = null;
+    try { rect = await window.wealthCalendar.getActiveWindowRect(); } catch (e) { /* ignore */ }
+    if (!rect) return;                            // 检测不到活跃窗口不跟
+    if (evt.x < rect.x || evt.x > rect.x + rect.width || evt.y < rect.y || evt.y > rect.y + rect.height) return;
+    // 暂停当前阶段，挪到鼠标附近并展示互动状态，短暂停留后继续粘人循环
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    try { await window.wealthCalendar.petFollowMouse(evt.x, evt.y); } catch (e) { /* ignore */ }
+    this.enterState(Math.random() < 0.5 ? 'play' : 'happy');
+    this._behaviorTimer = setTimeout(() => this._scheduleNextPhase(), 8000);
+  },
+
+  // 重新进入当前模式/阶段（面板关闭恢复时调用）
   _rearmCurrentPhase() {
+    const mode = this._activityMode();
+    if (mode === 'quiet') { this._beginQuietPhase(); return; }
+    if (mode === 'clingy') { this._scheduleNextPhase(); return; } // sit→回角, 其他继续循环
     if (this._currentPhase === 'roam') this._beginRoamPhase();
-    else if (this._currentPhase === 'rest') this._beginRestPhase();
-    else this._beginRoamPhase(); // 'sit' 或初始：离开继续漫游
+    else this._beginRestPhase();
   },
 
   // 设置页切换漫游开关：立即按新开关重新调度
@@ -152,7 +219,7 @@ const PetState = {
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
   },
   async onDragRelease() {
-    // 粘人模式：松手时鼠标在活跃窗口内 → 吸附趴上去；其余恢复当前阶段
+    // 粘人模式：松手时鼠标在活跃窗口内 → 吸附趴上去；其余恢复当前模式/阶段
     let snapped = false;
     try {
       if (this._activityMode() === 'clingy') {

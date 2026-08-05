@@ -16,10 +16,22 @@ const SettingsManager = {
     const activity = this.settings.activity || 'active';
     PetState.setActivity(activity);
 
+    // 界面主题（深色默认 / 浅色）
+    const uiTheme = this.settings.uiTheme || 'dark';
+    this.applyUiTheme(uiTheme);
+
     // Update UI buttons
     this.updateThemeUI(theme);
     this.updateActivityUI(activity);
     this.applyUserInfo();
+  },
+
+  // 界面主题：深色(默认) / 浅色，body.theme-light 由 styles.css CSS 变量覆盖
+  applyUiTheme(uiTheme) {
+    document.body.classList.toggle('theme-light', uiTheme === 'light');
+    document.querySelectorAll('#ui-theme-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', b.dataset.uiTheme === uiTheme);
+    });
   },
 
   applyUserInfo() {
@@ -130,6 +142,17 @@ const SettingsManager = {
       this.updateActivityUI(activity);
       PetState.setActivity(activity);
       this.save();
+    });
+
+    // 界面主题：深色 / 浅色（settings.uiTheme 持久化）
+    document.getElementById('ui-theme-options').addEventListener('click', (e) => {
+      const btn = e.target.closest('.activity-option');
+      if (!btn) return;
+      const uiTheme = btn.dataset.uiTheme;
+      this.settings.uiTheme = uiTheme;
+      this.applyUiTheme(uiTheme);
+      this.save();
+      showToast(uiTheme === 'light' ? '☀️ 已切换浅色主题' : '🌙 已切换深色主题');
     });
 
     // 全屏漫游开关（settings.petRoam，默认开启）

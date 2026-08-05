@@ -132,7 +132,8 @@ function convertToPng(dataUrl) {
       stage.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
       window.wealthCalendar.roamResume(); // 解除拖动暂停（漫游阶段自动恢复移动）
-      if (window.PetState && PetState.onDragEnd) PetState.onDragEnd(); // 恢复行为状态机，重排当前阶段
+      // 恢复行为状态机：粘人模式先做吸附检测（松手在活跃窗口内→趴上去），其余重排当前阶段
+      if (window.PetState && PetState.onDragRelease) PetState.onDragRelease();
     }
   });
 })();

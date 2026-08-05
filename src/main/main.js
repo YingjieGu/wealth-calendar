@@ -9,8 +9,11 @@ app.commandLine.appendSwitch('disable-gpu-compositing');
 // Try Chromium's bundled SwiftShader (pure software) instead of the ancient
 // system llvmpipe (Mesa 19.2.6 on this KVM box) — bitmaps may render again.
 app.commandLine.appendSwitch('use-angle', 'swiftshader');
+// Linux X11 transparent windows historically need this to present content.
+app.commandLine.appendSwitch('enable-transparent-visuals');
 const path = require('path');
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const { createTray } = require('./tray');
 const calendarStore = require('./calendarStore');
 const { startReminder, stopReminder } = require('./reminder');
@@ -151,6 +154,8 @@ function createWindow() {
     width: PET_WIDTH,
     height: PET_HEIGHT,
     frame: false,
+    // win32: 真透明桌宠（DWM 合成正常, 已验证完美）
+    // Linux KVM + SwiftShader: 透明窗口内容不上屏(实测壁纸透过无内容) → 保持不透明调试模式
     transparent: IS_WIN32,
     backgroundColor: IS_WIN32 ? '#00000000' : '#1a142e',
     alwaysOnTop: true,
@@ -311,6 +316,109 @@ function startRoaming() {
     mainWindow.setPosition(Math.round(nx), Math.round(ny));
     notifyRoam(true);
   }, ROAM_TICK_MS);
+}
+
+// --- 活跃工作窗口检测（粘人模式平台适配器） ---
+// 返回当前用户工作窗口的 {x,y,width,height}（屏幕绝对坐标），检测失败返回 null。
+// - Linux: 优先 xdotool getactivewindow getwindowgeometry --shell；缺失时退化到
+//   xprop -root _NET_ACTIVE_WINDOW + xwininfo -stats
+// - Windows: PowerShell GetForegroundWindow + GetWindowRect
+// - macOS: osascript System Events（需辅助功能权限）
+// 任一步骤失败都返回 null，调用方据此降级（随机屏幕位置趴下）。
+function getActiveWindowRect() {
+  const selfGuard = (rect) => {
+    // 排除宠物窗口自身（粘人模式下它可能拿到焦点，不能趴在"自己"上）
+    if (!rect || !mainWindow || mainWindow.isDestroyed()) return null;
+    const [wx, wy] = mainWindow.getPosition();
+    const [ww, wh] = mainWindow.getSize();
+    if (Math.abs(rect.x - wx) < 8 && Math.abs(rect.y - wy) < 8 &&
+        Math.abs(rect.width - ww) < 8 && Math.abs(rect.height - wh) < 8) return null;
+    return rect;
+  };
+  try {
+    if (process.platform === 'win32') {
+      const script = [
+        "Add-Type -TypeDefinition @\"",
+        "using System;",
+        "using System.Runtime.InteropServices;",
+        "public class WcWin {",
+        "  [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow();",
+        "  [DllImport(\"user32.dll\")] public static extern bool GetWindowRect(IntPtr h, out RECT r);",
+        "  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }",
+        "}",
+        "\"@",
+        "$h = [WcWin]::GetForegroundWindow()",
+        "$r = New-Object WcWin+RECT",
+        "[WcWin]::GetWindowRect($h, [ref]$r) | Out-Null",
+        "Write-Output (\"$($r.Left) $($r.Top) $($r.Right - $r.Left) $($r.Bottom - $r.Top)\")",
+      ].join('\n');
+      const out = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', timeout: 4000 });
+      const parts = String(out).trim().split(/\s+/).map(Number);
+      if (parts.length >= 4 && parts.every((n) => Number.isFinite(n))) {
+        return selfGuard({ x: parts[0], y: parts[1], width: parts[2], height: parts[3] });
+      }
+      return null;
+    }
+    if (process.platform === 'darwin') {
+      const script = 'tell application "System Events" to tell (first application process whose frontmost is true) to get {position, size} of front window';
+      const out = execFileSync('osascript', ['-e', script], { encoding: 'utf8', timeout: 4000 });
+      // 输出形如 "100, 200, 800, 600"（逗号分隔）
+      const m = String(out).match(/(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)/);
+      if (!m) return null;
+      return selfGuard({ x: +m[1], y: +m[2], width: +m[3], height: +m[4] });
+    }
+    // Linux
+    try {
+      const out = execFileSync('xdotool', ['getactivewindow', 'getwindowgeometry', '--shell'], { encoding: 'utf8', timeout: 3000 });
+      const nums = {};
+      String(out).split('\n').forEach((line) => {
+        const kv = line.match(/^([A-Z]+)=(\d+)/);
+        if (kv && ['X', 'Y', 'WIDTH', 'HEIGHT'].includes(kv[1])) nums[kv[1]] = parseInt(kv[2], 10);
+      });
+      if (nums.X !== undefined && nums.Y !== undefined && nums.WIDTH && nums.HEIGHT) {
+        return selfGuard({ x: nums.X, y: nums.Y, width: nums.WIDTH, height: nums.HEIGHT });
+      }
+    } catch (e) { /* xdotool 缺失 → 退化到 xprop+xwininfo */ }
+    try {
+      const wprop = execFileSync('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { encoding: 'utf8', timeout: 3000 });
+      const wid = String(wprop).match(/0x[0-9a-fA-F]+/);
+      if (!wid) return null;
+      const info = execFileSync('xwininfo', ['-id', wid[0], '-stats'], { encoding: 'utf8', timeout: 3000 });
+      const get = (label) => {
+        const line = String(info).split('\n').find((l) => l.includes(label));
+        const m = line && line.match(/(-?\d+)/);
+        return m ? parseInt(m[1], 10) : NaN;
+      };
+      const rect = { x: get('Absolute upper-left X'), y: get('Absolute upper-left Y'), width: get('Width'), height: get('Height') };
+      if ([rect.x, rect.y, rect.width, rect.height].every((n) => Number.isFinite(n))) return selfGuard(rect);
+    } catch (e) { /* ignore */ }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 把宠物窗口摆到目标窗口顶边居中趴着；target 为 null 时用随机屏幕位置（降级）。
+// y = 工作窗口 y - 宠物高 + 20，位置偏上避免挡内容；结果 clamp 到显示器 workArea。
+function sitWindowOn(target) {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  let x;
+  let y;
+  if (target && [target.x, target.y, target.width, target.height].every((n) => typeof n === 'number')) {
+    x = target.x + (target.width - PET_WIDTH) / 2;
+    y = target.y - PET_HEIGHT + 20;
+  } else {
+    const wa = screen.getPrimaryDisplay().workArea;
+    x = wa.x + Math.random() * Math.max(0, wa.width - PET_WIDTH);
+    y = wa.y + Math.random() * Math.max(0, wa.height - PET_HEIGHT);
+  }
+  try {
+    const nearest = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+    x = Math.max(nearest.x + 4, Math.min(x, nearest.x + nearest.width - PET_WIDTH - 4));
+    y = Math.max(nearest.y + 4, Math.min(y, nearest.y + nearest.height - PET_HEIGHT - 4));
+  } catch (e) { /* ignore */ }
+  mainWindow.setPosition(Math.round(x), Math.round(y));
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 // --- Lunar data helpers ---
@@ -895,6 +1003,28 @@ function setupIPC() {
     saveSettings(s);
     if (!enabled) stopRoaming();
     // 开启漫游时由渲染进程行为状态机决定何时开始（roamStart），这里不主动启动
+  });
+
+  // --- 粘人模式：活跃窗口检测 + 趴窗口 + 拖动吸附 ---
+  ipcMain.handle('get-active-window-rect', () => getActiveWindowRect());
+
+  // 趴到目标窗口顶部居中；target 为 null → 随机屏幕位置趴下（平台检测降级）
+  ipcMain.handle('pet-sit', (_event, target) => {
+    const pos = sitWindowOn(target);
+    return { ok: !!pos, ...(pos || {}) };
+  });
+
+  // 拖动松手吸附：鼠标在当前活跃窗口内 → 自动趴上去
+  ipcMain.handle('pet-snap', () => {
+    const rect = getActiveWindowRect();
+    if (!rect) return { sitting: false };
+    const c = screen.getCursorScreenPoint();
+    if (c.x >= rect.x && c.x <= rect.x + rect.width &&
+        c.y >= rect.y && c.y <= rect.y + rect.height) {
+      sitWindowOn(rect);
+      return { sitting: true, target: rect };
+    }
+    return { sitting: false };
   });
 
   // Start cursor watch (guarded until mainWindow exists)

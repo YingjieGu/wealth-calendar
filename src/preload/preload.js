@@ -102,6 +102,11 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   // 主题素材系统：按主题+动作文件名取动图 data URL（财神 webp / 猫咪 gif）
   themeAsset: (theme, file) => ipcRenderer.invoke('themes:asset', theme, file).then((r) => (r ? r.dataUrl : null)),
 
+  // 粘人模式：活跃工作窗口检测 / 趴窗口 / 拖动松手吸附
+  getActiveWindowRect: () => ipcRenderer.invoke('get-active-window-rect'),
+  petSit: (target) => ipcRenderer.invoke('pet-sit', target),
+  petSnap: () => ipcRenderer.invoke('pet-snap'),
+
   // Multimodal pet animation
   multimodalGenerate: (imageDataUrl) => ipcRenderer.invoke('multimodal:generate', imageDataUrl),
   multimodalClear: () => ipcRenderer.invoke('multimodal:clear'),

@@ -40,8 +40,9 @@ function convertToPng(dataUrl) {
 }
 
 // --- Click-through management (transparent pet window) ---
-// Main process polls the cursor and sends 'cursor-state' (interactive/transparent/outside).
-// We just mirror it: interactive -> show hover buttons; outside -> hide.
+// Main process polls the cursor, sends {mode, x, y} (window-relative coords),
+// and we do the hit-test here: only interactive elements (pet/buttons/bubble/
+// panels) are clickable; on win32 everything else clicks through.
 (function setupClickThrough() {
   // Tag platform for CSS (Windows can do true see-through pets)
   try {
@@ -66,20 +67,36 @@ function convertToPng(dataUrl) {
   const calView = document.getElementById('calendar-view');
   if (calView) observer.observe(calView, { attributes: true, attributeFilter: ['style'] });
 
-  // Cursor state drives hover button visibility
+  // 可交互元素：宠物本体 / 悬浮按钮 / 气泡 / 右键菜单 / 各面板
+  const INTERACTIVE_SELECTOR =
+    '#pet, #pet-svg, #pet-emoji, #pet-img, #pet-video, #pet-canvas, #pet-bg, #pet-zzz, ' +
+    '#hover-buttons, .hover-btn, #reminder-bubble, #context-menu, ' +
+    '#chat-panel, #settings-panel, #calendar-view';
+
+  function hitInteractive(x, y) {
+    if (x < 0 || y < 0) return false;
+    const el = document.elementFromPoint(x, y);
+    return !!(el && el.closest(INTERACTIVE_SELECTOR));
+  }
+
   const hoverButtons = document.getElementById('hover-buttons');
-  window.wealthCalendar.onCursorState((mode) => {
-    if (mode === 'interactive') {
-      hoverButtons.classList.add('visible');
-    } else {
-      hoverButtons.classList.remove('visible');
+  window.wealthCalendar.onCursorState((state) => {
+    const mode = (typeof state === 'string') ? state : state.mode;
+    const x = (typeof state === 'string') ? -1 : state.x;
+    const y = (typeof state === 'string') ? -1 : state.y;
+    const hit = mode === 'hit' && hitInteractive(x, y);
+    const interactive = mode === 'interactive' || hit;
+    hoverButtons.classList.toggle('visible', interactive);
+    // win32 真透明窗口：透明区域点击穿透，交互元素不穿透
+    if (window.wealthCalendar.platform === 'win32') {
+      window.wealthCalendar.setClickThrough(mode === 'hit' && !hit);
     }
   });
 
   notifyPanel();
 })();
 
-// --- Custom window drag (drag anywhere on the pet stage) ---
+// --- Custom window drag (drag pet to move the window) ---
 (function setupDrag() {
   const stage = document.getElementById('pet-stage');
   let isDragging = false;
@@ -90,6 +107,7 @@ function convertToPng(dataUrl) {
     // Don't drag when clicking buttons or inside panels
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     isDragging = true;
+    window.wealthCalendar.roamPause(); // 拖动时暂停漫游
     lastX = e.screenX;
     lastY = e.screenY;
     stage.style.cursor = 'grabbing';
@@ -112,6 +130,7 @@ function convertToPng(dataUrl) {
       isDragging = false;
       stage.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
+      window.wealthCalendar.roamResume(); // 松手恢复漫游
     }
   });
 })();

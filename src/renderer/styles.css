@@ -50,6 +50,19 @@ html, body {
   border: 1px solid rgba(110, 200, 240, 0.3);
 }
 
+/* Windows 透明桌宠模式：整个悬浮框就是宠物本身，透明无边框无阴影。
+   面板(聊天/日历/设置)打开时窗口转大，面板自带背景盖满即可 */
+body.platform-win32 #app {
+  background: transparent !important;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.platform-win32 #pet-stage::before {
+  display: none; /* 去掉舞台光晕，纯宠物可见 */
+}
+
 /* ============================================================
    宠物舞台
    ============================================================ */

@@ -82,7 +82,15 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   setClickThrough: (value) => ipcRenderer.send('set-click-through', value),
   setPanelOpen: (value) => ipcRenderer.send('set-panel-open', value),
   onCursorState: (callback) => {
-    ipcRenderer.on('cursor-state', (_event, mode) => callback(mode));
+    ipcRenderer.on('cursor-state', (_event, state) => callback(state));
+  },
+
+  // 全屏漫游：拖动时暂停/恢复，设置开关，监听漫游状态（窗口移动↔宠物走路）
+  roamPause: () => ipcRenderer.send('roam-pause'),
+  roamResume: () => ipcRenderer.send('roam-resume'),
+  roamSet: (enabled) => ipcRenderer.send('roam-set', enabled),
+  onPetRoam: (callback) => {
+    ipcRenderer.on('pet-roam', (_event, roaming) => callback(roaming));
   },
 
   // Multimodal pet animation

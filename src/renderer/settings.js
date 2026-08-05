@@ -74,6 +74,14 @@ const SettingsManager = {
     });
   },
 
+  // 全屏漫游开关（settings.petRoam，默认开启）
+  applyRoam() {
+    const on = this.settings.petRoam !== false;
+    document.querySelectorAll('#roam-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.roam === '1') === on);
+    });
+  },
+
   bindUI() {
     // Theme selection
     document.getElementById('theme-options').addEventListener('click', (e) => {
@@ -122,6 +130,21 @@ const SettingsManager = {
       this.updateActivityUI(activity);
       PetState.setActivity(activity);
       this.save();
+    });
+
+    // 全屏漫游开关（settings.petRoam，默认开启）
+    this.applyRoam();
+    document.querySelectorAll('#roam-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const on = btn.dataset.roam === '1';
+        this.settings.petRoam = on;
+        document.querySelectorAll('#roam-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        if (window.wealthCalendar.roamSet) window.wealthCalendar.roamSet(on);
+        showToast(on ? '🚶 已开启全屏漫游' : '🚫 已关闭漫游');
+      });
     });
 
     // Restore default position

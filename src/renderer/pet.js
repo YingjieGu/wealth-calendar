@@ -22,6 +22,7 @@ const PetState = {
     this._waterTimer = null;      // 喝水提醒定时器
     this._clicks = [];            // 连击计数（1 秒内的点击时间戳）
     this._clickTimer = null;      // 单击反应的延迟定时器（用于区分单击/双击）
+    this._roaming = false;        // 全屏漫游中（窗口移动 ↔ 宠物走路动画）
   },
 
   start() {
@@ -35,6 +36,19 @@ const PetState = {
     this.sayTimeGreeting();
     this.startIdleWatch();
     this.startWaterReminder();
+    // 全屏漫游：窗口移动时宠物持续走路，漫游停止恢复随机状态机
+    try {
+      window.wealthCalendar.onPetRoam((roaming) => {
+        if (roaming) {
+          this._roaming = true;
+          this._pauseStateMachine();
+          if (this.currentState !== 'walk') this.enterState('walk');
+        } else {
+          this._roaming = false;
+          this._resumeStateMachine();
+        }
+      });
+    } catch (e) { /* ignore */ }
   },
 
   setActivity(mode) {
@@ -316,6 +330,7 @@ const PetState = {
 
   // 用户主动互动时（单击/双击/摇签），若宠物正因空闲睡着则立即恢复活力
   _resumeIfIdle() {
+    if (this._roaming) return; // 漫游中保持走路视觉，不切换
     if (this._idleBucket === 'sleep' || this._idleBucket === 'rest') {
       this._idleBucket = 'active';
       this._resumeStateMachine();

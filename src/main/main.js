@@ -31,8 +31,9 @@ let tray = null;
 let isQuitting = false;
 let isCalendarMode = false;
 
-const PET_WIDTH = 220;
-const PET_HEIGHT = 260;
+// 宠物窗口：紧凑贴合宠物的尺寸（给宠物走动 + 气泡 + 底部按钮留空间）
+const PET_WIDTH = 200;
+const PET_HEIGHT = 220;
 const CAL_WIDTH = 420;
 const CAL_HEIGHT = 560;
 
@@ -146,15 +147,15 @@ function createWindow() {
   const savedX = saved.windowX;
   const savedY = saved.windowY;
 
+  // win32: 真透明桌宠窗口（豆包式，Windows 用户主用）；Linux 本机软渲染
+  // 透明窗口不上屏，保留不透明背景调试模式
+  const IS_WIN32 = process.platform === 'win32';
   const windowOptions = {
     width: PET_WIDTH,
     height: PET_HEIGHT,
     frame: false,
-    // Solid window with opaque background: content paints directly to screen
-    // without relying on any compositor. Transparent windows never reached the
-    // screen on this box (KWin + broken GPU), verified via ffmpeg x11grab.
-    transparent: false,
-    backgroundColor: '#1a142e',
+    transparent: IS_WIN32,
+    backgroundColor: IS_WIN32 ? '#00000000' : '#1a142e',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -233,13 +234,13 @@ function createWindow() {
   mainWindow.on('move', () => {
     if (moveTimeout) clearTimeout(moveTimeout);
     moveTimeout = setTimeout(() => {
-      if (!isCalendarMode) {
-        const [x, y] = mainWindow.getPosition();
-        const settings = loadSettings();
-        settings.windowX = x;
-        settings.windowY = y;
-        saveSettings(settings);
-      }
+      // 漫游/面板期间移动不保存位置（避免漫游频繁写盘）
+      if (isCalendarMode || roamTimer) return;
+      const [x, y] = mainWindow.getPosition();
+      const settings = loadSettings();
+      settings.windowX = x;
+      settings.windowY = y;
+      saveSettings(settings);
     }, 500);
   });
 
@@ -253,6 +254,66 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+}
+
+// --- 全屏漫游器（豆包式：窗口随机方向匀速移动，碰到屏幕边缘反弹） ---
+const ROAM_TICK_MS = 40;   // 每 40ms 移动一次
+const ROAM_SPEED = 1.6;    // px/tick ≈ 40px/s，匀速漫游
+let roamTimer = null;
+let roamAngle = Math.random() * Math.PI * 2;
+let roamPaused = false;    // 用户拖动时暂停移动（保持宠物走路视觉）
+let lastRoamState = null;
+
+function roamEnabled() {
+  // 可配置开关：settings.petRoam，默认开启
+  return loadSettings().petRoam !== false;
+}
+
+// 通知渲染进程漫游状态（窗口移动 ↔ 宠物走路动画同步）
+function notifyRoam(roaming) {
+  if (roaming === lastRoamState) return;
+  lastRoamState = roaming;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('pet-roam', roaming);
+  }
+}
+
+function stopRoaming() {
+  if (roamTimer) { clearInterval(roamTimer); roamTimer = null; }
+  notifyRoam(false);
+}
+
+function startRoaming() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!roamEnabled() || isCalendarMode || roamPaused) {
+    stopRoaming();
+    return;
+  }
+  if (roamTimer) return;
+  roamAngle = Math.random() * Math.PI * 2;
+  roamTimer = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // 面板打开：完全停漫游
+    if (isCalendarMode) { stopRoaming(); return; }
+    // 拖动中：暂停移动，但保持宠物走路视觉（不 stopRoaming）
+    if (roamPaused) return;
+
+    const [wx, wy] = mainWindow.getPosition();
+    const [ww, wh] = mainWindow.getSize();
+    const wa = screen.getDisplayNearestPoint({ x: wx, y: wy }).workArea;
+    const margin = 10;
+    let nx = wx + Math.cos(roamAngle) * ROAM_SPEED;
+    let ny = wy + Math.sin(roamAngle) * ROAM_SPEED;
+
+    // 碰到屏幕边缘反弹（镜像角度）
+    if (nx <= wa.x + margin) { nx = wa.x + margin; roamAngle = Math.PI - roamAngle; }
+    else if (nx + ww >= wa.x + wa.width - margin) { nx = wa.x + wa.width - ww - margin; roamAngle = Math.PI - roamAngle; }
+    if (ny <= wa.y + margin) { ny = wa.y + margin; roamAngle = -roamAngle; }
+    else if (ny + wh >= wa.y + wa.height - margin) { ny = wa.y + wa.height - wh - margin; roamAngle = -roamAngle; }
+
+    mainWindow.setPosition(Math.round(nx), Math.round(ny));
+    notifyRoam(true);
+  }, ROAM_TICK_MS);
 }
 
 // --- Lunar data helpers ---
@@ -348,6 +409,7 @@ function setupIPC() {
     if (!mainWindow) return false;
     if (mode === 'panel') {
       isCalendarMode = true;
+      stopRoaming(); // 面板模式固定窗口
       mainWindow.setResizable(true);
       mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
       const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
@@ -356,6 +418,7 @@ function setupIPC() {
       isCalendarMode = false;
       mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
       mainWindow.setResizable(false);
+      startRoaming(); // 回到宠物模式恢复漫游
       const saved = loadSettings();
       const sx = saved.windowX;
       const sy = saved.windowY;
@@ -705,13 +768,16 @@ function setupIPC() {
     return { ok: true };
   });
 
-  // --- Click-through for transparent pet window ---
-  // Poll cursor position from main process (event forwarding from transparent
-  // windows is unreliable on Linux) and drive click-through + hover state.
+  // --- 点击穿透（win32 透明桌宠）---
+  // 主进程轮询光标位置，把「窗口内相对坐标」发给渲染进程，由渲染进程判断
+  // 该点是否命中交互元素（宠物/按钮/气泡），再回传 set-click-through 驱动
+  // 真穿透。非 win32 平台（透明不上屏）保持整窗交互。
   let cursorTimer = null;
   let panelOpen = false;
   let currentClickThrough = null;
   let lastSentMode = null;
+  let lastRelX = null;
+  let lastRelY = null;
 
   function updateCursorState() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -722,24 +788,34 @@ function setupIPC() {
       cursor.y >= b.y && cursor.y <= b.y + b.height;
 
     let mode;
+    let relX = -1;
+    let relY = -1;
     if (!inWin) {
       mode = 'outside';
-    } else if (panelOpen || isCalendarMode) {
-      mode = 'interactive';
     } else {
-      // Whole window interactive (no click-through on any platform for now;
-      // see-through pets need per-platform validation first)
-      mode = 'interactive';
+      relX = cursor.x - b.x;
+      relY = cursor.y - b.y;
+      if (panelOpen || isCalendarMode) {
+        mode = 'interactive';
+      } else if (process.platform === 'win32') {
+        // 透明桌宠：光标在窗口内，交给渲染进程做命中测试
+        mode = 'hit';
+      } else {
+        // Linux/macOS：整窗交互
+        mode = 'interactive';
+      }
     }
 
-    // No click-through: the window is always interactive
-    if (currentClickThrough !== false) {
+    // 非 win32：透明不上屏，穿透无意义，强制整窗交互
+    if (process.platform !== 'win32' && currentClickThrough !== false) {
       currentClickThrough = false;
       mainWindow.setIgnoreMouseEvents(false);
     }
-    if (mode !== lastSentMode) {
+    if (mode !== lastSentMode || relX !== lastRelX || relY !== lastRelY) {
       lastSentMode = mode;
-      mainWindow.webContents.send('cursor-state', mode);
+      lastRelX = relX;
+      lastRelY = relY;
+      mainWindow.webContents.send('cursor-state', { mode, x: relX, y: relY });
     }
   }
 
@@ -755,9 +831,30 @@ function setupIPC() {
   });
 
   ipcMain.on('set-click-through', (_event, value) => {
-    // kept for compatibility; the cursor watch drives the real state
-    currentClickThrough = null;
-    updateCursorState();
+    // 仅 win32 真透明窗口启用穿透；forward:true 让穿透时鼠标移动仍转发
+    // 给渲染进程（悬停/光标状态用）
+    if (process.platform !== 'win32') return;
+    const v = !!value;
+    if (v !== currentClickThrough && mainWindow) {
+      currentClickThrough = v;
+      mainWindow.setIgnoreMouseEvents(v, { forward: true });
+    }
+  });
+
+  // --- 漫游 IPC：拖动暂停/恢复、设置开关 ---
+  ipcMain.on('roam-pause', () => {
+    roamPaused = true; // 只暂停移动，保持宠物走路视觉
+  });
+  ipcMain.on('roam-resume', () => {
+    roamPaused = false;
+    if (!isCalendarMode && roamEnabled()) startRoaming();
+  });
+  ipcMain.on('roam-set', (_event, enabled) => {
+    const s = loadSettings();
+    s.petRoam = !!enabled;
+    saveSettings(s);
+    if (enabled) startRoaming();
+    else stopRoaming();
   });
 
   // Start cursor watch (guarded until mainWindow exists)
@@ -791,6 +888,8 @@ app.whenReady().then(() => {
   );
   setupIPC();
   createWindow();
+  // 豆包式全屏漫游（settings.petRoam 默认开启；面板/拖动时自动暂停）
+  startRoaming();
   tray = createTray(mainWindow, () => {
     isQuitting = true;
     app.quit();

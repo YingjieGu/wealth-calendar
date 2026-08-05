@@ -12,7 +12,7 @@ const PetState = {
     this._currentPhase = null;      // 'roam' | 'rest'
     this._behaviorTimer = null;    // 阶段切换定时器
     // 豆包式玩法状态
-    this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/caishen）
+    this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/cat2/caishen）
     this._platform = (window.wealthCalendar && window.wealthCalendar.platform) || 'linux';
     this._roaming = false;         // 全屏漫游中（窗口移动 ↔ 宠物走路动画）
     this._idleBucket = undefined;  // 空闲感知上次区间：active/idle/rest/sleep
@@ -177,14 +177,26 @@ const PetState = {
     this._applyStateVisual(state);
   },
 
-  // 主题动作映射：各状态 → 动作素材文件名（随机取一张；素材少的状态复用）
+  // 主题动作映射：各状态 → 动作素材文件名（随机取一张；素材少的状态复用）。
+  // 文件名语义分类：sleep(睡觉/困了/躺着舒服) happy(开心/夸赞/音乐/羡慕/野餐)
+  // sad(伤心/哭/冷/心疼/安抚/生气/放屁) play(玩耍/捣蛋/挖沙/攻击/请罪/拖地)
+  // walk(无专门走路图, 复用 play 中合适动作) sit(粘人趴着: 偷看/挖沙/躺着舒服/户外野餐)
   THEME_ACTIONS: {
     cat1: {
-      walk: ['抬头看看.gif'],                       // 素材无走路图，用 play 图循环
+      walk: ['抬头看看.gif', '打屁股.gif'],          // 复用 play 中适合的动作
       sleep: ['睡觉.gif'],
-      happy: ['爱了爱了.gif', '哇我真好看.gif'],     // 随机
-      sad: ['伤心.gif'],
-      play: ['抓你哦.gif', '打屁股.gif', '抬头看看.gif', '偷看.gif'], // 随机
+      happy: ['爱了爱了.gif', '哇我真好看.gif', '欧耶.gif', '听音乐.gif', '哇羡慕.gif'], // 随机
+      sad: ['伤心.gif', '哭了.gif', '好冷.gif', '心疼你.gif', '别哭别哭.gif', '安抚你.gif'],
+      play: ['抓你哦.gif', '打屁股.gif', '抬头看看.gif', '偷看.gif', '捣蛋踢倒水杯.gif', '挖沙.gif', '瞄准准备攻击.gif', '负“鱼”请罪.gif'],
+      sit: ['偷看.gif', '挖沙.gif'],
+    },
+    cat2: {
+      walk: ['哈哈哈.gif'],                          // 无专门走路图，复用 play
+      sleep: ['困了.gif', '躺着舒服.gif'],
+      happy: ['哈哈哈.gif', '欧耶.gif', '太厉害了.gif', '户外野餐.gif'], // 随机
+      sad: ['哼生气.gif', '放屁给你吃.webp'],
+      play: ['拖地.gif', '哈哈哈.gif'],
+      sit: ['户外野餐.gif', '躺着舒服.gif'],
     },
     caishen: {
       walk: ['财神到.webp'],
@@ -192,6 +204,7 @@ const PetState = {
       happy: ['马上有钱.webp'],
       sad: ['财神到.webp'],
       play: ['财神到.webp'],
+      sit: ['财神到.webp'],
     },
   },
 
@@ -204,7 +217,7 @@ const PetState = {
   },
   _applyStateVisual(state) {
     const theme = this._theme || 'cat';
-    const isMaterial = theme === 'cat1' || theme === 'caishen';
+    const isMaterial = theme === 'cat1' || theme === 'cat2' || theme === 'caishen';
     const svgEl = document.getElementById('pet-svg');
     const cls = this._stateClass(state);
     if (isMaterial) {
@@ -646,8 +659,8 @@ const PetState = {
     // 素材主题：显示动作动图（webp/gif）。SwiftShader (use-angle=swiftshader)
     // 已让位图在本机 KVM 软渲染环境也能绘制，统一走素材图；
     // themeAsset 加载失败时 _applyStateVisual 内部自动兜底为 SVG。
-    if (theme === 'cat1' || theme === 'caishen') {
-      appEl.classList.add(theme === 'cat1' ? 'theme-cat' : 'theme-fortune');
+    if (theme === 'cat1' || theme === 'cat2' || theme === 'caishen') {
+      appEl.classList.add(theme === 'caishen' ? 'theme-fortune' : 'theme-cat');
       this._applyStateVisual(this.currentState || 'idle');
       return;
     }

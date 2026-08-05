@@ -8,5 +8,6 @@ Thumbs.db
 python/models/
 apikey.txt
 
-# 用户上传的原始素材目录（已复制入库到 assets/themes/，不入库）
+# 用户上传的原始素材目录/压缩包（已复制入库到 assets/themes/，不入库）
 主题素材/
+主题素材.zip

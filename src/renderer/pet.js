@@ -10,7 +10,8 @@ const PetState = {
     this.activityMode = 'active'; // 'active' | 'quiet' | 'clingy'
     // 位置-阶段模型（猫咪作息）：阶段计时器在渲染进程，位置池/瞬移在主进程
     this._currentPhase = null;      // 保留阶段名（信息用途）
-    this._behaviorTimer = null;    // 阶段切换定时器（10-20 分钟/阶段）
+    this._behaviorTimer = null;    // 阶段切换定时器（位置停留 10-20 分钟/阶段）
+    this._actionTimer = null;      // 动作切换定时器（位置阶段内每 30-90s 随机换动作，与阶段计时器分离）
     this._currentPosType = 'homeBase'; // 当前所在位置类型（跟鼠标互动后恢复用）
     this._firstSleep = false;      // 切粘人首轮在 homeBase 睡一轮
     this._phaseBooted = false;     // 阶段循环是否已由 setActivity 启动
@@ -36,10 +37,11 @@ const PetState = {
     this.sayTimeGreeting();
     this.startIdleWatch();
     this.startWaterReminder();
-    // 面板打开：暂停阶段调度（避免面板期间瞬移挪动面板窗口）
+    // 面板打开：暂停阶段调度与动作切换（避免面板期间瞬移挪动面板窗口）
     try {
       window.wealthCalendar.onPetPanel(() => {
         if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+        if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
       });
     } catch (e) { /* ignore */ }
     // 面板关闭：从当前位置继续阶段循环（下个阶段再瞬移）
@@ -86,8 +88,31 @@ const PetState = {
   POSITION_STATES: {
     homeBase: ['sleep', 'idle'],
     workEdge: ['play', 'happy'],
-    taskbar: ['play', 'idle'],
+    taskbar: ['play'],             // 搞怪（挖沙/捣蛋等，play 池内随机）
     random: ['idle', 'play'],
+  },
+
+  // 动作切换时长：位置阶段内每 30-90 秒随机换一个动作（与 10-20 分钟位置时长解耦）
+  _actionDuration() {
+    return 30000 + Math.random() * 60000;
+  },
+
+  // 武装动作计时器（位置阶段内按当前位置类型随机切动作）
+  _armActionTimer() {
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
+    this._actionTimer = setTimeout(() => this._switchAction(), this._actionDuration());
+  },
+
+  // 按当前位置类型从对应动作池随机切换动作（与当前不同），并切换动作图
+  _switchAction() {
+    const pool = PetState.POSITION_STATES[this._currentPosType] || PetState.POSITION_STATES.homeBase;
+    let next = pool[Math.floor(Math.random() * pool.length)];
+    if (pool.length > 1 && next === this.currentState) {
+      // 与当前不同（单元素池保持原动作，让 play 池内的 GIF 随机）
+      next = pool[(pool.indexOf(next) + 1) % pool.length];
+    }
+    this.enterState(next); // 素材主题播对应 GIF，内置主题切对应 SVG 动画
+    this._armActionTimer();
   },
 
   // 每阶段停留时长：10-20 分钟随机（猫咪作息）
@@ -101,6 +126,7 @@ const PetState = {
   async _beginPhase(forcedType) {
     const gen = ++this._phaseGen;
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
     const mode = this._activityMode();
     const firstSleep = this._firstSleep;
     this._firstSleep = false;
@@ -120,6 +146,8 @@ const PetState = {
     }
     if (firstSleep) type = 'homeBase'; // 粘人首轮: 停 homeBase 睡觉
     this._setStateForPosition(type);
+    // 阶段到点瞬移后：重置动作计时器，按新位置类型开始动作切换
+    this._armActionTimer();
     const dur = firstSleep ? 60000 : this._phaseDuration();
     this._behaviorTimer = setTimeout(() => this._beginPhase(), dur);
   },
@@ -129,6 +157,7 @@ const PetState = {
   async _teleportAndPlay(forcedType) {
     const gen = ++this._phaseGen;
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
     let type = 'homeBase';
     try {
       const r = await window.wealthCalendar.phaseGo(this._activityMode(), forcedType || null);
@@ -137,14 +166,16 @@ const PetState = {
     } catch (e) { /* 瞬移失败也照常展示玩耍状态 */ }
     this._currentPosType = type;
     this.enterState('play'); // 醒着玩耍动作
+    this._armActionTimer(); // 重置动作计时器
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
   },
 
-  // 重新武装阶段计时器（拖动松手/面板关闭后从当前位置继续，下个阶段再瞬移）
+  // 重新武装阶段计时器 + 动作计时器（拖动松手/面板关闭后从当前位置继续）
   _rearmPhase() {
     ++this._phaseGen; // 使在途 _beginPhase 的 await 结果失效
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
+    this._armActionTimer(); // 动作计时器同步重排
   },
 
   // 按位置类型展示状态动作（随机取该位置对应的动作池）
@@ -170,8 +201,9 @@ const PetState = {
     try { rect = await window.wealthCalendar.getActiveWindowRect(); } catch (e) { /* ignore */ }
     if (!rect) return;                            // 检测不到活跃窗口不跟
     if (evt.x < rect.x || evt.x > rect.x + rect.width || evt.y < rect.y || evt.y > rect.y + rect.height) return;
-    // 暂停阶段计时器，挪到鼠标附近展示互动状态，短暂停留后恢复
+    // 暂停阶段与动作计时器，挪到鼠标附近展示互动状态，短暂停留后恢复
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
     try { await window.wealthCalendar.petFollowMouse(evt.x, evt.y); } catch (e) { /* ignore */ }
     this.enterState(Math.random() < 0.5 ? 'play' : 'happy');
     setTimeout(() => {
@@ -180,9 +212,10 @@ const PetState = {
     }, 8000);
   },
 
-  // 拖动中暂停阶段调度（不切阶段），松手后从当前位置继续
+  // 拖动中暂停阶段调度与动作切换（不切阶段），松手后从当前位置继续
   onDragStart() {
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
   },
   onDragRelease() {
     this._rearmPhase(); // 拖动位置作为临时停靠，下个阶段按权重瞬移
@@ -330,13 +363,19 @@ const PetState = {
   ],
 
   triggerClickReaction() {
-    // 睡梦中被戳醒：唤醒 + 模式位置联动；非 sleep 保留随机小反应
+    // 睡梦中被戳醒：唤醒 + 模式位置联动
     if (this.currentState === 'sleep') {
       this._wakeUp();
       return;
     }
+    // 非 sleep：立即随机切换到另一个动作（play/happy/idle，与当前不同），素材图随之切换
+    const candidates = ['play', 'happy', 'idle'].filter((s) => s !== this.currentState);
+    this.enterState(candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : 'idle');
+    // 保留现有随机小反应（台词+表情）
     const r = this.clickReactions[Math.floor(Math.random() * this.clickReactions.length)];
     this.say(`${r.emoji} ${r.line}`);
+    // 重置动作计时器（点击立即切动作后重新计时）
+    this._armActionTimer();
     this._resumeIfIdle();
   },
 
@@ -347,9 +386,10 @@ const PetState = {
     const lines = ['喵?主人叫我~', '睡醒啦!', '唔...刚梦到主人给小鱼干~'];
     this.say(lines[Math.floor(Math.random() * lines.length)]);
     this._idleBucket = 'active';
-    // e) 重置阶段计时器（刚醒重新计时 10-20 分钟，避免立刻又瞬移）
+    // e) 重置阶段计时器（刚醒重新计时 10-20 分钟，避免立刻又瞬移）+ 重置动作计时器
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
+    this._armActionTimer();
     // b) 唤醒后按当前模式触发位置联动（1-2s 后；若期间模式已切换则放弃联动）
     const mode = this._activityMode();
     if (mode === 'clingy') {
@@ -467,9 +507,10 @@ const PetState = {
     }
   },
 
-  // 暂停阶段调度（空闲睡觉时保持 sleep：停止阶段切换，不做位置瞬移）
+  // 暂停阶段调度与动作切换（空闲睡觉时保持 sleep：停止位置瞬移与动作切换）
   _pauseStateMachine() {
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
   },
 
   // 恢复阶段调度（重新武装阶段计时器，从当前位置继续，下个阶段再瞬移）

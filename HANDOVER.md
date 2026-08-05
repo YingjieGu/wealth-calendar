@@ -64,6 +64,7 @@ npx electron-builder --win nsis
   - **位置池(主进程定义)**: homeBase(workArea 右下角留 20px) / workEdge(活跃窗口上沿居中 y=工作窗y-宠物高+10, 顶部空间不足贴下沿, 检测不到活跃窗口回退 homeBase) / taskbar(屏幕底部任务栏上方≈workArea 底部, 水平随机) / random(桌面随机避开边缘)
   - **模式权重**: quiet homeBase 100%; clingy homeBase 75%+workEdge 25%; active homeBase 55%+workEdge 15%+taskbar 15%+random 15%
   - **阶段调度(渲染进程 pet.js 计时)**: 每阶段停留 10-20 分钟随机(600-1200s), 到点按权重瞬移到下一位置(setPosition 直接跳, 无动画); 拖动/面板打开暂停阶段计时, 松手/关闭从当前位置继续(拖动位置作临时停靠, 下个阶段瞬移走)
+  - **动作子状态机(动作与位置时长解耦)**: 位置阶段内独立动作计时器每 30-90s 随机切换动作(与 10-20min 阶段计时器分离), 按 `_currentPosType` 从动作池随机切并换动作图(素材主题播对应 GIF, 内置主题切 SVG 动画): homeBase→sleep/idle/sad(睡觉发呆为主, 偶尔心情差), workEdge→play/happy, taskbar→play(搞怪), random→idle/play; 多元素池保证切换后与当前不同, 单元素池(play)重进重roll GIF; 单击立即切动作(play/happy/idle 与当前不同)并重置动作计时器, 双击/连击/摇签/空闲感知保留; `_armActionTimer`/`_switchAction` 实现, 阶段瞬移/唤醒/点击均重置动作计时器, 暂停(面板/拖动/空闲)同时清阶段+动作双计时器
   - **位置→状态动作映射**: homeBase→sleep/idle(睡觉发呆), workEdge→play/happy(趴窗玩耍), taskbar→play/idle(挖沙捣蛋), random→idle/play
   - **粘人**: 进入先在 homeBase 睡一轮(60s)再开始阶段循环, 避免瞬间跳位置; 跟鼠标保留(鼠标在工作窗口内快速移动概率 35%+冷却 15s → `pet-follow-mouse` 挪到鼠标上方~100px, 8s 后恢复当前阶段)
   - **点击唤醒(睡梦互动)**: 单击 sleep 状态宠物 → 唤醒切 idle/play 动作(素材主题播玩耍/清醒图, 内置主题切对应SVG动画) + 互动气泡 + 重置阶段计时器(重新 10-20 分钟); 唤醒后 1-2s 模式位置联动: clingy→phase-go 强制 workEdge 趴窗玩, active→按权重瞬移, quiet→原地; 非 sleep 单击保留随机小反应不换位置; 双击/连击彩蛋/摇签保留; `_phaseGen` 阶段代数计数器防止异步 `_beginPhase` 覆盖唤醒状态

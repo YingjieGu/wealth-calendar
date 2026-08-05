@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor } = require('electron');
 
 // Software rendering keeps the internal render buffer healthy on this box
 // (without it capturePage turns black). Screen presentation is validated
@@ -287,6 +287,17 @@ function setupIPC() {
     if (mainWindow) {
       const [x, y] = mainWindow.getPosition();
       mainWindow.setPosition(x + dx, y + dy);
+    }
+  });
+
+  // 空闲感知：返回系统空闲秒数（powerMonitor 各平台均支持；失败按 0 处理，
+  // 视为“用户在线”，避免误触发休息/睡觉逻辑）
+  ipcMain.handle('get-idle-time', () => {
+    try {
+      const seconds = powerMonitor.getSystemIdleTime();
+      return { seconds: typeof seconds === 'number' ? seconds : 0 };
+    } catch (e) {
+      return { seconds: 0, error: e.message };
     }
   });
 

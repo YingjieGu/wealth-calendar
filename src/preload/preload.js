@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   saveWindowPosition: () => ipcRenderer.send('save-window-position'),
   restoreDefaultPosition: () => ipcRenderer.invoke('restore-default-position'),
 
+  // 空闲感知：系统空闲秒数（主进程 powerMonitor.getSystemIdleTime）
+  getIdleTime: () => ipcRenderer.invoke('get-idle-time'),
+
   // Calendar: switch views
   openCalendar: () => ipcRenderer.invoke('open-calendar'),
   closeCalendar: () => ipcRenderer.invoke('close-calendar'),

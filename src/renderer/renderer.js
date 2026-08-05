@@ -218,6 +218,10 @@ function convertToPng(dataUrl) {
         await window.wealthCalendar.openCalendar();
         CalendarView.open();
         break;
+      case 'stick':
+        // 财神特色：随机抽一支签，用气泡显示签文
+        PetState.drawStick();
+        break;
       case 'calendar':
         await window.wealthCalendar.openCalendar();
         CalendarView.open();

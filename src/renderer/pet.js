@@ -16,6 +16,12 @@ const PetState = {
     this.petY = 0;
     this.rafId = null;
     this._walking = false;
+    // 豆包式玩法状态
+    this._idleBucket = undefined; // 空闲感知上次区间：active/idle/rest/sleep
+    this._idleWatchTimer = null;  // 空闲检查定时器
+    this._waterTimer = null;      // 喝水提醒定时器
+    this._clicks = [];            // 连击计数（1 秒内的点击时间戳）
+    this._clickTimer = null;      // 单击反应的延迟定时器（用于区分单击/双击）
   },
 
   start() {
@@ -25,6 +31,10 @@ const PetState = {
     this.scheduleStateChange();
     this.setupInteraction();
     this.startProactive();
+    // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒
+    this.sayTimeGreeting();
+    this.startIdleWatch();
+    this.startWaterReminder();
   },
 
   setActivity(mode) {
@@ -134,7 +144,7 @@ const PetState = {
     this.petEl.style.top = `calc(50% + ${this.petY}px)`;
   },
 
-  // ---- Double-click interaction ----
+  // ---- Click / double-click / combo interaction ----
   setupInteraction() {
     const lines = [
       '喵～找小财有什么事呀？',
@@ -144,10 +154,52 @@ const PetState = {
       '偷偷告诉你，今天财神方位在正东～',
       '小财会一直陪着你的！',
     ];
+
+    // 单击：随机触发小反应（蹭蹭/冒爱心/打滚等）。用 300ms 延迟区分双击。
+    // 连击彩蛋：1 秒内点击宠物 5 次触发「别戳啦，戳坏了！」
+    this.petEl.addEventListener('click', () => {
+      const now = Date.now();
+      this._clicks = (this._clicks || []).filter((t) => now - t < 1000);
+      this._clicks.push(now);
+
+      // 任何一次新点击都取消尚未触发的单击反应（双击或连击时不弹小反应）
+      if (this._clickTimer) { clearTimeout(this._clickTimer); this._clickTimer = null; }
+
+      // 1 秒内第 5 次点击 → 彩蛋
+      if (this._clicks.length >= 5) {
+        this._clicks = [];
+        this.say('别戳啦，戳坏了！😤');
+        this._resumeIfIdle();
+        return;
+      }
+
+      // 300ms 内没有第二次点击，才真正触发单击反应
+      this._clickTimer = setTimeout(() => this.triggerClickReaction(), 300);
+    });
+
+    // 双击：保留原有说话（取消待触发的单击反应）
     this.petEl.addEventListener('dblclick', () => {
+      if (this._clickTimer) { clearTimeout(this._clickTimer); this._clickTimer = null; }
       const line = lines[Math.floor(Math.random() * lines.length)];
       this.say(line);
+      this._resumeIfIdle();
     });
+  },
+
+  // 单击小反应的台词与表情
+  clickReactions: [
+    { emoji: '🥰', line: '蹭蹭~ 主人摸我啦，好开心！' },
+    { emoji: '💗', line: 'biu~ 小财冒爱心啦！' },
+    { emoji: '😄', line: '咕噜咕噜~ 打个滚～' },
+    { emoji: '🐾', line: '喵呜~ 再来一下嘛！' },
+    { emoji: '✨', line: '叮！好运+1，主人的幸运值又涨啦~' },
+    { emoji: '🎉', line: '主人戳我，是不是有好消息要分享呀？' },
+  ],
+
+  triggerClickReaction() {
+    const r = this.clickReactions[Math.floor(Math.random() * this.clickReactions.length)];
+    this.say(`${r.emoji} ${r.line}`);
+    this._resumeIfIdle();
   },
 
   // ---- Bubble ----
@@ -158,6 +210,157 @@ const PetState = {
     bubble.classList.remove('hidden');
     clearTimeout(this._bubbleTimer);
     this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 8000);
+  },
+
+  // ---- 时间感知问候：早安/午安/晚安/深夜，每天每时段只一次 ----
+  greetingLines: {
+    morning: [
+      '☀️ 早安主人！新的一天，财运旺旺，冲鸭！',
+      '☀️ 早上好！小财祝你今天顺顺利利，好运连连~',
+    ],
+    noon: [
+      '🌤️ 午安~ 记得好好吃午饭，养足精神！',
+      '🌤️ 中午好！小财陪你小憩一下，下午继续加油~',
+    ],
+    evening: [
+      '🌙 晚上好！今天辛苦啦，早点休息哦~',
+      '🌙 晚安前的问候~ 今天也要开开心心！',
+    ],
+    night: [
+      '🌃 夜深了，主人早点睡呀，熬夜伤身~',
+      '🌃 这么晚还没休息？小财默默陪着你~',
+    ],
+  },
+
+  getTimeSegment() {
+    const h = new Date().getHours();
+    if (h >= 7 && h <= 10) return 'morning';   // 早安 7-10
+    if (h >= 12 && h <= 14) return 'noon';     // 午安 12-14
+    if (h >= 18 && h <= 21) return 'evening';  // 晚安 18-21
+    return 'night';                            // 深夜 22-23 / 0-6
+  },
+
+  sayTimeGreeting() {
+    try {
+      const segment = this.getTimeSegment();
+      // 用「时段 + 本地日期」做去重 key，保证每天每时段只问候一次
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const key = `wc-greeting-${segment}-${today}`;
+      try {
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, '1');
+      } catch (e) { /* localStorage 不可用时也照常问候 */ }
+      const arr = this.greetingLines[segment];
+      if (arr && arr.length) {
+        // 稍微延迟再开口，避免和启动播报/动画重叠
+        setTimeout(() => this.say(arr[Math.floor(Math.random() * arr.length)]), 1500 + Math.random() * 3000);
+      }
+    } catch (e) { /* ignore */ }
+  },
+
+  // ---- 空闲感知：主进程 powerMonitor 提供空闲秒数，每 5 分钟检查一次 ----
+  startIdleWatch() {
+    this._idleWatchTimer = setInterval(() => this.checkIdle(), 5 * 60 * 1000);
+    // 首次延迟 1 分钟再检查，避免与启动问候/运势播报抢气泡
+    setTimeout(() => this.checkIdle(), 60 * 1000);
+  },
+
+  // 空闲区间划分：<1min 在线 / 1-5min 轻度离开 / 5-30min 该休息 / >30min 深度空闲
+  getIdleBucket(seconds) {
+    if (seconds < 60) return 'active';
+    if (seconds < 5 * 60) return 'idle';
+    if (seconds < 30 * 60) return 'rest';
+    return 'sleep';
+  },
+
+  async checkIdle() {
+    if (!window.wealthCalendar || !window.wealthCalendar.getIdleTime) return;
+    let seconds = 0;
+    try {
+      const r = await window.wealthCalendar.getIdleTime();
+      seconds = (r && typeof r.seconds === 'number') ? r.seconds : 0;
+    } catch (e) {
+      return; // IPC 失败则跳过本轮检查
+    }
+
+    const bucket = this.getIdleBucket(seconds);
+    const prev = this._idleBucket;
+    this._idleBucket = bucket;
+
+    if (bucket === 'sleep' && prev !== 'sleep') {
+      // 深度空闲：让宠物睡一会儿（复用现有 enterState，暂停随机状态机）
+      this._pauseStateMachine();
+      this.enterState('sleep');
+      this.say('😴 主人好久没动静，小财先眯一会儿…');
+    } else if (bucket === 'rest' && (prev === 'idle' || prev === 'active' || prev === undefined)) {
+      // 首次进入休息区间时提醒一次（prev 判断保证不重复刷屏）
+      this.say('主人是不是累了，起来活动一下，顺便喝口水~ 💧');
+    } else if (bucket === 'active' && (prev === 'sleep' || prev === 'rest')) {
+      // 用户回来了：恢复状态机并打招呼
+      this._resumeStateMachine();
+      this.say('主人回来啦！小财好想你~ 🥰');
+    }
+  },
+
+  // 暂停随机状态机（空闲睡觉时保持 sleep，不被 scheduleStateChange 打断）
+  _pauseStateMachine() {
+    if (this.stateTimer) { clearTimeout(this.stateTimer); this.stateTimer = null; }
+  },
+
+  // 恢复随机状态机（按当前活跃度节奏继续切换 idle/walk/sleep）
+  _resumeStateMachine() {
+    this._pauseStateMachine();
+    this.scheduleStateChange();
+  },
+
+  // 用户主动互动时（单击/双击/摇签），若宠物正因空闲睡着则立即恢复活力
+  _resumeIfIdle() {
+    if (this._idleBucket === 'sleep' || this._idleBucket === 'rest') {
+      this._idleBucket = 'active';
+      this._resumeStateMachine();
+    }
+  },
+
+  // ---- 财神特色：摇一支签（右键菜单触发） ----
+  fortuneSticks: {
+    '上上签': [
+      '🎋 上上签！财神驾到，今日正东方位有贵人，宜大胆求财！',
+      '🎋 上上签！鸿运当头，横财就手，钱包要鼓起来啦~',
+      '🎋 上上签！诸事大吉，心想事成，好运正在敲门！',
+    ],
+    '上签': [
+      '🎋 上签！财运渐旺，稳中求进必有回报，别错过良机~',
+      '🎋 上签！贵人将至，今天的决定都会有好结果！',
+      '🎋 上签！小财掐指一算，努力之人今天运势加身！',
+    ],
+    '中签': [
+      '🎋 中签！运势平平，宜守不宜攻，钱包看紧些~',
+      '🎋 中签！财运小有起伏，冲动是魔鬼，三思而后行。',
+      '🎋 中签！今日宜静养蓄力，明天再出发也不迟。',
+    ],
+    '下签': [
+      '🎋 下签…诸事宜谨慎，破财消灾，明天会更好！',
+      '🎋 下签…财运微滞，莫要投资冲动，早点休息养元气。',
+      '🎋 下签…小财提醒：凡事留一线，日后好相见~',
+    ],
+  },
+
+  drawStick() {
+    const types = ['上上签', '上签', '中签', '下签'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const arr = this.fortuneSticks[type];
+    const line = arr[Math.floor(Math.random() * arr.length)];
+    this.say(line); // 签文已带财运提示，直接走气泡
+    this._resumeIfIdle();
+  },
+
+  // ---- 喝水提醒：每 2 小时提醒一次 ----
+  startWaterReminder() {
+    if (this._waterTimer) clearInterval(this._waterTimer);
+    this._waterTimer = setInterval(() => {
+      this.say('💧 小财提醒主人喝水啦！规律补水身体好~');
+    }, 2 * 60 * 60 * 1000);
   },
 
   // ---- Proactive interaction (Doubao-style companion) ----

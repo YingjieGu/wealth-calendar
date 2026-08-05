@@ -196,7 +196,8 @@ html, body {
   transition: opacity 0.3s ease, transform 0.3s ease;
   animation: bubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   word-break: break-word;
-  pointer-events: none; /* don't block click-through */
+  cursor: pointer;
+  pointer-events: auto; /* clickable: opens the chat panel (Doubao-style) */
 }
 #reminder-bubble.hidden {
   opacity: 0;

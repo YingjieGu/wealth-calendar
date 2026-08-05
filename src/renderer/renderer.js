@@ -227,6 +227,9 @@ function convertToPng(dataUrl) {
         document.getElementById('hover-buttons').classList.add('hidden');
         await window.wealthCalendar.openChatPanel();
         break;
+      case 'hide':
+        window.wealthCalendar.hideWindow();
+        break;
       case 'quit':
         window.wealthCalendar.quitApp();
         break;
@@ -239,4 +242,20 @@ document.addEventListener('DOMContentLoaded', () => {
   PetState.start();
   SettingsManager.init();
   CalendarView.init();
+
+  // Doubao-style: hotkey summons the pet -> say hi
+  try {
+    window.wealthCalendar.onPetSummoned(() => {
+      PetState.say('喵～主人叫我啦！有什么吩咐？');
+    });
+  } catch (e) { /* ignore */ }
+
+  // Doubao-style: click the speech bubble to open chat
+  const bubble = document.getElementById('reminder-bubble');
+  bubble.addEventListener('click', () => {
+    bubble.classList.add('hidden');
+    if (window.ChatPanel) {
+      ChatPanel.open();
+    }
+  });
 });

@@ -24,6 +24,7 @@ const PetState = {
     this.walkLoop();
     this.scheduleStateChange();
     this.setupInteraction();
+    this.startProactive();
   },
 
   setActivity(mode) {
@@ -145,13 +146,86 @@ const PetState = {
     ];
     this.petEl.addEventListener('dblclick', () => {
       const line = lines[Math.floor(Math.random() * lines.length)];
-      const bubble = document.getElementById('reminder-bubble');
-      const text = document.getElementById('reminder-bubble-text');
-      text.textContent = `💬 ${line}`;
-      bubble.classList.remove('hidden');
-      clearTimeout(this._bubbleTimer);
-      this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 3500);
+      this.say(line);
     });
+  },
+
+  // ---- Bubble ----
+  say(text) {
+    const bubble = document.getElementById('reminder-bubble');
+    const el = document.getElementById('reminder-bubble-text');
+    el.textContent = `💬 ${text}`;
+    bubble.classList.remove('hidden');
+    clearTimeout(this._bubbleTimer);
+    this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 8000);
+  },
+
+  // ---- Proactive interaction (Doubao-style companion) ----
+  proactiveLines: [
+    '喵～主人，小财来陪你啦！',
+    '工作累了记得起来走走哦～',
+    '要不要看看今天的运势？右键小财就行～',
+    '小财掐指一算，你今天是潜力股！📈',
+    '财神爷今天心情不错，适合谈合作哦！',
+    '记得喝水，别熬太晚啦！',
+    '想听点啥？小财可以给你讲讲今天的宜忌～',
+    '金币金币，滚滚来～💰',
+  ],
+
+  startProactive() {
+    // 随机 20-40 分钟主动说一句话
+    const scheduleNext = () => {
+      this._proactiveTimer = setTimeout(() => {
+        if (Math.random() < 0.8) {
+          const line = this.proactiveLines[Math.floor(Math.random() * this.proactiveLines.length)];
+          this.say(line);
+        }
+        scheduleNext();
+      }, (20 + Math.random() * 20) * 60 * 1000);
+    };
+    scheduleNext();
+
+    // 启动后 30 秒播报今日运势（财神特色播报）
+    setTimeout(() => this.sayDailyFortune(), 30000);
+
+    // 吉时提醒：如果当前时间落在运势吉时区间内，提醒一次
+    setTimeout(() => this.checkGoodHour(), 40000);
+  },
+
+  async sayDailyFortune() {
+    try {
+      const fortune = await window.wealthCalendar.getDailyFortune();
+      if (!fortune || !fortune.overall) return;
+      const dir = fortune.caiShenDir || '';
+      // 主求方向提示（从设置读取）
+      let wishHint = '';
+      try {
+        const wish = SettingsManager.settings && SettingsManager.settings.mainWish;
+        const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
+        wishHint = wishMap[wish] ? `，今天重点：${wishMap[wish]}` : '';
+      } catch (e) { /* ignore */ }
+      let line = `📅 今日运势 ${fortune.overall} 分`;
+      if (dir) line += `，财神方位${dir}`;
+      line += wishHint;
+      if (fortune.reminderLines && fortune.reminderLines[0]) {
+        line += `。${fortune.reminderLines[0]}`;
+      }
+      this.say(line);
+    } catch (e) { /* ignore */ }
+  },
+
+  checkGoodHour() {
+    try {
+      window.wealthCalendar.getDailyFortune().then((fortune) => {
+        if (!fortune || !fortune.goodHours || !fortune.goodHours.length) return;
+        const now = new Date();
+        const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const inGood = fortune.goodHours.some((g) => hm >= g.start && hm <= g.end);
+        if (inGood) {
+          this.say(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`);
+        }
+      });
+    } catch (e) { /* ignore */ }
   },
 
   setTheme(theme, customEmoji) {

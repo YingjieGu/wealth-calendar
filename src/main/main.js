@@ -327,8 +327,31 @@ function setupIPC() {
   // Quit from renderer context menu
   ipcMain.on('app-quit', () => {
     isQuitting = true;
+    if (tray) tray.destroy();
     app.quit();
   });
+
+  // Hide pet window (context menu) — Ctrl+Alt+W to show again
+  ipcMain.on('hide-window', () => {
+    if (mainWindow) mainWindow.hide();
+  });
+
+  // Doubao-style summon: global hotkey toggles the pet window
+  try {
+    const { globalShortcut } = require('electron');
+    globalShortcut.register('CommandOrControl+Alt+W', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send('pet-summoned');
+      }
+    });
+  } catch (e) {
+    console.error('[main] global shortcut failed:', e.message);
+  }
 
   // --- Chat ---
   const executeTool = async (action, params) => {
@@ -678,6 +701,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  try {
+    const { globalShortcut } = require('electron');
+    globalShortcut.unregisterAll();
+  } catch (e) { /* ignore */ }
   isQuitting = true;
   stopReminder();
   sidecar.stopSidecar();

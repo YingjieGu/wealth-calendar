@@ -65,14 +65,17 @@ function setWallpaperPlatform(pngPath) {
         resolve(!err);
       });
     } else {
-      // Linux: try gsettings (GNOME), then feh
-      execFile('gsettings', ['set', 'org.gnome.desktop.background', 'picture-uri', uri], (err1) => {
+      // Linux: try Deepin schema, GNOME schema, then feh
+      execFile('gsettings', ['set', 'com.deepin.wrap.gnome.desktop.background', 'picture-uri', uri], (err1) => {
         if (!err1) return resolve(true);
-        execFile('gsettings', ['set', 'org.gnome.desktop.background', 'picture-uri-dark', uri], (err2) => {
+        execFile('gsettings', ['set', 'com.deepin.wrap.gnome.desktop.background', 'picture-uri-dark', uri], (err2) => {
           if (!err2) return resolve(true);
-          execFile('feh', ['--bg-scale', pngPath], (err3) => {
-            if (err3) console.error('[wallpaper] linux set failed:', err3.message);
-            resolve(!err3);
+          execFile('gsettings', ['set', 'org.gnome.desktop.background', 'picture-uri', uri], (err3) => {
+            if (!err3) return resolve(true);
+            execFile('feh', ['--bg-scale', pngPath], (err4) => {
+              if (err4) console.error('[wallpaper] linux set failed:', err4.message);
+              resolve(!err4);
+            });
           });
         });
       });

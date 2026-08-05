@@ -47,7 +47,11 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   },
 
   // Quit app (from context menu)
-  quitApp: () => ipcRenderer.send('app-quit'),
+  quitApp: () => ipcRenderer.send('quit-app'),
+  hideWindow: () => ipcRenderer.send('hide-window'),
+  onPetSummoned: (cb) => {
+    ipcRenderer.on('pet-summoned', () => cb && cb());
+  },
 
   // Chat
   chatSend: (message) => ipcRenderer.invoke('chat:send', message),

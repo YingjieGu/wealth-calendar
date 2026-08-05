@@ -4,6 +4,14 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage } = require
 // (without it capturePage turns black). Screen presentation is validated
 // separately (xwd / ffmpeg x11grab) — see git history for the rabbit hole.
 app.disableHardwareAcceleration();
+// Force Chromium's compositor to pure software as well. A broken GPU stack
+// (this Linux dev box, and some Win11 boxes with flaky GPU drivers) can create
+// the window fine but never present its content to the screen — exactly the
+// "starts without error, window never shows" symptom the user hits. These
+// switches were removed in 2da9e08 after a Linux-only measurement false-negative
+// (xwd can't read KWin's composited layer); they remain the right call on Win.
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('enable-features', 'UseSoftwareCompositor');
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');
@@ -59,6 +67,79 @@ function centerWindow(win, width, height) {
   };
 }
 
+// --- Startup diagnostics: logs + auto screenshots for remote debugging ---
+// Everything here is best-effort and never throws; a broken diagnostic path
+// must not take the app down.
+function diagnosticsDir() {
+  const dir = path.join(app.getPath('userData'), 'debug');
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { /* ignore */ }
+  return dir;
+}
+
+function appendStartupLog(...parts) {
+  try {
+    const stamp = new Date().toISOString();
+    fs.appendFileSync(path.join(diagnosticsDir(), 'startup.log'), `[${stamp}] ${parts.join(' ')}\n`);
+  } catch (e) { /* ignore */ }
+}
+
+function logDisplayLayout() {
+  try {
+    return JSON.stringify(screen.getAllDisplays().map((d) => ({
+      bounds: d.bounds,
+      workArea: d.workArea,
+      scaleFactor: d.scaleFactor,
+      primary: d.id === screen.getPrimaryDisplay().id,
+    })));
+  } catch (e) {
+    return `screen error: ${e.message}`;
+  }
+}
+
+// True when the window's centre lands inside some display's work area.
+// Used to reject stale saved coordinates that would park the frameless,
+// skip-taskbar window off-screen (invisible, with no taskbar entry).
+function positionVisible(x, y, w, h) {
+  try {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    return screen.getAllDisplays().some((d) => {
+      const wa = d.workArea;
+      return cx >= wa.x && cx <= wa.x + wa.width && cy >= wa.y && cy <= wa.y + wa.height;
+    });
+  } catch (e) {
+    return true; // if the screen API fails, don't block window creation
+  }
+}
+
+async function saveWindowScreenshot(label) {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const image = await mainWindow.webContents.capturePage();
+    const size = image.getSize();
+    if (image.isEmpty()) {
+      appendStartupLog(`screenshot(${label}) EMPTY (${size.width}x${size.height})`);
+      return;
+    }
+    const p = path.join(diagnosticsDir(), `window-${label}.png`);
+    fs.writeFileSync(p, image.toPNG());
+    appendStartupLog(`screenshot(${label}) saved ${size.width}x${size.height} -> ${p}`);
+  } catch (e) {
+    appendStartupLog(`screenshot(${label}) failed: ${e.message}`);
+  }
+}
+
+// Surface previously-silent main-process failures into the startup log so
+// "starts without error but no window" reports become debuggable.
+process.on('uncaughtException', (err) => {
+  console.error('[main] uncaughtException:', err);
+  appendStartupLog('uncaughtException:', String((err && err.stack) || err));
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] unhandledRejection:', reason);
+  appendStartupLog('unhandledRejection:', String((reason && reason.stack) || reason));
+});
+
 // --- Create the main transparent floating window ---
 function createWindow() {
   const saved = loadSettings();
@@ -85,10 +166,19 @@ function createWindow() {
     },
   };
 
-  if (typeof savedX === 'number' && typeof savedY === 'number') {
+  // Restore the saved position only if it lands the window on a visible
+  // display. Stale coordinates (monitor unplugged, DPI/scale or resolution
+  // change) park the frameless, skip-taskbar window off-screen — it looks like
+  // the app "never launched", with no taskbar entry to find. This is the top
+  // cause of "no window, no error" on Windows.
+  if (typeof savedX === 'number' && typeof savedY === 'number' && positionVisible(savedX, savedY, PET_WIDTH, PET_HEIGHT)) {
     windowOptions.x = savedX;
     windowOptions.y = savedY;
   } else {
+    if (typeof savedX === 'number' && typeof savedY === 'number') {
+      appendStartupLog(`saved position (${savedX},${savedY}) is off-screen — centering instead`);
+      console.warn(`[main] saved window position (${savedX},${savedY}) is off-screen — centering`);
+    }
     const pos = centerWindow(null, PET_WIDTH, PET_HEIGHT);
     windowOptions.x = pos.x;
     windowOptions.y = pos.y;
@@ -96,12 +186,45 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(windowOptions);
 
+  appendStartupLog(
+    `createWindow bounds=${JSON.stringify(mainWindow.getBounds())} visibleAtCreate=${mainWindow.isVisible()}`,
+    `displays=${logDisplayLayout()}`,
+    `savedPos=${typeof savedX === 'number' ? savedX : 'none'},${typeof savedY === 'number' ? savedY : 'none'}`
+  );
+
   // Forward renderer console + errors to stdout for debugging
   mainWindow.webContents.on('console-message', (_e, level, message, line, sourceId) => {
     console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`);
   });
   mainWindow.webContents.on('render-process-gone', (_e, details) => {
     console.error('[renderer] process gone:', JSON.stringify(details));
+    appendStartupLog(`render-process-gone ${JSON.stringify(details)}`);
+  });
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('[main] did-fail-load:', code, desc, url);
+    appendStartupLog(`did-fail-load code=${code} desc=${desc} url=${url}`);
+  });
+  mainWindow.webContents.on('did-finish-load', () => {
+    appendStartupLog(`did-finish-load visible=${mainWindow.isVisible()}`);
+    // Explicitly show + re-assert topmost: some Win11 setups drop a just-created
+    // frameless always-on-top window, leaving it effectively invisible.
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+      appendStartupLog('window was hidden after load — called show()');
+    }
+    mainWindow.setAlwaysOnTop(true);
+    if (process.platform === 'win32') mainWindow.focus();
+    // Auto-screenshot for remote debugging — saved to <userData>/debug/ so the
+    // user can send it back whenever "window didn't appear".
+    setTimeout(() => saveWindowScreenshot('loaded'), 1500);
+    setTimeout(() => saveWindowScreenshot('settled'), 5000);
+  });
+  mainWindow.once('ready-to-show', () => {
+    appendStartupLog(`ready-to-show visible=${mainWindow.isVisible()}`);
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+      appendStartupLog('ready-to-show: window was hidden — called show()');
+    }
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -639,6 +762,10 @@ function setupIPC() {
 
 // --- App lifecycle ---
 app.whenReady().then(() => {
+  appendStartupLog(
+    `app ready userData=${app.getPath('userData')} platform=${process.platform}`,
+    `electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node}`
+  );
   setupIPC();
   createWindow();
   tray = createTray(mainWindow, () => {
@@ -649,6 +776,7 @@ app.whenReady().then(() => {
   // Start fortune sidecar (non-blocking on failure)
   sidecar.startSidecar().then((ok) => {
     console.log('[main] sidecar ready:', ok);
+    appendStartupLog(`sidecar ready=${ok}`);
     if (ok) {
       // Startup fortune reminder (5s delay, only if userInfo exists)
       fortuneEngine.maybeSendStartupFortune(mainWindow, (d, f) =>

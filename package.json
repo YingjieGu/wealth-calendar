@@ -55,7 +55,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "财神日历"
+      "shortcutName": "财神日历",
+      "deleteAppDataOnUninstall": false
     }
   },
   "dependencies": {

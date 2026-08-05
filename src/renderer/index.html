@@ -197,12 +197,20 @@
           <div class="setting-group">
             <label>AI 命理（DeepSeek 兼容 API）</label>
             <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
-            <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com/v1）">
-            <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-chat）">
+            <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com）">
+            <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-v4-flash）">
             <label class="setting-checkbox">
               <input type="checkbox" id="fortune-reminder-enabled" checked> 每日运势提醒
             </label>
             <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
+          </div>
+
+          <div class="setting-group">
+            <label>配置备份与迁移（重装后一键恢复）</label>
+            <button id="btn-export-config" class="action-btn">⬇️ 导出配置（含 API Key，保存为 JSON）</button>
+            <button id="btn-import-config" class="action-btn">⬆️ 导入配置（恢复备份）</button>
+            <input type="file" id="cfg-import" accept=".json,application/json" style="display:none;">
+            <p class="placeholder-text">卸载安装程序默认保留用户数据（settings.json + settings.backup.json）；换机或重装后可用「导出配置」生成的 JSON 文件一键恢复全部设置。</p>
           </div>
         </div>
       </div>

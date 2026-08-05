@@ -241,12 +241,47 @@ const SettingsManager = {
       const key = document.getElementById('llm-api-key').value.trim();
       this.settings.modelConfig = {
         llmApiKey: key || '',
-        llmBaseUrl: document.getElementById('llm-base-url').value.trim() || 'https://api.deepseek.com/v1',
-        llmModel: document.getElementById('llm-model').value.trim() || 'deepseek-chat',
+        llmBaseUrl: document.getElementById('llm-base-url').value.trim() || 'https://api.deepseek.com',
+        llmModel: document.getElementById('llm-model').value.trim() || 'deepseek-v4-flash',
       };
       this.settings.fortuneReminderEnabled = document.getElementById('fortune-reminder-enabled').checked;
       await this.save();
       showToast(key ? '✅ 模型配置已保存（AI 命理已启用）' : '✅ 已保存（未填 Key，使用本地模板推算）');
+    });
+
+    // 导出配置：主进程弹出保存对话框，把 settings.json（含 API Key）写为 JSON 文件
+    document.getElementById('btn-export-config').addEventListener('click', async () => {
+      const r = await window.wealthCalendar.exportConfig();
+      if (r && r.ok) {
+        showToast(`✅ 配置已导出：${r.path}`);
+      } else if (r && r.canceled) {
+        showToast('已取消导出');
+      } else {
+        showToast(`❌ 导出失败：${(r && r.error) || '未知错误'}`);
+      }
+    });
+
+    // 导入配置：读取 JSON → 校验 → 合并保存 → 重载应用全部设置（重装后一键恢复）
+    document.getElementById('btn-import-config').addEventListener('click', () => {
+      document.getElementById('cfg-import').click();
+    });
+    document.getElementById('cfg-import').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          showToast('❌ 配置文件格式不正确（需为 JSON 对象）');
+          return;
+        }
+        await window.wealthCalendar.saveSettings(parsed); // 主进程做浅合并保存
+        showToast('✅ 配置已导入，正在应用…');
+        setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        console.error('[config] import failed:', err);
+        showToast('❌ 导入失败：JSON 解析错误');
+      }
     });
 
     // Wake word
@@ -387,8 +422,8 @@ const SettingsManager = {
   applyModelConfig() {
     const mc = this.settings.modelConfig || {};
     document.getElementById('llm-api-key').value = mc.llmApiKey || '';
-    document.getElementById('llm-base-url').value = mc.llmBaseUrl || 'https://api.deepseek.com/v1';
-    document.getElementById('llm-model').value = mc.llmModel || 'deepseek-chat';
+    document.getElementById('llm-base-url').value = mc.llmBaseUrl || 'https://api.deepseek.com';
+    document.getElementById('llm-model').value = mc.llmModel || 'deepseek-v4-flash';
     document.getElementById('fortune-reminder-enabled').checked = this.settings.fortuneReminderEnabled !== false;
   },
 

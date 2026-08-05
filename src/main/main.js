@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor, dialog } = require('electron');
 
 // Software rendering keeps the internal render buffer healthy on this box
 // (without it capturePage turns black). Screen presentation is validated
@@ -38,25 +38,87 @@ const CAL_WIDTH = 420;
 const CAL_HEIGHT = 560;
 
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
+const SETTINGS_BACKUP_PATH = path.join(app.getPath('userData'), 'settings.backup.json');
+
+// 首次启动（settings 为空）时预填的 DeepSeek 默认模型配置；Key 留空，
+// 用户填 Key 后即可启用 AI 命理/对话。baseUrl 不带 /v1（官方兼容两种）。
+const DEFAULT_MODEL_CONFIG = {
+  llmBaseUrl: 'https://api.deepseek.com',
+  llmModel: 'deepseek-v4-flash',
+  llmApiKey: '',
+};
 
 // --- Settings persistence helpers ---
+// 容错读取：settings.json 不存在/损坏/为空时，尝试从 settings.backup.json 恢复
+//（每次写盘前 saveSettings 都会生成备份）。恢复成功后把内容写回 settings.json，
+// 保证 chatEngine/fortuneEngine 等直接读文件的其他模块也能拿到一致的配置；
+// 写回走直接 fs 写入而非 saveSettings，避免把损坏文件再次复制覆盖掉好备份。
 function loadSettings() {
   try {
     if (fs.existsSync(SETTINGS_PATH)) {
-      return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+      const parsed = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        return parsed;
+      }
+      // settings.json 为空对象（或空内容）→ 尝试从备份恢复
+      console.warn('[settings] settings.json 为空，尝试从备份恢复');
+      appendStartupLog('settings.json 为空，尝试从备份恢复');
     }
   } catch (e) {
-    console.error('Failed to load settings:', e);
+    console.error('Failed to load settings, trying backup:', e);
+    appendStartupLog(`settings.json 损坏(${e.message})，尝试从备份恢复`);
+  }
+  return recoverFromBackup();
+}
+
+function recoverFromBackup() {
+  try {
+    if (!fs.existsSync(SETTINGS_BACKUP_PATH)) {
+      appendStartupLog('无 settings.backup.json，跳过备份恢复');
+      return {};
+    }
+    const parsed = JSON.parse(fs.readFileSync(SETTINGS_BACKUP_PATH, 'utf-8'));
+    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+      console.warn('[settings] 已从 settings.backup.json 恢复配置');
+      appendStartupLog(`已从 settings.backup.json 恢复配置(${Object.keys(parsed).length} 项)`);
+      try {
+        fs.writeFileSync(SETTINGS_PATH, JSON.stringify(parsed, null, 2), 'utf-8');
+        appendStartupLog('恢复内容已写回 settings.json');
+      } catch (e) {
+        console.error('[settings] 恢复写回 settings.json 失败:', e.message);
+      }
+      return parsed;
+    }
+    appendStartupLog('settings.backup.json 为空/无效，恢复失败');
+  } catch (e) {
+    console.error('Failed to load backup settings:', e);
+    appendStartupLog(`备份恢复失败: ${e.message}`);
   }
   return {};
 }
 
 function saveSettings(settings) {
   try {
+    // 写前备份：旧 settings.json → settings.backup.json（卸载保留配置 + 损坏恢复用）
+    if (fs.existsSync(SETTINGS_PATH)) {
+      fs.copyFileSync(SETTINGS_PATH, SETTINGS_BACKUP_PATH);
+    }
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
   } catch (e) {
     console.error('Failed to save settings:', e);
   }
+}
+
+// 首次启动（settings 为空）时预填 DeepSeek 默认模型配置并保存进 settings.json。
+function ensureDefaultSettings() {
+  const s = loadSettings();
+  if (!s || Object.keys(s).length === 0) {
+    s.modelConfig = { ...DEFAULT_MODEL_CONFIG };
+    saveSettings(s);
+    console.log('[settings] 首次启动，已预填 DeepSeek 默认模型配置（Key 留空）');
+    appendStartupLog('首次启动：已预填 DeepSeek 默认 modelConfig');
+  }
+  return s;
 }
 
 function centerWindow(win, width, height) {
@@ -618,6 +680,26 @@ function setupIPC() {
   });
 
   ipcMain.handle('load-settings', () => loadSettings());
+
+  // 配置导出：把 settings.json（含 API Key）另存为用户选择的 JSON 文件，
+  // 供重装/换机后一键导入恢复。
+  ipcMain.handle('export-config', async () => {
+    try {
+      const settings = loadSettings();
+      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: '导出配置（含 API Key）',
+        defaultPath: `财神日历配置-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'JSON 配置文件', extensions: ['json'] }],
+      });
+      if (canceled || !filePath) return { canceled: true };
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
+      appendStartupLog(`config exported -> ${filePath}`);
+      return { ok: true, path: filePath };
+    } catch (e) {
+      console.error('[config] export failed:', e.message);
+      return { error: e.message };
+    }
+  });
 
   ipcMain.on('save-window-position', () => {
     if (mainWindow && !isCalendarMode) {
@@ -1229,6 +1311,8 @@ app.whenReady().then(() => {
     `app ready userData=${app.getPath('userData')} platform=${process.platform}`,
     `electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node}`
   );
+  // 首次启动预填 DeepSeek 默认模型配置（Key 留空）；已存在配置则原样保留
+  ensureDefaultSettings();
   setupIPC();
   createWindow();
   // 位置-阶段模型：阶段调度（10-20 分钟计时 + 状态动作）在渲染进程 pet.js，

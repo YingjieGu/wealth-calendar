@@ -55,7 +55,7 @@ function buildSystemWithDate() {
 }
 
 async function callLLM(mc, messages) {
-  const baseUrl = (mc.llmBaseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '');
+  const baseUrl = (mc.llmBaseUrl || 'https://api.deepseek.com').replace(/\/$/, '');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   try {
@@ -63,7 +63,7 @@ async function callLLM(mc, messages) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mc.llmApiKey}` },
       body: JSON.stringify({
-        model: mc.llmModel || 'deepseek-chat',
+        model: mc.llmModel || 'deepseek-v4-flash',
         temperature: 0.8,
         // v4 series are reasoning models: reasoning_content consumes tokens too.
         max_tokens: 8000,

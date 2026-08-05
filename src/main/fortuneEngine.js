@@ -177,7 +177,7 @@ function relationOf(me, other) {
 // LLM call
 // ---------------------------------------------------------------------------
 async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
-  const url = `${(baseUrl || 'https://api.deepseek.com/v1').replace(/\/$/, '')}/chat/completions`;
+  const url = `${(baseUrl || 'https://api.deepseek.com').replace(/\/$/, '')}/chat/completions`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   // 代理环境信息（Electron 主进程 fetch 走 Chromium 网络栈，win 上默认受系统代理影响）
@@ -196,7 +196,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: model || 'deepseek-chat',
+          model: model || 'deepseek-v4-flash',
           temperature: 0.8,
           // v4 series are reasoning models: reasoning_content also consumes tokens,
           // so keep a generous budget or content may come back empty/truncated.

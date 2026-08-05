@@ -68,6 +68,35 @@ function centerWindow(win, width, height) {
   };
 }
 
+// --- 托盘图标：用 萌宠1 睡觉.gif 首帧转 PNG（python PIL），存 userData/tray-icon.png ---
+function ensureTrayIcon() {
+  try {
+    const dev = path.join(app.getAppPath(), 'assets', 'themes', 'cat1', '睡觉.gif');
+    const gifPath = fs.existsSync(dev)
+      ? dev
+      : path.join(process.resourcesPath || '', 'themes', 'cat1', '睡觉.gif');
+    if (!fs.existsSync(gifPath)) return null;
+    const pngPath = path.join(app.getPath('userData'), 'tray-icon.png');
+    if (fs.existsSync(pngPath)) {
+      const cached = nativeImage.createFromPath(pngPath);
+      if (!cached.isEmpty()) return cached;
+    }
+    const script = [
+      'from PIL import Image',
+      `im = Image.open(${JSON.stringify(gifPath)})`,
+      'im.seek(0)',
+      "im = im.convert('RGBA')",
+      'im.thumbnail((64, 64))',
+      `im.save(${JSON.stringify(pngPath)}, 'PNG')`,
+    ].join('\n');
+    execFileSync('python3', ['-c', script], { timeout: 6000 });
+    const icon = nativeImage.createFromPath(pngPath);
+    return icon.isEmpty() ? null : icon;
+  } catch (e) {
+    return null;
+  }
+}
+
 // --- Startup diagnostics: logs + auto screenshots for remote debugging ---
 // Everything here is best-effort and never throws; a broken diagnostic path
 // must not take the app down.
@@ -1193,7 +1222,7 @@ app.whenReady().then(() => {
   tray = createTray(mainWindow, () => {
     isQuitting = true;
     app.quit();
-  });
+  }, ensureTrayIcon()); // 托盘图标：睡觉.gif 首帧 PNG（PIL 转换）
   startReminder(mainWindow);
   // Start fortune sidecar (non-blocking on failure)
   sidecar.startSidecar().then((ok) => {

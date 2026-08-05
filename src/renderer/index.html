@@ -121,14 +121,28 @@
               <button class="theme-option" data-gender="male" id="gender-male">♂ 男</button>
               <button class="theme-option" data-gender="female" id="gender-female">♀ 女</button>
             </div>
+            <div class="setting-row" style="align-items:center;">
+              <span class="placeholder-text" style="margin:0;flex-shrink:0;">生肖</span>
+              <select id="user-zodiac-select" class="setting-input">
+                <option value="">自动（按出生年份）</option>
+                <option value="鼠">🐭 鼠</option>
+                <option value="牛">🐮 牛</option>
+                <option value="虎">🐯 虎</option>
+                <option value="兔">🐰 兔</option>
+                <option value="龙">🐲 龙</option>
+                <option value="蛇">🐍 蛇</option>
+                <option value="马">🐴 马</option>
+                <option value="羊">🐑 羊</option>
+                <option value="猴">🐵 猴</option>
+                <option value="鸡">🐔 鸡</option>
+                <option value="狗">🐶 狗</option>
+                <option value="猪">🐷 猪</option>
+              </select>
+            </div>
             <p class="placeholder-text" id="user-zodiac">星座：—</p>
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
           </div>
 
-          <div class="setting-group">
-            <label>内置宠物素材（透明 PNG，点击应用）</label>
-            <div id="pets-grid" class="pets-grid"></div>
-          </div>
           <div class="setting-group">
             <label>主求方向（提醒侧重，报告仍全面展示）</label>
             <div class="setting-options" id="wish-options">

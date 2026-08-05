@@ -33,10 +33,11 @@ const PetState = {
     this.enterState('idle');
     this.setupInteraction();
     this.startProactive();
-    // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒
+    // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒 / 每日运势分段播报
     this.sayTimeGreeting();
     this.startIdleWatch();
     this.startWaterReminder();
+    this.startFortuneSlots();
     // 面板打开：暂停阶段调度与动作切换（避免面板期间瞬移挪动面板窗口）
     try {
       window.wealthCalendar.onPetPanel(() => {
@@ -619,6 +620,91 @@ const PetState = {
       }
       this.say(line);
     } catch (e) { /* ignore */ }
+  },
+
+  // ---- 每日运势分段播报（上午/中午/下午/晚上 四时段, 每时段 2-3 条, 每天 10+ 条）----
+  // 时段内间歇播报(间隔 60-90 分钟), 复用 say 气泡; 主求方向内容约占一半,
+  // 另一半播报当天最强两维度。
+  startFortuneSlots() {
+    this._scheduleNextFortuneBroadcast();
+  },
+
+  _scheduleNextFortuneBroadcast() {
+    if (this._fortuneSlotTimer) { clearTimeout(this._fortuneSlotTimer); this._fortuneSlotTimer = null; }
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    // 四时段: 上午 9:00-11:30 / 中午 12:00-14:30 / 下午 15:00-17:30 / 晚上 19:00-21:30
+    const slots = [
+      { start: 9 * 60, end: 11 * 60 + 30 },
+      { start: 12 * 60, end: 14 * 60 + 30 },
+      { start: 15 * 60, end: 17 * 60 + 30 },
+      { start: 19 * 60, end: 21 * 60 + 30 },
+    ];
+    // 每时段 2-3 条（按日期做轻微变化）, 间隔 65-95 分钟
+    const daySeed = now.getDate();
+    const times = [];
+    for (const s of slots) {
+      const n = 2 + ((daySeed * 7 + s.start) % 2);
+      for (let i = 0; i < n; i++) {
+        times.push(s.start + 20 + i * (65 + ((daySeed + i) % 2) * 30));
+      }
+    }
+    const future = times.filter((t) => t > nowMin);
+    if (!future.length) {
+      // 今天播完，明天凌晨再排
+      this._fortuneSlotTimer = setTimeout(() => this.startFortuneSlots(), 6 * 3600 * 1000);
+      return;
+    }
+    const wait = (future[0] - nowMin) * 60000;
+    this._fortuneSlotTimer = setTimeout(() => {
+      this._doFortuneBroadcast();
+      this._scheduleNextFortuneBroadcast();
+    }, wait);
+  },
+
+  async _doFortuneBroadcast() {
+    try {
+      const fortune = await window.wealthCalendar.getDailyFortune();
+      if (!fortune || !fortune.overall) return;
+      this.say(this._buildFortuneLine(fortune));
+    } catch (e) { /* ignore */ }
+  },
+
+  _buildFortuneLine(fortune) {
+    // 主求方向内容约占一半
+    const useWish = Math.random() < 0.5;
+    let wish = '';
+    try { wish = (SettingsManager.settings && SettingsManager.settings.mainWish) || ''; } catch (e) { /* ignore */ }
+    const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
+    if (useWish && wish && wishMap[wish] && this._wishTips[wish]) {
+      const tips = this._wishTips[wish];
+      const tip = tips[Math.floor(Math.random() * tips.length)];
+      const dir = (fortune.directions && fortune.directions.wealth) || '';
+      return `🎯 主求${wishMap[wish]}：${tip}` + (dir ? `，财神方位${dir}` : '');
+    }
+    // 另一半：播报当天最强两维度
+    const dimLabels = { wealth: '财运', career: '事业', love: '桃花', health: '健康', study: '学业', travel: '出行', signing: '签约' };
+    const dims = fortune.dimensions || {};
+    const scored = Object.keys(dimLabels)
+      .map((k) => ({ label: dimLabels[k], score: (dims[k] && dims[k].score) || 0 }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2);
+    if (scored.length) {
+      return `✨ 今日最旺：${scored.map((d) => `${d.label}${d.score}分`).join('、')}，把握住好运气~`;
+    }
+    // 兜底
+    const dir2 = (fortune.directions && fortune.directions.wealth) || '';
+    return `📅 今日运势 ${fortune.overall} 分` + (dir2 ? `，财神方位${dir2}` : '');
+  },
+
+  // 主求方向播报文案池
+  _wishTips: {
+    wealth: ['求财宜进不宜守，大胆开口机会多~', '正财稳偏财旺，今天适合谈钱~', '钱包鼓鼓的一天，理性消费更旺财~'],
+    love: ['主动联系一下喜欢的人吧，桃花正旺~', '今天适合赴约，魅力值拉满~', '真诚最动人，姻缘自会来~'],
+    career: ['事业小高峰，重要任务今天处理~', '职场贵人运不错，多请教多协作~', '稳扎稳打，升职加薪在路上~'],
+    health: ['早睡早起身体好，今天宜养生~', '起来动一动，活力满满一整天~', '按时吃饭别熬夜，健康是本钱~'],
+    study: ['学习黄金期，抓住专注力~', '温故知新效率高，今天宜刷题~', '新知识吸收快，适合学点新技能~'],
+    peace: ['平安是福，出行慢一点稳一点~', '遇事放宽心，好运自然来~', '今日宜静心，诸事皆顺~'],
   },
 
   checkGoodHour() {

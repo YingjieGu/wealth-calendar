@@ -46,7 +46,7 @@ const WISH_LABELS = {
 // ---------------------------------------------------------------------------
 // Template fallback (pure, testable)
 // ---------------------------------------------------------------------------
-function buildTemplateFortune(paipan, almanac, dateStr, wish) {
+function buildTemplateFortune(paipan, almanac, dateStr, wish, zodiac) {
   const almanacYi = (almanac && almanac.yi) || [];
   const almanacJi = (almanac && almanac.ji) || [];
   const caiShen = (almanac && almanac.direction && almanac.direction.caiShenDesc) || '';
@@ -129,10 +129,11 @@ function buildTemplateFortune(paipan, almanac, dateStr, wish) {
       `今日诸事${dims.travel.score >= 70 ? '顺遂' : '多留心'}，遇事不急，稳字当头~`,
     ],
   };
+  const zText = zodiac ? `生肖${zodiac}的你，` : '';
   const lines = wish && wishLines[wish]
     ? wishLines[wish]
     : [
-        `小财发现，今日宜${yiText}，整体运势 ${overall} 分，${dims.wealth.advice}~`,
+        `${zText}小财发现，今日宜${yiText}，整体运势 ${overall} 分，${dims.wealth.advice}~`,
         `今日忌${jiText}，${dims.career.advice}，小财会一直陪着你哦～`,
       ];
   const reminderLines = lines;
@@ -233,6 +234,7 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
     return { error: 'noUserInfo', message: '请先在设置中填写出生信息' };
   }
   const gender = userInfo.gender || 'male';
+  const zodiac = userInfo.zodiac || ''; // 生肖：用户可手动设置（默认按出生年份自动算）
 
   // Parallel sidecar calls
   const [paipan, chart, almanac] = await Promise.all([
@@ -280,6 +282,7 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
         `用户八字排盘：\n${JSON.stringify(compactPaipan, null, 2)}\n` +
         `用户星盘：\n${JSON.stringify(compactChart, null, 2)}\n` +
         `当日黄历：\n${JSON.stringify(almanac.data, null, 2)}\n` +
+        `用户生肖（手动设置优先）：${zodiac || '未设置，按出生年份推算'}\n` +
         wishPrompt +
         `请按系统要求输出当日运势 JSON。`;
       fortune = await callLLM({
@@ -296,7 +299,7 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   }
 
   if (!fortune) {
-    fortune = buildTemplateFortune(paipanData.data || {}, almanac.data || {}, todayKey, wish);
+    fortune = buildTemplateFortune(paipanData.data || {}, almanac.data || {}, todayKey, wish, zodiac);
     source = 'template';
   }
 

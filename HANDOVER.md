@@ -77,6 +77,13 @@ npx electron-builder --win nsis
 - styles.css 用 CSS 变量实现界面主题: `:root` 深色默认(--panel-bg/--text/--card/--input-border/--accent 等), `body.theme-light` 覆盖为浅色(白色/米色背景+深色文字+暗金点缀); 面板/日历/聊天/设置/右键菜单/提示 toast/输入框(含 color-scheme)全部适配; 宠物悬浮窗背景随浅色转浅(win32 透明模式不受影响); 金色按钮(#ffd700 渐变)两主题通用保持亮金
 - 设置页「界面主题」深/浅切换, settings.json 存 `uiTheme`, 重启保持; body class 由 settings.js `applyUiTheme` 控制
 
+### 5. 其他功能
+- **托盘图标**: main.js `ensureTrayIcon()` — 用 assets/themes/cat1/睡觉.gif 首帧, python PIL 转 64x64 RGBA PNG 存 `userData/tray-icon.png`(缓存), nativeImage 加载传给 tray.js `createTray(mainWindow, onQuit, icon)`; 转换失败退回金色硬币占位图
+- **每日运势分段播报**: pet.js `startFortuneSlots` — 上午9/中午12/下午15/晚上19 四时段(每时段 2-3 条, 间隔 65-95 分钟, 按日期做变化, 每天 8-12 条), 复用 say 气泡; `_buildFortuneLine` 约一半播主求方向(主求文案池 _wishTips), 一半播最强两维度(从 fortune.dimensions 排序取前2); 调度按当前时间算未来时间点, 重启自动续播
+- **生肖配置**: 设置页用户信息加生肖下拉(12生肖+自动), settings.userInfo.zodiac; 默认按出生年份自动算(getChineseZodiac, (year-4)%12), 可手动改; fortuneEngine 读 zodiac 注入 LLM prompt 与模板 reminderLines("生肖X的你")
+- **今日运势雷达图**: calendar.js `buildRadarSVG(dims)` — 纯 SVG 7 维(财运/事业/桃花/健康/学业/出行/签约)七边形雷达图, 同心网格+数据多边形(金色线性渐变 url(#radarGold))+7 顶点+7 标签(颜色 var(--accent)); 插入 #fortune-body 的 `.fortune-radar`; 无维度数据时显示占位文案
+- **内置宠物素材板块已移除**: 设置页 pets-grid UI 与 settings.js loadPets/EMOJI_FOR 删除(与主题功能冲突); 素材主题(cat1/cat2/caishen)仍保留在主题选择中
+
 ### 5. 其他约定
 - LLM: deepseek-v4-flash, max_tokens ≥16000 (推理模型 reasoning 吃 token)
 - 主求方向: settings.mainWish (wealth/love/career/health/study/peace)

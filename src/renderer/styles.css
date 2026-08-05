@@ -1163,6 +1163,17 @@ body.platform-win32 #pet-stage::before {
   flex-direction: column;
   gap: 3px;
 }
+/* 今日运势雷达图（纯 SVG，全平台渲染安全） */
+.fortune-radar {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+}
+.fortune-radar svg {
+  display: block;
+}
 .fortune-dim {
   display: flex;
   align-items: baseline;

@@ -266,6 +266,61 @@ const CalendarView = {
     }
   },
 
+  // 纯 SVG 7 维运势雷达图（财运/事业/桃花/健康/学业/出行/签约），金色渐变，全平台渲染安全
+  buildRadarSVG(dims) {
+    const keys = ['wealth', 'career', 'love', 'health', 'study', 'travel', 'signing'];
+    const labels = { wealth: '财运', career: '事业', love: '桃花', health: '健康', study: '学业', travel: '出行', signing: '签约' };
+    const cx = 130, cy = 112, R = 78;
+    const N = keys.length;
+    const angle = (i) => (-90 + i * (360 / N)) * Math.PI / 180;
+    const pt = (i, r) => ({ x: cx + r * Math.cos(angle(i)), y: cy + r * Math.sin(angle(i)) });
+
+    let hasData = false;
+    const score = (k) => {
+      const d = dims[k] || {};
+      const s = parseInt(d.score, 10) || 0;
+      if (s > 0) hasData = true;
+      return Math.max(0, Math.min(100, s));
+    };
+    const scores = keys.map(score);
+    if (!hasData) return '<div class="fortune-empty">暂无维度数据</div>';
+
+    // 同心七边形网格
+    let grid = '';
+    for (const f of [0.25, 0.5, 0.75, 1]) {
+      const pts = keys.map((_, i) => pt(i, R * f)).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+      grid += `<polygon points="${pts}" fill="none" stroke="rgba(255,215,0,0.14)" stroke-width="1"/>`;
+    }
+    // 轴线 + 维度标签
+    let axes = '';
+    for (let i = 0; i < N; i++) {
+      const p = pt(i, R);
+      axes += `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="rgba(255,215,0,0.16)" stroke-width="1"/>`;
+      const lp = pt(i, R + 17);
+      const anchor = lp.x > cx + 5 ? 'start' : (lp.x < cx - 5 ? 'end' : 'middle');
+      axes += `<text x="${lp.x.toFixed(1)}" y="${(lp.y + 4).toFixed(1)}" font-size="11" fill="var(--accent)" text-anchor="${anchor}" dominant-baseline="middle">${labels[keys[i]]}</text>`;
+    }
+    // 数据多边形（金色渐变）+ 顶点
+    const dataPts = keys.map((k, i) => pt(i, R * (score(k) / 100))).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const dots = keys.map((k, i) => {
+      const p = pt(i, R * (score(k) / 100));
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="#ffd700"/>`;
+    }).join('');
+
+    return `<svg viewBox="0 0 260 230" width="100%" height="230" role="img" aria-label="今日运势雷达图">
+  <defs>
+    <linearGradient id="radarGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd700" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#f0a830" stop-opacity="0.32"/>
+    </linearGradient>
+  </defs>
+  ${grid}
+  ${axes}
+  <polygon points="${dataPts}" fill="url(#radarGold)" stroke="#ffd700" stroke-width="2" stroke-linejoin="round"/>
+  ${dots}
+</svg>`;
+  },
+
   async loadFortune(force) {
     const section = document.getElementById('fortune-section');
     const body = document.getElementById('fortune-body');
@@ -311,6 +366,7 @@ const CalendarView = {
       <div class="fortune-overall">总分 <b>${f.overall}</b> <span class="fortune-source">${sourceTag}</span></div>
       ${reminderLine ? `<div class="fortune-line">💬 ${this.escapeHtml(reminderLine)}</div>` : ''}
       <div class="fortune-dims">${dimHtml}</div>
+      <div class="fortune-radar">${this.buildRadarSVG(dims)}</div>
       <div class="fortune-meta">🕐 吉时：${this.escapeHtml(luckyTime)} ｜ 🧭 财神方位：${this.escapeHtml(dirWealth)}</div>
       <div class="fortune-disclaimer">${this.escapeHtml(f.disclaimer || '')}</div>`;
   },

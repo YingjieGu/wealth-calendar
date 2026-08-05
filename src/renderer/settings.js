@@ -48,7 +48,25 @@ const SettingsManager = {
       document.getElementById('gender-male').classList.toggle('active', ui.gender === 'male');
       document.getElementById('gender-female').classList.toggle('active', ui.gender === 'female');
       this.updateZodiac(ui.birth);
+      // 生肖：手动设置优先，否则按出生年份自动计算
+      const zSel = document.getElementById('user-zodiac-select');
+      if (zSel) {
+        if (ui.zodiac) {
+          zSel.value = ui.zodiac;
+        } else {
+          zSel.value = ui.birth
+            ? this.getChineseZodiac(new Date(ui.birth.replace(' ', 'T')).getFullYear())
+            : '';
+        }
+      }
     }
+  },
+
+  // 生肖：鼠=0 起点，(year-4)%12（如 2020 鼠）
+  getChineseZodiac(year) {
+    const arr = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+    if (!year) return '';
+    return arr[(((year - 4) % 12) + 12) % 12];
   },
 
   updateZodiac(birth) {
@@ -178,13 +196,20 @@ const SettingsManager = {
       showToast('已恢复默认位置');
     });
 
-    // User info: birth datetime change -> update zodiac preview
+    // User info: birth datetime change -> update zodiac preview + auto 生肖
     document.getElementById('user-birth').addEventListener('change', (e) => {
       this.updateZodiac(e.target.value ? e.target.value.replace('T', ' ') : null);
+      const zSel = document.getElementById('user-zodiac-select');
+      if (zSel && e.target.value) {
+        zSel.value = this.getChineseZodiac(new Date(e.target.value).getFullYear());
+      }
     });
 
-    // Built-in pet assets grid
-    this.loadPets();
+    // 生肖手动选择：立即保存 settings.userInfo.zodiac
+    document.getElementById('user-zodiac-select').addEventListener('change', (e) => {
+      this.settings.userInfo = { ...(this.settings.userInfo || {}), zodiac: e.target.value };
+      this.save();
+    });
 
     // Gender selection
     document.getElementById('gender-male').addEventListener('click', () => {
@@ -203,6 +228,8 @@ const SettingsManager = {
       const raw = document.getElementById('user-birth').value;
       const birth = raw ? raw.replace('T', ' ') : null; // datetime-local -> "YYYY-MM-DD HH:mm"
       this.settings.userInfo = { ...(this.settings.userInfo || {}), birth };
+      const zSel = document.getElementById('user-zodiac-select');
+      if (zSel) this.settings.userInfo.zodiac = zSel.value;
       await this.save();
       this.updateZodiac(birth);
       showToast(birth ? '✅ 用户信息已保存' : '⚠️ 未填写出生时间');
@@ -337,69 +364,6 @@ const SettingsManager = {
     document.querySelectorAll('#wish-options .activity-option').forEach((b) => {
       b.classList.toggle('active', b.dataset.wish === wish);
     });
-  },
-
-  // --- Built-in pet assets ---
-  // Linux dev box (software rendering) can't paint bitmaps at all, so the grid
-  // shows emoji stand-ins there; real PNGs are used on Windows/macOS.
-  EMOJI_FOR: {
-    cat: '🐱', dog: '🐶', rabbit: '🐰', panda: '🐼', tiger: '🐯',
-    fox: '🦊', pig: '🐷', koala: '🐨', moneybag: '💰', hongbao: '🧧',
-    coin: '💰', heart: '💗',
-  },
-
-  async loadPets() {
-    const grid = document.getElementById('pets-grid');
-    if (!grid) return;
-    const isLinux = window.wealthCalendar.platform === 'linux';
-    let names = [];
-    try {
-      names = await window.wealthCalendar.petsList();
-    } catch (e) { /* ignore */ }
-    if (!names.length) {
-      grid.innerHTML = '<p class="placeholder-text">暂无内置素材</p>';
-      return;
-    }
-    grid.innerHTML = '';
-    for (const n of names) {
-      const item = document.createElement('div');
-      item.className = 'pets-item';
-      item.title = n;
-      if (isLinux) {
-        // emoji stand-in (bitmap rendering is broken on this box)
-        const emoji = SettingsManager.EMOJI_FOR[n] || '🐱';
-        item.textContent = emoji;
-        item.style.fontSize = '40px';
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-        item.style.justifyContent = 'center';
-      } else {
-        const dataUrl = await window.wealthCalendar.petsImage(n);
-        if (!dataUrl) continue;
-        const img = document.createElement('img');
-        img.src = dataUrl;
-        img.alt = n;
-        item.appendChild(img);
-      }
-      item.addEventListener('click', async () => {
-        this.settings.theme = 'custom';
-        if (isLinux) {
-          // save emoji choice instead of copying a png
-          this.settings.petEmoji = SettingsManager.EMOJI_FOR[n] || '🐱';
-        } else {
-          const r = await window.wealthCalendar.petsApply(n);
-          if (!r || !r.ok) {
-            showToast('❌ 应用失败');
-            return;
-          }
-        }
-        this.updateThemeUI('custom');
-        PetState.setTheme('custom', this.settings.petEmoji);
-        await this.save();
-        showToast(`✅ 已应用：${n}`);
-      });
-      grid.appendChild(item);
-    }
   },
 
   // --- Multimodal config ---

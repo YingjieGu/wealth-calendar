@@ -282,6 +282,30 @@ function clampPos(x, y) {
   }
 }
 
+// 把 w×h 窗口摆到 anchor 附近并 clamp 到所在显示器 workArea 内。
+// 优先保持左上角可见(尽量贴近 anchor 但不出界); 若窗口比 workArea 大则居中。
+// 用于面板打开(放大到 420x560)与关闭(恢复宠物尺寸)时防止窗口超出桌面。
+function clampWindowInWorkArea(win, w, h, anchorX, anchorY) {
+  if (!win || win.isDestroyed()) return null;
+  let wa;
+  try {
+    wa = screen.getDisplayNearestPoint({ x: Math.round(anchorX), y: Math.round(anchorY) }).workArea;
+  } catch (e) {
+    wa = screen.getPrimaryDisplay().workArea;
+  }
+  let x = anchorX;
+  let y = anchorY;
+  if (w > wa.width || h > wa.height) {
+    x = wa.x + (wa.width - w) / 2;
+    y = wa.y + (wa.height - h) / 2;
+  } else {
+    x = Math.max(wa.x, Math.min(x, wa.x + wa.width - w));
+    y = Math.max(wa.y, Math.min(y, wa.y + wa.height - h));
+  }
+  win.setPosition(Math.round(x), Math.round(y));
+  return { x: Math.round(x), y: Math.round(y) };
+}
+
 // homeBase：workArea 右下角据点，留 20px 边距
 function homeBasePos() {
   const wa = screen.getPrimaryDisplay().workArea;
@@ -590,10 +614,12 @@ function setupIPC() {
     if (!mainWindow) return false;
     if (mode === 'panel') {
       isCalendarMode = true;
+      // 记录宠物当前位置作为面板锚点（放大后优先保持左上角可见）
+      const [px, py] = mainWindow.getPosition();
       mainWindow.setResizable(true);
       mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
-      const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
-      mainWindow.setPosition(pos.x, pos.y);
+      // 面板位置 clamp 到所在显示器 workArea，防止放大后超出桌面显示范围
+      clampWindowInWorkArea(mainWindow, CAL_WIDTH, CAL_HEIGHT, px, py);
       // 面板打开：通知渲染进程暂停阶段调度（避免瞬移挪动面板窗口）
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('pet-panel');
@@ -606,11 +632,12 @@ function setupIPC() {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('pet-resume');
       }
+      // 恢复宠物尺寸后位置也 clamp（防止停在屏幕边缘/越界）
       const saved = loadSettings();
       const sx = saved.windowX;
       const sy = saved.windowY;
       if (typeof sx === 'number' && typeof sy === 'number') {
-        mainWindow.setPosition(sx, sy);
+        clampWindowInWorkArea(mainWindow, PET_WIDTH, PET_HEIGHT, sx, sy);
       } else {
         const pos = centerWindow(mainWindow, PET_WIDTH, PET_HEIGHT);
         mainWindow.setPosition(pos.x, pos.y);

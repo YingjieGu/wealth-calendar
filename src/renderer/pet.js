@@ -14,6 +14,7 @@ const PetState = {
     this._currentPosType = 'homeBase'; // 当前所在位置类型（跟鼠标互动后恢复用）
     this._firstSleep = false;      // 切粘人首轮在 homeBase 睡一轮
     this._phaseBooted = false;     // 阶段循环是否已由 setActivity 启动
+    this._phaseGen = 0;            // 阶段代数：异步 _beginPhase 期间被唤醒/新阶段打断则放弃
     this._lastMouseFollow = 0;     // 粘人「跟鼠标」上次跟随时间(冷却 15s)
     // 豆包式玩法状态
     this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/cat2/caishen）
@@ -95,10 +96,14 @@ const PetState = {
   },
 
   // 进入新阶段：按模式权重瞬移到下一个位置，并按位置类型展示状态动作。
-  // forceHomeBase: 粘人切模式后先在 homeBase 睡一轮再进入正常权重循环
-  async _beginPhase(forceHomeBase) {
+  // forcedType: 强制瞬移到指定位置类型（如点击唤醒后 'workEdge' 趴窗玩）；
+  // _firstSleep 时强制 homeBase（粘人切模式先睡一轮再进入正常权重循环）。
+  async _beginPhase(forcedType) {
+    const gen = ++this._phaseGen;
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     const mode = this._activityMode();
+    const firstSleep = this._firstSleep;
+    this._firstSleep = false;
     // 位置切换开关（原全屏漫游开关）：关闭时原地状态循环，不瞬移
     let roamOn = true;
     try {
@@ -107,20 +112,37 @@ const PetState = {
     let type = 'homeBase';
     if (roamOn) {
       try {
-        const r = await window.wealthCalendar.phaseGo(mode, forceHomeBase ? 'homeBase' : null);
+        const force = forcedType || (firstSleep ? 'homeBase' : null);
+        const r = await window.wealthCalendar.phaseGo(mode, force);
+        if (gen !== this._phaseGen) return; // 期间被唤醒/新阶段打断，放弃本次瞬移结果
         if (r && r.type) { type = r.type; this._currentPosType = r.type; }
       } catch (e) { /* 瞬移失败也照常展示状态 */ }
     }
-    const firstSleep = this._firstSleep;
-    this._firstSleep = false;
     if (firstSleep) type = 'homeBase'; // 粘人首轮: 停 homeBase 睡觉
     this._setStateForPosition(type);
     const dur = firstSleep ? 60000 : this._phaseDuration();
     this._behaviorTimer = setTimeout(() => this._beginPhase(), dur);
   },
 
+  // 瞬移到指定位置并强制展示玩耍状态（点击唤醒后趴窗玩/换新位置）。
+  // forcedType 为 null 时按当前模式权重选位置。
+  async _teleportAndPlay(forcedType) {
+    const gen = ++this._phaseGen;
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    let type = 'homeBase';
+    try {
+      const r = await window.wealthCalendar.phaseGo(this._activityMode(), forcedType || null);
+      if (gen !== this._phaseGen) return; // 期间被再次打断，放弃
+      if (r && r.type) type = r.type;
+    } catch (e) { /* 瞬移失败也照常展示玩耍状态 */ }
+    this._currentPosType = type;
+    this.enterState('play'); // 醒着玩耍动作
+    this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
+  },
+
   // 重新武装阶段计时器（拖动松手/面板关闭后从当前位置继续，下个阶段再瞬移）
   _rearmPhase() {
+    ++this._phaseGen; // 使在途 _beginPhase 的 await 结果失效
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
   },
@@ -308,9 +330,40 @@ const PetState = {
   ],
 
   triggerClickReaction() {
+    // 睡梦中被戳醒：唤醒 + 模式位置联动；非 sleep 保留随机小反应
+    if (this.currentState === 'sleep') {
+      this._wakeUp();
+      return;
+    }
     const r = this.clickReactions[Math.floor(Math.random() * this.clickReactions.length)];
     this.say(`${r.emoji} ${r.line}`);
     this._resumeIfIdle();
+  },
+
+  // 点击唤醒睡梦中的宠物：切清醒/玩耍动作 + 互动气泡 + 重置阶段计时器 + 模式位置联动
+  _wakeUp() {
+    ++this._phaseGen; // 使在途 _beginPhase 的 await 结果失效，避免其覆盖唤醒状态
+    this.enterState(Math.random() < 0.5 ? 'play' : 'idle'); // 切换动作图（素材主题播玩耍/清醒动作，内置主题切对应SVG动画）
+    const lines = ['喵?主人叫我~', '睡醒啦!', '唔...刚梦到主人给小鱼干~'];
+    this.say(lines[Math.floor(Math.random() * lines.length)]);
+    this._idleBucket = 'active';
+    // e) 重置阶段计时器（刚醒重新计时 10-20 分钟，避免立刻又瞬移）
+    if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
+    this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
+    // b) 唤醒后按当前模式触发位置联动（1-2s 后；若期间模式已切换则放弃联动）
+    const mode = this._activityMode();
+    if (mode === 'clingy') {
+      setTimeout(() => {
+        if (this._activityMode() !== mode) return;
+        this._teleportAndPlay('workEdge'); // 瞬移到工作窗口上沿趴着玩
+      }, 1200 + Math.random() * 800);
+    } else if (mode === 'active') {
+      setTimeout(() => {
+        if (this._activityMode() !== mode) return;
+        this._teleportAndPlay(); // 按权重瞬移新位置
+      }, 1200 + Math.random() * 800);
+    }
+    // quiet：原地不动，状态已切 idle/play 玩耍动作
   },
 
   // ---- Bubble ----

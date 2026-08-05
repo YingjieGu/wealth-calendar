@@ -62,6 +62,22 @@ function findPythonCmd() {
   return null;
 }
 
+// 内置 Windows Python 运行时（免安装零依赖）：打包后 resources/python-win/python.exe，
+// 开发态 assets/python-win/python.exe。找不到回退系统 python。
+function bundledPythonCmd() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'python-win', 'python.exe'),
+    path.join(app.getAppPath(), 'assets', 'python-win', 'python.exe'),
+  ];
+  for (const p of candidates) {
+    try {
+      require('fs').accessSync(p);
+      return p;
+    } catch (e) { /* try next */ }
+  }
+  return null;
+}
+
 function requestSidecar(method, urlPath, body) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
@@ -142,8 +158,14 @@ function startSidecar() {
       cmd = script;
       args = ['--port', String(SIDECAR_PORT)];
     } else {
-      // Windows may not have python3 in PATH
-      cmd = process.platform === 'win32' ? (findPythonCmd() || 'python') : 'python3';
+      // Windows 优先用内置 python-win 运行时（免安装零依赖）；找不到再回退系统 python3/python/py
+      if (process.platform === 'win32') {
+        const bundled = bundledPythonCmd();
+        cmd = bundled || findPythonCmd() || 'python';
+        if (bundled) console.log('[sidecar] using bundled python:', cmd);
+      } else {
+        cmd = 'python3';
+      }
       args = [script, '--port', String(SIDECAR_PORT)];
     }
     console.log('[sidecar] starting:', cmd, args.join(' '));

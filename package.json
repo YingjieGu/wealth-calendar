@@ -35,6 +35,10 @@
       {
         "from": "assets/themes",
         "to": "themes"
+      },
+      {
+        "from": "assets/python-win",
+        "to": "python-win"
       }
     ],
     "win": {

@@ -94,6 +94,15 @@ npx electron-builder --win nsis
 - **全局细滚动条**: `*::-webkit-scrollbar` 宽 4px 圆角半透明, hover 用 --scrollbar-hover 变亮, 对话/日历/设置统一
 - **日历布局**: 关闭按钮移到右上角(参照对话/设置面板); 月历/运势/雷达图/日程详情合并到 `.cal-scroll` 单滚动容器(移除各板块独立滚动, 同设置页)
 
+### 5. 内置 Windows Python 运行时（win 无 Python 环境时 sidecar 起不来）
+- **assets/python-win/（gitignore，仅打包用）**：Windows 免安装 Python 运行时 + 命理/语音依赖
+  - **Python 3.11.9 embeddable**（非 3.12：pyswisseph 无 cp312 win_amd64 轮子，最新到 cp311；"或相近版本"即此）— 华为云镜像下载，解压含 python.exe + python311.dll + python311.zip(stdlib)
+  - **python311._pth 已启用 `import site` + `Lib\site-packages`**（关键：否则 site-packages 不进 sys.path）
+  - **wheels**（清华源 pip download --platform win_amd64 --python-version 3.11 --only-binary=:all:）解压到 Lib/site-packages：pyswisseph/edge-tts/faster-whisper/lunar-python(1.4.8, 仅 sdist 纯 py 手动解包)/numpy/ctranslate2/onnxruntime/av/tokenizers/certifi/aiohttp/huggingface_hub 等；体积约 269M
+- **sidecar.js**：win32 优先 `bundledPythonCmd()`（resources/python-win/python.exe 打包态 / app.getAppPath()/assets/python-win/python.exe 开发态），找不到回退系统 python3/python/py；启动日志打印所用 python
+- **打包**：package.json extraResources `assets/python-win → python-win`（electron-builder 已实测 --dir 产物含 python-win 269M）
+- 重新生成/更新：重跑第 46-49 任务的下载脚本（华为云 + 清华源镜像）；faster-whisper 模型下载 server.py 已走 hf-mirror
+
 ### 5. 其他约定
 - LLM: deepseek-v4-flash, max_tokens ≥16000 (推理模型 reasoning 吃 token)
 - 主求方向: settings.mainWish (wealth/love/career/health/study/peace)

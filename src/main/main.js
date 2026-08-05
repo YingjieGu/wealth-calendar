@@ -236,8 +236,8 @@ function createWindow() {
   mainWindow.on('move', () => {
     if (moveTimeout) clearTimeout(moveTimeout);
     moveTimeout = setTimeout(() => {
-      // 漫游/面板期间移动不保存位置（避免漫游频繁写盘）
-      if (isCalendarMode || roamTimer) return;
+      // 阶段瞬移/面板期间移动不保存位置（避免瞬移与面板移动写盘）
+      if (isCalendarMode || isPhaseTeleport) return;
       const [x, y] = mainWindow.getPosition();
       const settings = loadSettings();
       settings.windowX = x;
@@ -258,64 +258,123 @@ function createWindow() {
   });
 }
 
-// --- 全屏漫游器（豆包式：窗口随机方向匀速移动，碰到屏幕边缘反弹） ---
-const ROAM_TICK_MS = 40;   // 每 40ms 移动一次
-const ROAM_SPEED = 1.6;    // px/tick ≈ 40px/s，匀速漫游
-let roamTimer = null;
-let roamAngle = Math.random() * Math.PI * 2;
-let roamPaused = false;    // 用户拖动时暂停移动（保持宠物走路视觉）
-let lastRoamState = null;
+// ============ 猫咪生活作息式「位置-阶段」模型 ============
+// 旧的平滑漫游（40ms tick 逐帧移动）已移除；位置切换全部改为「瞬移」：
+// 阶段到点后直接 setPosition 跳到下一个位置，无移动动画。
+// 位置池：homeBase(右下角据点) / workEdge(活跃窗口上沿或下沿) /
+//         taskbar(屏幕底部任务栏上方) / random(桌面随机避开边缘)。
+// 权重(按模式)：quiet homeBase 100%；clingy homeBase 75%+workEdge 25%；
+//               active homeBase 55%+workEdge 15%+taskbar 15%+random 15%。
+const PHASE_MIN_MS = 600000; // 每阶段停留 10-20 分钟（猫咪作息）
+const PHASE_MAX_MS = 1200000;
 
-function roamEnabled() {
-  // 可配置开关：settings.petRoam，默认开启
-  return loadSettings().petRoam !== false;
-}
+let isPhaseTeleport = false; // 阶段瞬移中：move 处理器不保存瞬移位置
 
-// 通知渲染进程漫游状态（窗口移动 ↔ 宠物走路动画同步）
-function notifyRoam(roaming) {
-  if (roaming === lastRoamState) return;
-  lastRoamState = roaming;
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('pet-roam', roaming);
+function clampPos(x, y) {
+  try {
+    const wa = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+    return {
+      x: Math.max(wa.x + 4, Math.min(x, wa.x + wa.width - PET_WIDTH - 4)),
+      y: Math.max(wa.y + 4, Math.min(y, wa.y + wa.height - PET_HEIGHT - 4)),
+    };
+  } catch (e) {
+    return { x, y };
   }
 }
 
-function stopRoaming() {
-  if (roamTimer) { clearInterval(roamTimer); roamTimer = null; }
-  notifyRoam(false);
+// homeBase：workArea 右下角据点，留 20px 边距
+function homeBasePos() {
+  const wa = screen.getPrimaryDisplay().workArea;
+  return {
+    x: Math.round(wa.x + wa.width - PET_WIDTH - 20),
+    y: Math.round(wa.y + wa.height - PET_HEIGHT - 20),
+  };
 }
 
-function startRoaming() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (!roamEnabled() || isCalendarMode || roamPaused) {
-    stopRoaming();
-    return;
+// workEdge：活跃窗口上沿居中（顶部空间不足贴下沿）；检测不到活跃窗口返回 null
+function workEdgePos() {
+  const rect = getActiveWindowRect();
+  if (!rect) return null;
+  let x = rect.x + (rect.width - PET_WIDTH) / 2;
+  let y = rect.y - PET_HEIGHT + 10;
+  try {
+    const wa = screen.getDisplayNearestPoint({ x: Math.round(rect.x), y: Math.round(rect.y) }).workArea;
+    if (y < wa.y) y = rect.y + rect.height + 10; // 顶部空间不足 → 贴下沿
+  } catch (e) { /* ignore */ }
+  return clampPos(x, y);
+}
+
+// taskbar：屏幕底部任务栏上方（约 workArea 底部），水平随机避开边缘
+function taskbarPos() {
+  const wa = screen.getPrimaryDisplay().workArea;
+  return {
+    x: Math.round(wa.x + 20 + Math.random() * Math.max(0, wa.width - PET_WIDTH - 40)),
+    y: Math.round(wa.y + wa.height - PET_HEIGHT - 8),
+  };
+}
+
+// random：桌面随机位置，四周留 20px 避开屏幕边缘
+function randomPos() {
+  const wa = screen.getPrimaryDisplay().workArea;
+  return {
+    x: Math.round(wa.x + 20 + Math.random() * Math.max(0, wa.width - PET_WIDTH - 40)),
+    y: Math.round(wa.y + 20 + Math.random() * Math.max(0, wa.height - PET_HEIGHT - 40)),
+  };
+}
+
+// 模式 → 位置池权重
+const POSITION_WEIGHTS = {
+  quiet: { homeBase: 100 },
+  clingy: { homeBase: 75, workEdge: 25 },
+  active: { homeBase: 55, workEdge: 15, taskbar: 15, random: 15 },
+};
+
+function pickPositionType(mode) {
+  const w = POSITION_WEIGHTS[mode] || POSITION_WEIGHTS.active;
+  let total = 0;
+  for (const k in w) total += w[k];
+  let roll = Math.random() * total;
+  for (const k in w) {
+    roll -= w[k];
+    if (roll < 0) return k;
   }
-  if (roamTimer) return;
-  roamAngle = Math.random() * Math.PI * 2;
-  roamTimer = setInterval(() => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    // 面板打开：完全停漫游
-    if (isCalendarMode) { stopRoaming(); return; }
-    // 拖动中：暂停移动，但保持宠物走路视觉（不 stopRoaming）
-    if (roamPaused) return;
+  return 'homeBase';
+}
 
-    const [wx, wy] = mainWindow.getPosition();
-    const [ww, wh] = mainWindow.getSize();
-    const wa = screen.getDisplayNearestPoint({ x: wx, y: wy }).workArea;
-    const margin = 10;
-    let nx = wx + Math.cos(roamAngle) * ROAM_SPEED;
-    let ny = wy + Math.sin(roamAngle) * ROAM_SPEED;
+// 按类型解析实际坐标并返回真实类型；workEdge 检测不到活跃窗口时回退 homeBase
+function resolvePosition(type) {
+  switch (type) {
+    case 'workEdge': {
+      const p = workEdgePos();
+      if (p) return { type: 'workEdge', x: p.x, y: p.y };
+      const hb = homeBasePos();
+      return { type: 'homeBase', x: hb.x, y: hb.y };
+    }
+    case 'taskbar': {
+      const p = taskbarPos();
+      return { type: 'taskbar', x: p.x, y: p.y };
+    }
+    case 'random': {
+      const p = randomPos();
+      return { type: 'random', x: p.x, y: p.y };
+    }
+    case 'homeBase':
+    default: {
+      const p = homeBasePos();
+      return { type: 'homeBase', x: p.x, y: p.y };
+    }
+  }
+}
 
-    // 碰到屏幕边缘反弹（镜像角度）
-    if (nx <= wa.x + margin) { nx = wa.x + margin; roamAngle = Math.PI - roamAngle; }
-    else if (nx + ww >= wa.x + wa.width - margin) { nx = wa.x + wa.width - ww - margin; roamAngle = Math.PI - roamAngle; }
-    if (ny <= wa.y + margin) { ny = wa.y + margin; roamAngle = -roamAngle; }
-    else if (ny + wh >= wa.y + wa.height - margin) { ny = wa.y + wa.height - wh - margin; roamAngle = -roamAngle; }
-
-    mainWindow.setPosition(Math.round(nx), Math.round(ny));
-    notifyRoam(true);
-  }, ROAM_TICK_MS);
+// 阶段瞬移：按模式权重选位置池类型 → 解析坐标 → 直接 setPosition（无平滑动画）
+function teleportTo(mode, forcedType) {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+  const type = forcedType || pickPositionType(mode || 'active');
+  const res = resolvePosition(type);
+  isPhaseTeleport = true;
+  mainWindow.setPosition(res.x, res.y);
+  setTimeout(() => { isPhaseTeleport = false; }, 120);
+  return res; // { type, x, y }
 }
 
 // --- 活跃工作窗口检测（粘人模式平台适配器） ---
@@ -531,16 +590,19 @@ function setupIPC() {
     if (!mainWindow) return false;
     if (mode === 'panel') {
       isCalendarMode = true;
-      stopRoaming(); // 面板模式固定窗口
       mainWindow.setResizable(true);
       mainWindow.setSize(CAL_WIDTH, CAL_HEIGHT);
       const pos = centerWindow(mainWindow, CAL_WIDTH, CAL_HEIGHT);
       mainWindow.setPosition(pos.x, pos.y);
+      // 面板打开：通知渲染进程暂停阶段调度（避免瞬移挪动面板窗口）
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('pet-panel');
+      }
     } else {
       isCalendarMode = false;
       mainWindow.setSize(PET_WIDTH, PET_HEIGHT);
       mainWindow.setResizable(false);
-      // 漫游由渲染进程行为状态机驱动；面板关闭后通知渲染进程恢复行为循环
+      // 面板关闭后通知渲染进程恢复阶段调度（从当前位置继续，下个阶段瞬移）
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('pet-resume');
       }
@@ -1012,30 +1074,18 @@ function setupIPC() {
     }
   });
 
-  // --- 漫游 IPC ---
-  // 漫游由渲染进程的「随机行为状态机」驱动：roam-start（开始漫游阶段）/
-  // roam-stop（停下进入休息状态）。拖动仍用 roam-pause/resume 临时暂停。
-  ipcMain.on('roam-pause', () => {
-    roamPaused = true; // 只暂停移动，保持宠物走路视觉
+  // --- 位置-阶段 IPC（猫咪作息） ---
+  // 阶段调度（10-20 分钟计时）在渲染进程 pet.js；主进程负责位置池与瞬移。
+  // phase-go：按模式权重选位置类型 → 解析坐标 → 直接 setPosition 瞬移。
+  ipcMain.handle('phase-go', (_event, mode, forcedType) => {
+    return teleportTo(mode, forcedType);
   });
-  ipcMain.on('roam-resume', () => {
-    roamPaused = false;
-    // 若窗口漫游器（ticker）仍在运行，解除暂停即自动恢复移动；不主动重启，
-    // 由渲染进程行为状态机决定何时进入/退出漫游阶段
-  });
-  ipcMain.on('roam-start', () => {
-    // 渲染进程行为状态机：进入「漫游」阶段（拖动中/面板打开/漫游关闭时不启动）
-    if (!roamPaused && !isCalendarMode && roamEnabled()) startRoaming();
-  });
-  ipcMain.on('roam-stop', () => {
-    stopRoaming();
-  });
+
+  // 位置切换开关（原「全屏漫游」）：关闭时渲染进程不瞬移，原地状态循环
   ipcMain.on('roam-set', (_event, enabled) => {
     const s = loadSettings();
     s.petRoam = !!enabled;
     saveSettings(s);
-    if (!enabled) stopRoaming();
-    // 开启漫游时由渲染进程行为状态机决定何时开始（roamStart），这里不主动启动
   });
 
   // --- 粘人模式：活跃窗口检测 + 趴窗口 + 拖动吸附 ---
@@ -1111,8 +1161,8 @@ app.whenReady().then(() => {
   );
   setupIPC();
   createWindow();
-  // 豆包式全屏漫游：由渲染进程「随机行为状态机」驱动（roam-start/roam-stop），
-  // 启动时窗口先停在原位展示休息状态，行为循环到漫游阶段才移动
+  // 位置-阶段模型：阶段调度（10-20 分钟计时 + 状态动作）在渲染进程 pet.js，
+  // 主进程负责位置池与瞬移（phase-go）。启动时渲染进程按保存模式开始阶段循环
   tray = createTray(mainWindow, () => {
     isQuitting = true;
     app.quit();

@@ -60,12 +60,13 @@ npx electron-builder --win nsis
 ### 4. 拖拽/交互 / 透明桌宠 (豆包式)
 - 拖拽: #pet-stage mousedown → moveWindow IPC; **不要加 window blur 重置** (会导致拖不动); 拖动时 roamPause 暂停漫游, 松手 roamResume
 - **win32 真透明桌宠**: 窗口 `transparent:true` + `backgroundColor` 透明; CSS `body.platform-win32 #app` 透明/无边框/无阴影/去光晕; 点击穿透 = 主进程光标轮询(120ms)发窗口内相对坐标 → 渲染进程 `elementFromPoint` 命中测试(交互元素: pet/按钮/气泡/面板) → `set-click-through` → `setIgnoreMouseEvents(value, {forward:true})`; **Linux 软渲染透明不上屏, 保持不透明调试模式**
-- **三种宠物模式(settings.activity)与行为状态机** (宠物固定在窗口中心, 移动靠窗口位置管理):
-  - **active 活跃**: 全屏漫游(roamStart→窗口 40ms/tick ~40px/s 随机方向+边缘反弹, 宠物 walk 动图 15-45s) ↔ 休息(roamStop→窗口停下, 随机 sleep/play/happy/sad 10-40s), 随机动或不动
-  - **quiet 安静**: 只在屏幕右下角据点(workArea 右下角留 20px, `pet-corner` IPC), 不漫游, 状态只 sleep/idle; 拖动后停在新位置不再回角(本阶段不重复 dock)
-  - **clingy 粘人**: 默认右下角据点休息(sleep/sad 等, 切粘人先强制在角落睡一轮); 抽到 happy/play → 趴到当前活跃窗口上沿居中(`sitWindowOn`: y=工作窗y-宠物高+10, 顶部空间不足贴下沿 y=工作窗y+高+10), 玩耍 20-60s 后回右下角; 鼠标在工作窗口内快速移动时概率性跟过去(`pet-follow-mouse` 挪到鼠标上方~100px, `pet-mouse-fast` 事件限流, 渲染概率 35%+冷却 15s)
-  - 漫游仅 active 模式启用; 拖动 roam-pause/resume 临时暂停; `pet-roam` 事件同步走路视觉; `pet-resume` 事件面板关闭后重排; `petRoam` 关闭时 active 只休息循环
-- **主进程行为支撑**: `getActiveWindowRect()` 平台适配器(Linux xdotool→xprop+xwininfo 退化, Win PowerShell GetForegroundWindow, macOS osascript; 全 try/catch 失败返 null; 自动排除宠物窗口自身); IPC: `pet-sit`(趴窗定位) / `pet-snap`(拖动松手吸附) / `pet-corner`(右下角停靠) / `pet-follow-mouse`(跟鼠标) / `get-active-window-rect`; 渲染进程 `_beginQuietPhase`/`_beginClingyRest`/`_beginSitPhase`/`_handleMouseFast`/`onDragRelease` 驱动
+- **位置-阶段模型(猫咪生活作息, settings.activity 三模式)** (宠物固定在窗口中心, 移动靠「阶段瞬移」, **旧的全屏漫游 40ms tick 平滑移动已删除**):
+  - **位置池(主进程定义)**: homeBase(workArea 右下角留 20px) / workEdge(活跃窗口上沿居中 y=工作窗y-宠物高+10, 顶部空间不足贴下沿, 检测不到活跃窗口回退 homeBase) / taskbar(屏幕底部任务栏上方≈workArea 底部, 水平随机) / random(桌面随机避开边缘)
+  - **模式权重**: quiet homeBase 100%; clingy homeBase 75%+workEdge 25%; active homeBase 55%+workEdge 15%+taskbar 15%+random 15%
+  - **阶段调度(渲染进程 pet.js 计时)**: 每阶段停留 10-20 分钟随机(600-1200s), 到点按权重瞬移到下一位置(setPosition 直接跳, 无动画); 拖动/面板打开暂停阶段计时, 松手/关闭从当前位置继续(拖动位置作临时停靠, 下个阶段瞬移走)
+  - **位置→状态动作映射**: homeBase→sleep/idle(睡觉发呆), workEdge→play/happy(趴窗玩耍), taskbar→play/idle(挖沙捣蛋), random→idle/play
+  - **粘人**: 进入先在 homeBase 睡一轮(60s)再开始阶段循环, 避免瞬间跳位置; 跟鼠标保留(鼠标在工作窗口内快速移动概率 35%+冷却 15s → `pet-follow-mouse` 挪到鼠标上方~100px, 8s 后恢复当前阶段)
+- **主进程行为支撑**: `getActiveWindowRect()` 平台适配器(Linux xdotool→xprop+xwininfo 退化, Win PowerShell GetForegroundWindow, macOS osascript; 全 try/catch 失败返 null; 自动排除宠物窗口自身); IPC: `phase-go`(按模式权重选位置→解析→setPosition 瞬移, 返回 {type,x,y}) / `pet-sit` / `pet-snap` / `pet-corner` / `pet-follow-mouse` / `get-active-window-rect` / `pet-panel`(面板打开暂停) / `pet-resume`(面板关闭恢复); 渲染进程 `_beginPhase`/`_rearmPhase`/`_setStateForPosition`/`_handleMouseFast`/`onDragStart`/`onDragRelease` 驱动; `isPhaseTeleport` 标志让 move 处理器不保存瞬移位置
 - **悬浮窗无边框(全平台)**: `#app` 无 border/outline/box-shadow; 各主题背景也去边框; `body.theme-light #app.theme-*` 不再设边框(曾因 specificity 高于 `body.platform-win32 #app` 在 win32+浅色下残留 1px 边框); win32 透明规则全部 `!important`
 - 气泡 #reminder-bubble 可点击 → 打开聊天
 

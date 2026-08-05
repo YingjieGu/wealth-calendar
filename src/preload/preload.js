@@ -85,15 +85,12 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
     ipcRenderer.on('cursor-state', (_event, state) => callback(state));
   },
 
-  // 全屏漫游：行为状态机驱动（roam-start/roam-stop），拖动暂停/恢复，设置开关，
-  // 监听漫游状态（窗口移动↔宠物走路）与面板关闭恢复（pet-resume）
-  roamStart: () => ipcRenderer.send('roam-start'),
-  roamStop: () => ipcRenderer.send('roam-stop'),
-  roamPause: () => ipcRenderer.send('roam-pause'),
-  roamResume: () => ipcRenderer.send('roam-resume'),
+  // 位置-阶段模型（猫咪作息）：phase-go 瞬移到按模式权重选出的位置；
+  // 设置开关（roam-set，原全屏漫游）；面板开/关暂停/恢复阶段调度
+  phaseGo: (mode, forcedType) => ipcRenderer.invoke('phase-go', mode, forcedType),
   roamSet: (enabled) => ipcRenderer.send('roam-set', enabled),
-  onPetRoam: (callback) => {
-    ipcRenderer.on('pet-roam', (_event, roaming) => callback(roaming));
+  onPetPanel: (callback) => {
+    ipcRenderer.on('pet-panel', () => callback && callback());
   },
   onPetResume: (callback) => {
     ipcRenderer.on('pet-resume', () => callback && callback());

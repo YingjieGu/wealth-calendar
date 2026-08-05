@@ -107,8 +107,8 @@ function convertToPng(dataUrl) {
     // Don't drag when clicking buttons or inside panels
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
     isDragging = true;
-    window.wealthCalendar.roamPause(); // 拖动时暂停漫游（窗口停止移动）
-    if (window.PetState && PetState.onDragStart) PetState.onDragStart(); // 暂停行为状态机，拖动中不切阶段
+    // 拖动时暂停阶段调度（阶段计时器在渲染进程 pet.js），拖动中不瞬移/不切阶段
+    if (window.PetState && PetState.onDragStart) PetState.onDragStart();
     lastX = e.screenX;
     lastY = e.screenY;
     stage.style.cursor = 'grabbing';
@@ -131,8 +131,7 @@ function convertToPng(dataUrl) {
       isDragging = false;
       stage.style.cursor = '';
       window.wealthCalendar.saveWindowPosition();
-      window.wealthCalendar.roamResume(); // 解除拖动暂停（漫游阶段自动恢复移动）
-      // 恢复行为状态机：粘人模式先做吸附检测（松手在活跃窗口内→趴上去），其余重排当前阶段
+      // 松手：拖动位置作为临时停靠，从当前位置继续阶段循环（下个阶段瞬移走）
       if (window.PetState && PetState.onDragRelease) PetState.onDragRelease();
     }
   });

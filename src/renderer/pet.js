@@ -152,13 +152,8 @@ const PetState = {
     const isMaterial = theme === 'cat1' || theme === 'caishen';
     const svgEl = document.getElementById('pet-svg');
     if (isMaterial) {
-      if (this._platform === 'linux') {
-        // Linux 软渲染位图全灭：SVG 兜底（萌猫/财神），仅切 idle/walk 动画类
-        this._showPetElement(svgEl);
-        this.petEl.classList.add(state === 'walk' ? 'walking' : 'idle');
-        return;
-      }
-      // Windows/macOS：加载当前状态的动图素材（walk 加弹跳动画）
+      // 加载当前状态的动图素材（SwiftShader 后本机软渲染也能绘制位图；
+      // walk 加弹跳动画；素材缺失时 _loadActionImage 内兜底 SVG）
       this.petEl.classList.add(state === 'walk' ? 'walking' : 'idle');
       this._loadActionImage(state);
       return;
@@ -592,17 +587,12 @@ const PetState = {
     const emojiSpan = document.getElementById('pet-emoji');
     const video = document.getElementById('pet-video');
 
-    // 素材主题：Windows/macOS 显示动作动图（webp/gif），Linux 软渲染兜底为对应 SVG
+    // 素材主题：显示动作动图（webp/gif）。SwiftShader (use-angle=swiftshader)
+    // 已让位图在本机 KVM 软渲染环境也能绘制，统一走素材图；
+    // themeAsset 加载失败时 _applyStateVisual 内部自动兜底为 SVG。
     if (theme === 'cat1' || theme === 'caishen') {
       appEl.classList.add(theme === 'cat1' ? 'theme-cat' : 'theme-fortune');
-      if (this._platform === 'linux') {
-        this._showPetElement(svgEl);
-        svgEl.innerHTML = theme === 'cat1' ? this.svgCat() : this.svgFortune();
-        this._applyStateVisual(this.currentState || 'idle');
-      } else {
-        // 动作图：由 _applyStateVisual 按当前状态加载对应素材
-        this._applyStateVisual(this.currentState || 'idle');
-      }
+      this._applyStateVisual(this.currentState || 'idle');
       return;
     }
 

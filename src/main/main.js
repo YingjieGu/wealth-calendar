@@ -4,14 +4,11 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonit
 // (without it capturePage turns black). Screen presentation is validated
 // separately (xwd / ffmpeg x11grab) — see git history for the rabbit hole.
 app.disableHardwareAcceleration();
-// Force Chromium's compositor to pure software as well. A broken GPU stack
-// (this Linux dev box, and some Win11 boxes with flaky GPU drivers) can create
-// the window fine but never present its content to the screen — exactly the
-// "starts without error, window never shows" symptom the user hits. These
-// switches were removed in 2da9e08 after a Linux-only measurement false-negative
-// (xwd can't read KWin's composited layer); they remain the right call on Win.
+app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('enable-features', 'UseSoftwareCompositor');
+// Try Chromium's bundled SwiftShader (pure software) instead of the ancient
+// system llvmpipe (Mesa 19.2.6 on this KVM box) — bitmaps may render again.
+app.commandLine.appendSwitch('use-angle', 'swiftshader');
 const path = require('path');
 const fs = require('fs');
 const { createTray } = require('./tray');

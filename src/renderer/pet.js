@@ -497,7 +497,7 @@ const PetState = {
   },
   affinityText() {
     const lv = this._affinityLevel(this._petAffinity);
-    return `亲密度: ${this._petAffinity}/100 (Lv.${lv} ${this._affinityTitle(lv)})`;
+    return `亲密度 ${this._petAffinity}% (Lv.${lv} ${this._affinityTitle(lv)})`;
   },
   // 右键菜单顶部刷新亲密度显示；同步设置面板「财宠名字」板块的亲密度/心情卡片展示
   refreshAffinityMenu() {
@@ -982,7 +982,6 @@ const PetState = {
       const result = await window.wealthCalendar.getDailyFortune();
       if (!result || !result.data) return;
       const fortune = result.data;
-      const dir = (fortune.directions && fortune.directions.wealth) || '';
       // 主求方向提示（从设置读取）
       let wishHint = '';
       try {
@@ -990,18 +989,11 @@ const PetState = {
         const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
         wishHint = wishMap[wish] ? `，今天重点：${wishMap[wish]}` : '';
       } catch (e) { /* ignore */ }
-      let line = `📅 今日运势 ${fortune.overall} 分`;
-      if (dir) line += `，财神方位${dir}`;
-      // 意外财运 / 幸运数字 / 幸运色开运物 / 彩票建议元素
-      if (fortune.luckyNumber && fortune.luckyNumber.length) line += `，幸运数字 ${fortune.luckyNumber.join(' ')}`;
-      if (fortune.luckyColor || fortune.luckyItem) {
-        line += `。幸运色：${fortune.luckyColor || '—'}，开运物：${fortune.luckyItem || '—'}（仅供参考）`;
-      }
-      if (fortune.lotteryTip) line += `。${fortune.lotteryTip}`;
-      line += wishHint;
-      if (fortune.reminderLines && fortune.reminderLines[0]) {
-        line += `。${fortune.reminderLines[0]}`;
-      }
+      // 运势拆成多条（总运势/财运/避忌/幸运元素）：启动只播总运势 1 条，
+      // 其余分段存入队列，由 startFortuneSlots 分散到一天多个时段播报（不集中轰炸）
+      const segs = this._fortuneSegments(fortune);
+      this._fortuneSegmentsQueue = segs.slice(1);
+      const line = segs[0] + wishHint;
       // 运势类播报：先"叮~"提示音再语音播报
       this._broadcast(line, { speech: true });
     } catch (e) { /* ignore */ }
@@ -1051,7 +1043,11 @@ const PetState = {
     try {
       const result = await window.wealthCalendar.getDailyFortune();
       if (!result || !result.data) return;
-      const line = this._buildFortuneLine(result.data);
+      // 分段队列轮换：每次只播 1 条（总/财/避忌/幸运元素），分散各时段，不集中轰炸
+      if (!this._fortuneSegmentsQueue || !this._fortuneSegmentsQueue.length) {
+        this._fortuneSegmentsQueue = this._fortuneSegments(result.data);
+      }
+      const line = this._fortuneSegmentsQueue.shift();
       // 运势类播报：先"叮~"提示音再语音播报
       if (line) this._broadcast(line, { speech: true });
     } catch (e) { /* ignore */ }
@@ -1189,6 +1185,32 @@ const PetState = {
     }
     // 兜底
     return `📅 今日运势 ${fortune.overall} 分` + (dir ? `，财神方位${dir}` : '');
+  },
+
+  // 运势拆分成多条独立播报（总运势/财运细节/避忌提醒/幸运元素），每条各自成句，
+  // 由播报调度一次只播 1 条、分散在一天多个时段，避免一次全塞进去轰炸用户。
+  _fortuneSegments(fortune) {
+    const dims = fortune.dimensions || {};
+    const w = dims.wealth || {};
+    const dir = (fortune.directions && fortune.directions.wealth) || '';
+    const segs = [];
+    // 1) 总运势（含推理依据 briefReason）
+    let seg0 = `📅 今日运势 ${fortune.overall} 分`;
+    if (fortune.briefReason) seg0 += `。${fortune.briefReason}`;
+    if (dir) seg0 += `。财神方位${dir}`;
+    segs.push(seg0);
+    // 2) 财运细节
+    segs.push(`💰 财运：${w.summary || '财运平稳'}。${w.advice || '忌冲动消费'}`);
+    // 3) 避忌提醒
+    let seg2 = `⚠️ 小财提醒：${(fortune.reminderLines && fortune.reminderLines[0]) || '今日宜稳扎稳打'}`;
+    if (fortune.lotteryTip) seg2 += `。${fortune.lotteryTip}`;
+    segs.push(seg2);
+    // 4) 幸运元素
+    let seg3 = `🍀 今日幸运数字 ${(fortune.luckyNumber || []).join(' ') || '—'}`;
+    if (fortune.luckyColor || fortune.luckyItem) seg3 += `，幸运色：${fortune.luckyColor || '—'}，开运物：${fortune.luckyItem || '—'}（仅供参考）`;
+    if (fortune.luckyTime && fortune.luckyTime.length) seg3 += `。吉时：${fortune.luckyTime.join('、')}`;
+    segs.push(seg3);
+    return segs;
   },
 
   // 主求方向播报文案池

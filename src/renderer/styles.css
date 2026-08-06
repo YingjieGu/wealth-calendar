@@ -115,6 +115,53 @@ body.theme-light {
   --scrollbar-hover: rgba(31, 41, 55, 0.35);
   --schedule-item: rgba(31, 41, 55, 0.05);
 }
+/* 青涩模式（第三主题）：清新淡雅水墨风——背景淡青渐变/淡水墨、卡片淡米黄、文字深墨、强调青竹色。
+   派生变量(--accent/--card/--panel-bg 等)在 :root 用 var() 定义、解析值在根元素就定死，
+   必须在青涩主题重新覆盖，否则落到暗色值（淡青底上亮金/暗半透明=看不清）。 */
+body.theme-teal {
+  --color-primary: #5f8d7a;        /* 青竹色（主品牌色） */
+  --color-accent: #6fa08c;         /* 淡青蓝点缀 */
+  --color-accent-soft: rgba(95, 141, 122, 0.14);
+  --bg: linear-gradient(170deg, #dce8e6 0%, #eef4f2 100%);   /* 淡青渐变背景 */
+  --surface: #f7f1e0;              /* 卡片淡米黄 */
+  --surface-2: #fdf9ee;            /* 浮层/小卡 */
+  --surface-3: #efe7d4;            /* 按压/hover 高亮 */
+  --text: #2b3a36;                 /* 文字深墨 */
+  --text-dim: #6b7a74;             /* 弱文字 */
+  --shadow-1: 0 2px 8px rgba(43, 58, 54, 0.08);
+  --shadow-2: 0 6px 20px rgba(43, 58, 54, 0.12);
+  --shadow-3: 0 12px 36px rgba(43, 58, 54, 0.16);
+  /* 派生覆盖：必须在青涩主题重写，避免落到深色默认值 */
+  --accent: #5f8d7a;
+  --accent-dim: #4e7a67;
+  --card: var(--surface);
+  --panel-bg: linear-gradient(170deg, #dce8e6 0%, #eef4f2 100%);
+  --panel-bg2: linear-gradient(170deg, #dce8e6 0%, #e8f0ee 100%);
+  --menu-bg: rgba(240, 246, 244, 0.98);
+  --toast-bg: rgba(43, 58, 54, 0.94);
+  --text-strong: #243330;
+  --text-mid: #4f625b;
+  --card-border: #cfded9;
+  --input-bg: #fbf7ec;
+  --input-border: #c9d8d3;
+  --border-soft: #e2ebe8;
+  --btn-bg: #eef2e6;
+  --btn-hover: #e2e9dd;
+  --scrollbar: rgba(43, 58, 54, 0.2);
+  --scrollbar-hover: rgba(43, 58, 54, 0.38);
+  --schedule-item: rgba(95, 141, 122, 0.1);
+}
+/* 青涩模式：宠物悬浮窗整体转淡青水墨底（与浅色模式同一套覆盖逻辑） */
+body.theme-teal #app.theme-cat,
+body.theme-teal #app.theme-fortune,
+body.theme-teal #app.theme-bagua {
+  background: linear-gradient(160deg, #dce8e6 0%, #e8f1ee 60%, #eef4f2 100%);
+}
+body.theme-teal #app.theme-gold {
+  background: linear-gradient(160deg, #f0e7c8 0%, #e6e9dc 60%, #dce8e6 100%);
+  border: 2px solid #b8952f;
+  box-shadow: inset 0 0 24px rgba(184, 149, 47, 0.18);
+}
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
 *::-webkit-scrollbar {
@@ -564,11 +611,11 @@ body.theme-light #gold-badge {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 215, 0, 0.35);
 }
 
-/* 亲密度爱心：左上角(距左上各 1/4)动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
+/* 亲密度爱心：左上角(距左上各 1/8，比旧 1/4 更靠左上)动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
 #pet-heart {
   position: absolute;
-  top: 25%;
-  left: 25%;
+  top: 12.5%;
+  left: 12.5%;
   font-size: 14px;
   font-weight: 700;
   line-height: 1;
@@ -1603,6 +1650,13 @@ body.theme-light #gold-badge {
   margin-bottom: var(--spacing-2);
   line-height: 1.5;
 }
+/* 推理依据（briefReason）：弱化配色，与提醒语区分 */
+.fortune-line.fortune-brief {
+  background: transparent;
+  border: 1px dashed var(--card-border);
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
 /* 三列迷你卡：幸运数字 / 财神方位 / 吉时 */
 .fortune-minicards {
   display: grid;
@@ -1810,6 +1864,63 @@ body.theme-light #gold-badge {
 #toast.hidden {
   opacity: 0;
   transform: translateX(-50%) translateY(8px);
+}
+
+/* ============================================================
+   🔮 星盘（懒加载区块）：运势区下方，点击才加载行星落座列表
+   ============================================================ */
+#star-chart-section {
+  margin-top: 12px;
+  border-top: 1px dashed var(--border-soft);
+  padding-top: 12px;
+}
+.star-chart-toggle {
+  width: 100%;
+  padding: 10px 0;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.star-chart-toggle:hover {
+  background: var(--btn-hover);
+}
+#star-chart-body {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.star-chart-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.star-chart-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.star-chart-name { color: var(--text-mid); }
+.star-chart-val { color: var(--text-strong); font-weight: 600; }
+.star-chart-phases {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.star-chart-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 12px 0;
 }
 
 /* ============================================================

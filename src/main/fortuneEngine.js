@@ -186,10 +186,20 @@ function buildTemplateFortune(paipan, almanac, dateStr, wish, zodiac) {
     lotteryTip = '小财建议量力而行，娱乐为主，开心就好～';
   }
 
+  // 推理性文案（模板降级也带推理链：日主五行强弱 + 当日干支生克关系 + 喜用神倾向）
+  const relTexts = { shengWo: '当日五行生扶日主，运势有所加成', tongWo: '当日五行与日主同类，同气相扶较顺', woKe: '日主得势可克当日五行，主进取得财', keWo: '当日五行克制日主，宜守不宜攻', woSheng: '日主生泄当日五行，注意精力消耗' };
+  const rel = dayMaster && dayGanWuXing ? relationOf(dayMaster, dayGanWuXing) : '';
+  const relText = rel && relTexts[rel] ? relTexts[rel] : (dayGanWuXing ? `当日日干五行属${dayGanWuXing}` : '当日干支五行未明');
+  const XIYONG = { 木: '水、木', 火: '木、火', 土: '火、土', 金: '土、金', 水: '金、水' };
+  const briefReason = dayMaster
+    ? `今日${dayGanZhi}（${dayGanWuXing}日），日主五行属${dayMaster}，${relText}；喜用神倾向${XIYONG[dayMaster] || dayMaster}，行事可多借相关五行之势。`
+    : `今日${dayGanZhi}（${dayGanWuXing}日），${relText}，可依${dayGanWuXing}五行之势安排行事。`;
+
   return {
     date: dateStr,
     overall,
     dimensions: dims,
+    briefReason,
     luckyTime: ['09:00-11:00', '15:00-17:00'],
     directions: { wealth: caiShen || '—', love: '西南' },
     luckyNumber,
@@ -245,7 +255,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
             {
               role: 'system',
               content:
-                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
+                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须先做简短推理再给分数：把推理要点（日主五行强弱、当日干支与日主生克关系、喜用神倾向）用 1-2 句通俗话写入 briefReason 字段。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"briefReason":"1-2句简短推理：日主五行强弱/当日干支与日主生克/喜用神倾向","dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
             },
             { role: 'user', content: userPrompt },
           ],
@@ -425,6 +435,7 @@ function normalizeFortune(f, dateStr) {
     luckyItem: f.luckyItem || '',
     lotteryTip: f.lotteryTip || '',
     reminderLines: Array.isArray(f.reminderLines) ? f.reminderLines.slice(0, 3) : [],
+    briefReason: f.briefReason || '',
     disclaimer: f.disclaimer || '仅供参考娱乐',
   };
 }

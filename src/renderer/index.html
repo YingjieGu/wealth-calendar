@@ -207,6 +207,7 @@
             <div class="setting-options" id="ui-theme-options">
               <button class="activity-option active" data-ui-theme="dark">🌙 深色</button>
               <button class="activity-option" data-ui-theme="light">☀️ 浅色</button>
+              <button class="activity-option" data-ui-theme="teal">🍃 青涩</button>
             </div>
             <p class="placeholder-text">默认深色模式</p>
             <div class="setting-sublabel">日历显示</div>
@@ -322,6 +323,11 @@
             <button id="btn-refresh-fortune" class="fortune-refresh" title="刷新运势">🔄</button>
           </div>
           <div id="fortune-body"><!-- filled by calendar.js --></div>
+          <!-- 🔮 星盘（懒加载）：点击才请求 natal chart 数据渲染 -->
+          <div id="star-chart-section">
+            <button id="btn-view-star-chart" class="star-chart-toggle" type="button">🔮 点击查看星盘</button>
+            <div id="star-chart-body" class="hidden"><!-- lazy loaded by calendar.js --></div>
+          </div>
         </div>
 
         <!-- Schedule detail panel -->

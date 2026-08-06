@@ -144,9 +144,10 @@ const SettingsManager = {
     });
   },
 
-  // 界面主题：深色(默认) / 浅色，body.theme-light 由 styles.css CSS 变量覆盖
+  // 界面主题：深色(默认) / 浅色 / 青涩，body.theme-light / body.theme-teal 由 styles.css CSS 变量覆盖
   applyUiTheme(uiTheme) {
     document.body.classList.toggle('theme-light', uiTheme === 'light');
+    document.body.classList.toggle('theme-teal', uiTheme === 'teal');
     document.querySelectorAll('#ui-theme-options .activity-option').forEach((b) => {
       b.classList.toggle('active', b.dataset.uiTheme === uiTheme);
     });
@@ -324,7 +325,7 @@ const SettingsManager = {
       this.settings.uiTheme = uiTheme;
       this.applyUiTheme(uiTheme);
       this.save();
-      showToast(uiTheme === 'light' ? '☀️ 已切换浅色主题' : '🌙 已切换深色主题');
+      showToast(uiTheme === 'light' ? '☀️ 已切换浅色主题' : (uiTheme === 'teal' ? '🍃 已切换青涩主题' : '🌙 已切换深色主题'));
     });
 
     // 全屏漫游开关（settings.petRoam，默认开启）

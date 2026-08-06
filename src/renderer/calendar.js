@@ -55,6 +55,11 @@ const CalendarView = {
       // 刷新当前展示日期的运势（默认今日）
       this.loadFortuneForDate(this._fortuneDate || this._todayStr(), true);
     });
+
+    // 🔮 星盘（懒加载）：点击加载/切换
+    document.getElementById('btn-view-star-chart').addEventListener('click', () => {
+      this.toggleStarChart();
+    });
   },
 
   async open() {
@@ -381,6 +386,7 @@ const CalendarView = {
     const luckyNum = Array.isArray(f.luckyNumber) ? f.luckyNumber.join('、') : (f.luckyNumber || '—');
     const sourceTag = result.source === 'llm' ? '✨ AI 命理' : '📜 模板推算';
     const reminderLine = (f.reminderLines && f.reminderLines[0]) || '';
+    const briefReason = f.briefReason || '';   // 推理依据（LLM 推理链 / 模板降级推理性文案）
     const overall = Number(f.overall) || 0;
 
     body.innerHTML = `
@@ -393,6 +399,7 @@ const CalendarView = {
           <span class="fortune-score-num" id="fortune-score-value">0</span>
           <span class="fortune-score-total">/ 100</span>
         </div>
+        ${briefReason ? `<div class="fortune-line fortune-brief">🔍 ${this.escapeHtml(briefReason)}</div>` : ''}
         ${reminderLine ? `<div class="fortune-line">💬 ${this.escapeHtml(reminderLine)}</div>` : ''}
         <div class="fortune-radar">${this.buildRadarSVG(dims)}</div>
         <div class="fortune-minicards">
@@ -465,6 +472,70 @@ const CalendarView = {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  },
+
+  // ---- 🔮 星盘（懒加载）：首次点击请求 natal chart 数据渲染，之后点击切换显隐 ----
+  _starChartLoaded: false,
+  async toggleStarChart() {
+    const body = document.getElementById('star-chart-body');
+    const btn = document.getElementById('btn-view-star-chart');
+    if (!body || !btn) return;
+    if (this._starChartLoaded) {
+      const hidden = body.classList.contains('hidden');
+      body.classList.toggle('hidden', !hidden);
+      btn.textContent = hidden ? '🔮 收起星盘' : '🔮 点击查看星盘';
+      return;
+    }
+    btn.textContent = '🔮 加载星盘中…';
+    try {
+      const s = await window.wealthCalendar.loadSettings();
+      const birth = (s.userInfo && s.userInfo.birth) || '';
+      if (!birth) {
+        body.innerHTML = '<div class="star-chart-empty">请先在设置中填写出生信息，再查看星盘</div>';
+      } else {
+        const chart = await window.wealthCalendar.natalChart(birth);
+        this._renderStarChart(chart, birth);
+      }
+      this._starChartLoaded = true;
+      body.classList.remove('hidden');
+      btn.textContent = '🔮 收起星盘';
+    } catch (e) {
+      body.innerHTML = '<div class="star-chart-empty">星盘数据加载失败，请稍后重试</div>';
+      body.classList.remove('hidden');
+      btn.textContent = '🔮 收起星盘';
+      this._starChartLoaded = true;
+    }
+  },
+
+  _renderStarChart(chart, birth) {
+    const body = document.getElementById('star-chart-body');
+    if (!body) return;
+    const d = (chart && chart.data) || chart || {};
+    const planets = d.planets || {};
+    const ascendant = d.ascendant || '';
+    let html = '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(birth || ''));
+    if (m) html += `<div class="star-chart-sub">${m[1]}年${Number(m[2])}月${Number(m[3])}日 本命星盘</div>`;
+    if (ascendant) html += `<div class="star-chart-line"><span class="star-chart-name">上升</span><span class="star-chart-val">${this.escapeHtml(String(ascendant))}</span></div>`;
+    const nameMap = { sun: '太阳', moon: '月亮', mercury: '水星', venus: '金星', mars: '火星', jupiter: '木星', saturn: '土星', uranus: '天王星', neptune: '海王星', pluto: '冥王星' };
+    const entries = Object.entries(planets);
+    for (const [key, p] of entries) {
+      const label = (p && (p.planetLabel || nameMap[key] || key)) || key;
+      const sign = (p && p.sign) || '';
+      const degree = (p && p.degree) != null ? String(p.degree) : '';
+      html += `<div class="star-chart-line"><span class="star-chart-name">${this.escapeHtml(String(label))}</span><span class="star-chart-val">${this.escapeHtml(sign)}${degree ? ` ${degree}°` : ''}</span></div>`;
+    }
+    if (!entries.length && !ascendant) {
+      html = '<div class="star-chart-empty">暂无星盘数据</div>';
+    } else {
+      // 相位摘要（简表，纯文字安全）
+      const aspects = d.aspects;
+      if (Array.isArray(aspects) && aspects.length) {
+        const labels = aspects.slice(0, 5).map((a) => (typeof a === 'string' ? a : (a && (a.label || a.type)) || '')).filter(Boolean);
+        if (labels.length) html += `<div class="star-chart-phases">相位：${this.escapeHtml(labels.join('、'))}</div>`;
+      }
+    }
+    body.innerHTML = html;
   }
 };
 

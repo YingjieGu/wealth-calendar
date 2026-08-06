@@ -199,6 +199,10 @@ function convertToPng(dataUrl) {
 
   window.wealthCalendar.onFortuneReminder((data) => {
     showBubble(`🔮 ${data.line || ''}`);
+    // 运势类播报：先"叮~"提示音再语音播报（交互类台词不播报）
+    if (window.PetState && PetState.speakFortune && data.line) {
+      PetState.speakFortune(data.line);
+    }
   });
 })();
 
@@ -249,26 +253,8 @@ function convertToPng(dataUrl) {
         // 今日任务：气泡展示完成情况
         PetState.showDailyTasks();
         break;
-      case 'partner-summary':
-        // 伙伴模式 L2：总结选中内容（剪贴板；主进程读选区优先，>20字才总结）
-        try {
-          await window.wealthCalendar.summarizeClipboard();
-        } catch (err) { /* ignore */ }
-        break;
-      case 'calendar':
-        await window.wealthCalendar.openCalendar();
-        CalendarView.open();
-        break;
-      case 'settings':
-        document.getElementById('settings-panel').classList.remove('hidden');
-        document.getElementById('hover-buttons').classList.add('hidden');
-        await window.wealthCalendar.openChatPanel();
-        break;
       case 'hide':
         window.wealthCalendar.hideWindow();
-        break;
-      case 'quit':
-        window.wealthCalendar.quitApp();
         break;
     }
   });

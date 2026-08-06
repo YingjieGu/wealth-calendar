@@ -21,8 +21,8 @@
           <img id="pet-action" style="display:none;" alt="theme action">
         </div>
         <div id="pet-zzz">💤</div>
-        <!-- 心情图标（宠物右下角小气泡） -->
-        <div id="pet-mood">😐</div>
+        <!-- 亲密度爱心（左上角动态漂浮粉色爱心，显示亲密度数值） -->
+        <div id="pet-heart">♥0</div>
       </div>
 
       <!-- Reminder speech bubble -->
@@ -43,11 +43,7 @@
         <button data-action="fortune">🔮 今日运势</button>
         <button data-action="stick">🎋 摇一支签</button>
         <button data-action="tasks">📋 今日任务</button>
-        <button data-action="partner-summary">📌 解析选中内容</button>
-        <button data-action="calendar">📅 日历</button>
-        <button data-action="settings">⚙️ 设置</button>
         <button data-action="hide">🙈 隐藏宠物（Ctrl+Alt+W）</button>
-        <button data-action="quit">🚪 退出</button>
       </div>
 
       <!-- Chat panel -->
@@ -73,83 +69,22 @@
           <button id="btn-close-settings" class="close-btn">✕</button>
         </div>
         <div class="settings-body">
+          <!-- 1. 主求方向（✨推荐 默认） -->
           <div class="setting-group">
-            <label>主题</label>
-            <div class="setting-options" id="theme-options">
-              <button class="theme-option active" data-theme="cat1">🐱 Q版猫咪-素材</button>
-              <button class="theme-option" data-theme="cat2">🐱 萌宠2-猫咪</button>
-              <button class="theme-option" data-theme="caishen">🧧 财神-素材</button>
-              <button class="theme-option" data-theme="custom">🖼️ 自定义</button>
+            <label>主求方向（提醒侧重，报告仍全面展示）</label>
+            <div class="setting-options" id="wish-options">
+              <button class="activity-option" data-wish="recommend">✨ 推荐</button>
+              <button class="activity-option" data-wish="wealth">💰 求财</button>
+              <button class="activity-option" data-wish="love">💘 求姻缘</button>
+              <button class="activity-option" data-wish="career">💼 求事业</button>
+              <button class="activity-option" data-wish="health">💪 求健康</button>
+              <button class="activity-option" data-wish="study">📚 求学业</button>
+              <button class="activity-option" data-wish="peace">🛡️ 求平安</button>
             </div>
-            <input type="file" id="pet-upload" accept="image/*" style="display:none;">
-            <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>
+            <p class="placeholder-text">✨ 推荐（默认）：按当天运势动态播报，财运/桃花/事业哪个旺就都播，提醒更详细含注意事项避忌</p>
           </div>
 
-          <div class="setting-group">
-            <label>宠物名字（气泡台词中“小财”会替换为这个名字）</label>
-            <input type="text" id="pet-name" class="setting-input" placeholder="默认：小财" maxlength="12">
-            <button id="btn-save-petname" class="action-btn">💾 保存宠物名字</button>
-          </div>
-
-          <div class="setting-group">
-            <label>宠物模式</label>
-            <div class="setting-options" id="activity-options">
-              <button class="activity-option active" data-activity="active">🐾 活跃</button>
-              <button class="activity-option" data-activity="quiet">😴 安静</button>
-              <button class="activity-option" data-activity="clingy">🧲 粘人</button>
-            </div>
-            <p class="placeholder-text">粘人模式：宠物每隔 30-90 秒趴到当前窗口上撒娇，拖它松手还会吸附回窗口哦～</p>
-          </div>
-
-          <div class="setting-group">
-            <label>界面主题</label>
-            <div class="setting-options" id="ui-theme-options">
-              <button class="activity-option active" data-ui-theme="dark">🌙 深色</button>
-              <button class="activity-option" data-ui-theme="light">☀️ 浅色</button>
-            </div>
-          </div>
-
-          <div class="setting-group">
-            <label>位置阶段切换（猫咪作息）</label>
-            <div class="setting-options" id="roam-options">
-              <button class="activity-option active" data-roam="1">🚶 开启</button>
-              <button class="activity-option" data-roam="0">🚫 关闭</button>
-            </div>
-            <p class="placeholder-text">开启后宠物每 10-20 分钟瞬移到下一个位置（据点/窗口/任务栏/随机）</p>
-          </div>
-
-          <div class="setting-group">
-            <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
-          </div>
-
-          <div class="setting-group">
-            <label>开机启动</label>
-            <div class="setting-options" id="autostart-options">
-              <button class="activity-option" data-autostart="1">🚀 开启</button>
-              <button class="activity-option active" data-autostart="0">🚫 关闭</button>
-            </div>
-            <p class="placeholder-text">开机自动启动财神日历（Windows/macOS 登录项；Linux 创建 ~/.config/autostart 自启动项，默认关闭）</p>
-          </div>
-
-          <div class="setting-group">
-            <label>捣蛋模式</label>
-            <div class="setting-options" id="prank-options">
-              <button class="activity-option active" data-prank="0">🙂 关闭</button>
-              <button class="activity-option" data-prank="1">😜 开启</button>
-            </div>
-            <p class="placeholder-text">小财会偶尔调皮一下~（每 25-45 分钟随机吐槽你正在做的事，偶尔敲几下键盘，每天最多 5 次）</p>
-          </div>
-
-          <div class="setting-group">
-            <label>伙伴模式</label>
-            <div class="setting-options" id="partner-options">
-              <button class="activity-option active" data-partner="0">🙈 关闭</button>
-              <button class="activity-option" data-partner="1">🤝 开启</button>
-            </div>
-            <p class="placeholder-text">让小财感知你在做什么，主动提供帮助~（选中内容按 Ctrl+Alt+S 总结；聊天框发链接可解析文章）</p>
-            <p class="placeholder-text privacy-note">🔒 隐私说明：仅本机处理，不上传窗口内容</p>
-          </div>
-
+          <!-- 2. 用户信息 -->
           <div class="setting-group">
             <label>用户信息（命理分析用）</label>
             <input type="datetime-local" id="user-birth" class="setting-input">
@@ -179,21 +114,70 @@
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
           </div>
 
+          <!-- 3. 财宠名字 + 亲密度/心情 + 唤醒口令 -->
           <div class="setting-group">
-            <label>主求方向（提醒侧重，报告仍全面展示）</label>
-            <div class="setting-options" id="wish-options">
-              <button class="activity-option" data-wish="wealth">💰 求财</button>
-              <button class="activity-option" data-wish="love">💘 求姻缘</button>
-              <button class="activity-option" data-wish="career">💼 求事业</button>
-              <button class="activity-option" data-wish="health">💪 求健康</button>
-              <button class="activity-option" data-wish="study">📚 求学业</button>
-              <button class="activity-option" data-wish="peace">🛡️ 求平安</button>
-            </div>
-            <button id="btn-clear-wish" class="action-btn">✖️ 清除主求（全面提醒）</button>
+            <label>财宠名字（气泡台词中“小财”会替换为这个名字）</label>
+            <input type="text" id="pet-name" class="setting-input" placeholder="默认：小财" maxlength="12">
+            <button id="btn-save-petname" class="action-btn">💾 保存财宠名字</button>
+            <p class="placeholder-text" id="affinity-display">💗 亲密度：--/100（Lv.- 学徒）｜心情：😐 平静</p>
+            <div class="setting-sublabel">唤醒口令（语音对话用）</div>
+            <p class="placeholder-text">财宠名字喊两遍即可唤醒，如「小财小财」</p>
+            <input type="text" id="wake-word" class="setting-input" placeholder="默认：小财小财">
+            <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
           </div>
 
+          <!-- 4. 主题 -->
           <div class="setting-group">
-            <label>日历模式</label>
+            <label>主题</label>
+            <div class="setting-options" id="theme-options">
+              <button class="theme-option active" data-theme="cat1">🐱 Q版猫咪-素材</button>
+              <button class="theme-option" data-theme="cat2">🐱 萌宠2-猫咪</button>
+              <button class="theme-option" data-theme="caishen">🧧 财神-素材</button>
+              <button class="theme-option" data-theme="custom">🖼️ 自定义</button>
+            </div>
+            <input type="file" id="pet-upload" accept="image/*" style="display:none;">
+            <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>
+          </div>
+
+          <!-- 5. 模式（宠物模式 + 捣蛋 + 伙伴 + 位置阶段切换 + 恢复位置） -->
+          <div class="setting-group">
+            <label>模式</label>
+            <div class="setting-options" id="activity-options">
+              <button class="activity-option active" data-activity="active">🐾 活跃</button>
+              <button class="activity-option" data-activity="quiet">😴 安静</button>
+              <button class="activity-option" data-activity="clingy">🧲 粘人</button>
+            </div>
+            <p class="placeholder-text">粘人模式：宠物每隔 30-90 秒趴到当前窗口上撒娇，拖它松手还会吸附回窗口哦～</p>
+            <div class="setting-sublabel">捣蛋模式</div>
+            <div class="setting-options" id="prank-options">
+              <button class="activity-option active" data-prank="0">🙂 关闭</button>
+              <button class="activity-option" data-prank="1">😜 开启</button>
+            </div>
+            <p class="placeholder-text">小财会偶尔调皮一下~（活跃度 60%，每 15-30 分钟随机吐槽你正在做的事，偶尔敲几下键盘，每天最多 8 次）</p>
+            <div class="setting-sublabel">伙伴模式</div>
+            <div class="setting-options" id="partner-options">
+              <button class="activity-option active" data-partner="0">🙈 关闭</button>
+              <button class="activity-option" data-partner="1">🤝 开启</button>
+            </div>
+            <p class="placeholder-text" id="partner-hint">开启后「🔓 已打开技能权限」：小财可感知你在做什么，选中内容按 Ctrl+Alt+S 总结，聊天框发链接可解析文章（🔒 仅本机处理，不上传窗口内容）</p>
+            <div class="setting-sublabel">位置阶段切换（猫咪作息）</div>
+            <div class="setting-options" id="roam-options">
+              <button class="activity-option active" data-roam="1">🚶 开启</button>
+              <button class="activity-option" data-roam="0">🚫 关闭</button>
+            </div>
+            <p class="placeholder-text">开启后宠物每 10-20 分钟瞬移到下一个位置（据点/窗口/任务栏/随机）</p>
+            <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
+          </div>
+
+          <!-- 6. 界面模式（深色/浅色 + 日历显示） -->
+          <div class="setting-group">
+            <label>界面模式</label>
+            <div class="setting-options" id="ui-theme-options">
+              <button class="activity-option active" data-ui-theme="dark">🌙 深色</button>
+              <button class="activity-option" data-ui-theme="light">☀️ 浅色</button>
+            </div>
+            <p class="placeholder-text">默认深色模式</p>
+            <div class="setting-sublabel">日历显示</div>
             <div class="setting-options" id="calendar-mode-options">
               <button class="activity-option active" data-mode="floating">🪟 悬浮日历</button>
               <button class="activity-option" data-mode="wallpaper">🖼️ 桌面背景</button>
@@ -202,8 +186,18 @@
             <p class="placeholder-text">桌面背景模式会把今日行程+运势+黄历合成壁纸，每小时自动刷新</p>
           </div>
 
+          <!-- 7. 模型配置（AI 命理 + 多模态 + 本地模型状态 合并） -->
           <div class="setting-group">
-            <label>多模态动图生成（图片 → 动画宠物）</label>
+            <label>模型配置</label>
+            <div class="setting-sublabel">AI 命理（DeepSeek 兼容 API）</div>
+            <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
+            <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com）">
+            <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-v4-flash）">
+            <label class="setting-checkbox">
+              <input type="checkbox" id="fortune-reminder-enabled" checked> 每日运势提醒
+            </label>
+            <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
+            <div class="setting-sublabel">多模态动图生成（图片 → 动画宠物）</div>
             <select id="mm-provider" class="setting-input">
               <option value="jimeng">即梦 Seedance（火山引擎，有免费额度）</option>
               <option value="kling">可灵 Kling</option>
@@ -219,57 +213,50 @@
             <button id="btn-mm-upload" class="action-btn">🖼️ 选择图片 → 生成动画宠物</button>
             <button id="btn-mm-clear" class="action-btn">🗑️ 清除动画宠物</button>
             <p class="placeholder-text" id="mm-status">上传一张宠物图片（如小猫照片），AI 会把它变成会动的桌面宠物，生成约 1-3 分钟</p>
-          </div>
-
-          <div class="setting-group">
-            <label>本地模型状态</label>
+            <div class="setting-sublabel">本地模型状态</div>
             <p class="placeholder-text" id="model-status">检测中…</p>
           </div>
+
+          <!-- 8. 技能配置（点击=启用/停用，双击=展开配置卡片） -->
           <div class="setting-group">
-            <label>唤醒口令（语音对话用）</label>
-            <input type="text" id="wake-word" class="setting-input" placeholder="默认：小财小财">
-            <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
-          </div>
-          <div class="setting-group">
-            <label>技能（聊天框输入命令直接触发）</label>
+            <label>技能配置（点击=启用/停用，双击=展开配置卡片）</label>
             <div class="setting-options" id="skills-options">
               <button class="activity-option active" data-skill="calculator">🧮 计算器</button>
               <button class="activity-option active" data-skill="weather">🌤 天气</button>
               <button class="activity-option active" data-skill="translate">🌐 翻译</button>
               <button class="activity-option active" data-skill="luckyNumber">🔢 数字吉凶</button>
+              <button class="activity-option active" data-skill="mail">📮 邮件</button>
             </div>
-            <p class="placeholder-text">示例：123*45= ｜ 天气 北京 ｜ 翻译 hello ｜ 数字 8（前四项无需 AI Key 即可用）</p>
-            <p class="placeholder-text" id="mail-skill-status">📮 邮件技能：未配置（在下方邮件服务配置后自动启用「收邮件」「发邮件」）</p>
+            <p class="placeholder-text">示例：123*45= ｜ 天气 北京 ｜ 翻译 hello ｜ 数字 8（前四项无需 AI Key）｜ 收邮件 / 发邮件: 主题|收件人|正文（📮 邮件双击展开配置）</p>
+            <div class="skill-config-card hidden" id="skill-config-card" data-skill="mail">
+              <div class="setting-sublabel">📮 邮件服务配置（可选）</div>
+              <div class="setting-row">
+                <input type="text" id="mail-imap-server" class="setting-input" placeholder="IMAP服务器，如 imap.qq.com">
+                <input type="number" id="mail-imap-port" class="setting-input" placeholder="端口(993)" style="width:110px;flex-shrink:0;">
+              </div>
+              <div class="setting-row">
+                <input type="text" id="mail-smtp-server" class="setting-input" placeholder="SMTP服务器，如 smtp.qq.com">
+                <input type="number" id="mail-smtp-port" class="setting-input" placeholder="端口(465)" style="width:110px;flex-shrink:0;">
+              </div>
+              <div class="setting-row">
+                <input type="text" id="mail-email" class="setting-input" placeholder="邮箱账号">
+                <input type="password" id="mail-password" class="setting-input" placeholder="密码/授权码">
+              </div>
+              <button id="btn-save-mail" class="action-btn">💾 保存邮件配置</button>
+              <button id="btn-clear-mail" class="action-btn">🗑️ 清除邮件配置</button>
+              <p class="placeholder-text" id="mail-skill-status">📮 邮件技能：未配置（双击 📮 邮件展开配置后自动启用「收邮件」「发邮件」）</p>
+              <p class="placeholder-text">🔒 邮箱密码仅保存在本机 settings.json，经本机 Python 标准库收发，不上传</p>
+            </div>
           </div>
 
+          <!-- 9. 开机启动 -->
           <div class="setting-group">
-            <label>邮件服务（可选；配置后聊天支持「收邮件」/「发邮件: 主题|收件人|正文」）</label>
-            <div class="setting-row">
-              <input type="text" id="mail-imap-server" class="setting-input" placeholder="IMAP服务器，如 imap.qq.com">
-              <input type="number" id="mail-imap-port" class="setting-input" placeholder="端口(993)" style="width:110px;flex-shrink:0;">
+            <label>开机启动</label>
+            <div class="setting-options" id="autostart-options">
+              <button class="activity-option" data-autostart="1">🚀 开启</button>
+              <button class="activity-option active" data-autostart="0">🚫 关闭</button>
             </div>
-            <div class="setting-row">
-              <input type="text" id="mail-smtp-server" class="setting-input" placeholder="SMTP服务器，如 smtp.qq.com">
-              <input type="number" id="mail-smtp-port" class="setting-input" placeholder="端口(465)" style="width:110px;flex-shrink:0;">
-            </div>
-            <div class="setting-row">
-              <input type="text" id="mail-email" class="setting-input" placeholder="邮箱账号">
-              <input type="password" id="mail-password" class="setting-input" placeholder="密码/授权码">
-            </div>
-            <button id="btn-save-mail" class="action-btn">💾 保存邮件配置</button>
-            <button id="btn-clear-mail" class="action-btn">🗑️ 清除邮件配置</button>
-            <p class="placeholder-text">🔒 邮箱密码仅保存在本机 settings.json，经本机 Python 标准库收发，不上传</p>
-          </div>
-
-          <div class="setting-group">
-            <label>AI 命理（DeepSeek 兼容 API）</label>
-            <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
-            <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com）">
-            <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-v4-flash）">
-            <label class="setting-checkbox">
-              <input type="checkbox" id="fortune-reminder-enabled" checked> 每日运势提醒
-            </label>
-            <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
+            <p class="placeholder-text">开机自动启动财神日历（Windows/macOS 登录项；Linux 创建 ~/.config/autostart 自启动项，默认关闭）</p>
           </div>
 
         </div>

@@ -168,7 +168,7 @@ async function summarize(text) {
 // 不需 LLM 的技能（计算器/天气/数字吉凶/邮件）在无 API Key 下也可用
 // ============================================================
 
-const SKILL_DEFAULTS = { calculator: true, weather: true, translate: true, luckyNumber: true };
+const SKILL_DEFAULTS = { calculator: true, weather: true, translate: true, luckyNumber: true, mail: true };
 
 function skillState(settings) {
   const s = settings.skills || {};
@@ -177,6 +177,7 @@ function skillState(settings) {
     weather: s.weather !== false,
     translate: s.translate !== false,
     luckyNumber: s.luckyNumber !== false,
+    mail: s.mail !== false,
   };
 }
 
@@ -359,9 +360,11 @@ async function runSkill(userMessage, deps) {
     const n = tryLuckyNumber(userMessage);
     if (n !== null) return { reply: luckyNumberReading(n), skill: 'luckyNumber', toolExecuted: false };
   }
-  // 邮件：配置了才启用（未配置走 runMail 提示）
-  const mail = tryMail(userMessage);
-  if (mail) return await runMail(mail, deps, settings);
+  // 邮件：技能开关开启才走（未配置走 runMail 提示）
+  if (skills.mail) {
+    const mail = tryMail(userMessage);
+    if (mail) return await runMail(mail, deps, settings);
+  }
 
   return null;
 }

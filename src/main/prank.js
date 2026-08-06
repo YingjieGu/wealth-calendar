@@ -1,6 +1,6 @@
 // 捣蛋模式引擎（娱乐互动，主进程）
 // - getActiveWindowTitle()：平台适配获取活跃窗口标题（获取失败/工具缺失返回 null）
-// - 随机触发：开启后每 25-45 分钟按 30% 概率触发一次，每天上限 5 次
+// - 随机触发：开启后每 15-30 分钟按 50% 概率触发一次，每天上限 8 次
 //   （settings.prankCount 按日期重置，settings.prankMode 开关）
 // - 抢键盘打字：Windows SendKeys / Linux xdotool type；平台工具不可用时跳过该玩法
 //   （⚠ 抢键盘打字需 Windows 实机验证 —— 本机 xdotool 不可用）
@@ -19,11 +19,11 @@ let saveSettingsFn = () => {};
 let typeTextImpl = null;
 
 // 每日次数上限
-const DAILY_LIMIT = 5;
-// 触发间隔 25-45 分钟；触发概率 30%
-const INTERVAL_MIN = 25;
-const INTERVAL_MAX = 45;
-const TRIGGER_CHANCE = 0.3;
+const DAILY_LIMIT = 8;
+// 触发间隔 15-30 分钟；触发概率 50%（活跃度 60%）
+const INTERVAL_MIN = 15;
+const INTERVAL_MAX = 30;
+const TRIGGER_CHANCE = 0.5;
 
 // --- 甜系吐槽池（按窗口标题关键词匹配，全卖萌甜系） ---
 const PRANK_POOL = [
@@ -257,7 +257,7 @@ function onSettingsChanged() {
   }
 }
 
-// 手动触发一次（测试/诊断）：force=true 跳过 30% 概率骰；mode 透传给 doPrank
+// 手动触发一次（测试/诊断）：force=true 跳过 50% 概率骰；mode 透传给 doPrank
 function doTick({ force, mode } = {}) {
   const s = getSettings() || {};
   if (s.prankMode !== true) return { ok: false, reason: 'disabled' };

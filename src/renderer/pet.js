@@ -427,7 +427,7 @@ const PetState = {
       this._petDailyTask = this._normalizeDailyTask(null);
       this._recomputeMood();
     }
-    this.refreshAffinityMenu();
+    this._updateHeart();
   },
 
   // 今日任务进度结构（按日期重置）: { date:'YYYY-MM-DD', pet, fortune, stick, chat }
@@ -480,11 +480,20 @@ const PetState = {
     const lv = this._affinityLevel(this._petAffinity);
     return `亲密度: ${this._petAffinity}/100 (Lv.${lv} ${this._affinityTitle(lv)})`;
   },
-  // 右键菜单顶部刷新亲密度显示
+  // 右键菜单顶部刷新亲密度显示；同步设置面板「财宠名字」板块的亲密度/心情展示
   refreshAffinityMenu() {
     try {
       const el = document.getElementById('context-menu-affinity');
       if (el) el.textContent = `💗 ${this.affinityText()}`;
+    } catch (e) { /* ignore */ }
+    try {
+      const d = document.getElementById('affinity-display');
+      if (d) {
+        const lv = this._affinityLevel(this._petAffinity);
+        const title = this._affinityTitle(lv);
+        const moodText = { happy: '开心', normal: '平静', sad: '低落', excited: '兴奋' }[this._mood] || '平静';
+        d.textContent = `💗 亲密度：${this._petAffinity}/100（Lv.${lv} ${title}）｜心情：${this.MOOD_EMOJI[this._mood] || '😐'} ${moodText}`;
+      }
     } catch (e) { /* ignore */ }
   },
 
@@ -495,7 +504,7 @@ const PetState = {
     this._petAffinity = Math.min(100, before + (points || 0));
     const afterLv = this._affinityLevel(this._petAffinity);
     await this._savePetGrowth();
-    this.refreshAffinityMenu();
+    this._updateHeart();
     if (afterLv > beforeLv) {
       this.say(`🎉 ${this._petName}升级啦! Lv.${afterLv} ${this._affinityTitle(afterLv)}！`);
     }
@@ -507,14 +516,15 @@ const PetState = {
     this._interactionLog = (this._interactionLog || []).filter((t) => t > cutoff);
     const n = this._interactionLog.length;
     this._mood = n >= 8 ? 'excited' : (n >= 4 ? 'happy' : (n >= 1 ? 'normal' : 'sad'));
-    this._updateMoodIcon();
     return this._mood;
   },
-  _updateMoodIcon() {
+  // 左上角粉色爱心：显示亲密度数值（如 ♥42），并同步刷新亲密度/心情展示
+  _updateHeart() {
     try {
-      const el = document.getElementById('pet-mood');
-      if (el) el.textContent = this.MOOD_EMOJI[this._mood] || '😐';
+      const el = document.getElementById('pet-heart');
+      if (el) el.textContent = `♥${this._petAffinity}`;
     } catch (e) { /* ignore */ }
+    this.refreshAffinityMenu();
   },
   // 记录一次互动（时间戳）并刷新心情
   _recordInteraction() {
@@ -945,7 +955,8 @@ const PetState = {
       if (fortune.reminderLines && fortune.reminderLines[0]) {
         line += `。${fortune.reminderLines[0]}`;
       }
-      this._broadcast(line);
+      // 运势类播报：先"叮~"提示音再语音播报
+      this._broadcast(line, { speech: true });
     } catch (e) { /* ignore */ }
   },
 
@@ -994,13 +1005,16 @@ const PetState = {
       const result = await window.wealthCalendar.getDailyFortune();
       if (!result || !result.data) return;
       const line = this._buildFortuneLine(result.data);
-      if (line) this._broadcast(line);
+      // 运势类播报：先"叮~"提示音再语音播报
+      if (line) this._broadcast(line, { speech: true });
     } catch (e) { /* ignore */ }
   },
 
   // 播报：宠物气泡说话 + 同步追加到聊天对话框（只追加，不打断用户对话）
-  _broadcast(line) {
+  // opts.speech=true 时额外语音播报（运势类：先"叮~"提示音再播报）；普通交互台词不播报
+  _broadcast(line, opts) {
     this.say(line);
+    if (opts && opts.speech) this.speakFortune(line);
     try {
       if (typeof ChatPanel !== 'undefined' && ChatPanel && ChatPanel.addMessage) {
         ChatPanel.addMessage('assistant', line);
@@ -1008,12 +1022,52 @@ const PetState = {
     } catch (e) { /* ignore */ }
   },
 
+  // ---- 运势类语音播报：先"叮~"提示音再"小财帮你瞄了一眼：..."语音 ----
+  // 提示音与 TTS 均走现有 sidecar /tts/synthesize；交互类台词不播报
+  async speakFortune(line) {
+    try {
+      const s = await window.wealthCalendar.loadSettings();
+      if (s.ttsEnabled === false) return;
+      const chime = await window.wealthCalendar.ttsSynthesize('叮～');
+      if (chime && chime.audioBase64) await this._playAudio(chime.audioBase64);
+      const full = `小财帮你瞄了一眼：${String(line || '')}`;
+      const r = await window.wealthCalendar.ttsSynthesize(full);
+      if (r && r.audioBase64) await this._playAudio(r.audioBase64);
+    } catch (e) { console.warn('[tts] speakFortune:', e.message); }
+  },
+  // 播放 base64 音频，等待播完或超时（15s 兜底，避免阻塞后续播报）
+  _playAudio(base64) {
+    return new Promise((resolve) => {
+      try {
+        const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+        setTimeout(resolve, 15000);
+      } catch (e) { resolve(); }
+    });
+  },
+
   _buildFortuneLine(fortune) {
-    // 内容池轮换：主求方向 / 幸运数字+彩票 / 最强维度 / 吉时，约占一半的多样性
+    // 内容池轮换：推荐动态播报 / 主求方向 / 幸运数字+彩票 / 最强维度 / 吉时，约占一半的多样性
     const roll = Math.random();
     const dimLabels = { wealth: '财运', career: '事业', love: '桃花', health: '健康', study: '学业', travel: '出行', signing: '签约' };
     const dims = fortune.dimensions || {};
     const dir = (fortune.directions && fortune.directions.wealth) || '';
+    let wish = '';
+    try { wish = (SettingsManager.settings && SettingsManager.settings.mainWish) || ''; } catch (e) { /* ignore */ }
+
+    // 0) ✨推荐模式（未设主求=推荐，默认）：按当天运势动态播报，
+    //    财运/桃花/事业哪个旺(≥75分)就都播，提醒更详细含注意事项避忌
+    if (!wish) {
+      const recLabels = { wealth: '财运', love: '桃花', career: '事业' };
+      const hot = Object.keys(recLabels).filter((k) => (dims[k] && dims[k].score) >= 75);
+      if (hot.length) {
+        let s = `✨ 今日推荐：${hot.map((k) => `${recLabels[k]}${dims[k].score}分`).join('、')}${hot.length === 3 ? '，三路全旺' : ''}，都可以好好把握~`;
+        if (fortune.reminderLines && fortune.reminderLines[0]) s += ` 小财提醒：${fortune.reminderLines[0]}`;
+        return s;
+      }
+    }
 
     // 1) 幸运数字 + 彩票建议（新元素）
     if (fortune.luckyNumber && fortune.luckyNumber.length && roll < 0.3) {
@@ -1024,8 +1078,6 @@ const PetState = {
     }
     // 2) 主求方向（约占 1/3）
     if (roll < 0.63) {
-      let wish = '';
-      try { wish = (SettingsManager.settings && SettingsManager.settings.mainWish) || ''; } catch (e) { /* ignore */ }
       const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
       if (wish && wishMap[wish] && this._wishTips[wish]) {
         const tips = this._wishTips[wish];
@@ -1075,7 +1127,8 @@ const PetState = {
           return hm >= g.start && hm <= g.end;
         });
         if (inGood) {
-          this._broadcast(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`);
+          // 吉时属运势类播报：先"叮~"提示音再语音播报
+          this._broadcast(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`, { speech: true });
         }
       });
     } catch (e) { /* ignore */ }

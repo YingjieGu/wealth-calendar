@@ -440,7 +440,7 @@ body.platform-win32 #pet-stage::before {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 86%;
+  max-width: 100%;
   background: rgba(255, 255, 255, 0.96);
   color: #2a2438;
   padding: 10px 16px;
@@ -465,20 +465,27 @@ body.platform-win32 #pet-stage::before {
   white-space: pre-line; /* 今日任务列表换行 */
 }
 
-/* 宠物右下角心情图标小气泡 */
-#pet-mood {
+/* 亲密度爱心：左上角动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
+#pet-heart {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  font-size: 16px;
+  top: 12px;
+  left: 12px;
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1;
+  color: #ff6b9d;
   background: rgba(255, 255, 255, 0.92);
-  border-radius: 10px;
-  padding: 3px 5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 5px 8px;
+  box-shadow: 0 2px 10px rgba(255, 107, 157, 0.35);
   z-index: 6;
   pointer-events: none;
   user-select: none;
+  animation: heartFloat 2.4s ease-in-out infinite;
+}
+@keyframes heartFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
 @keyframes bubbleIn {
   0%   { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.7); }
@@ -843,6 +850,37 @@ body.platform-win32 #pet-stage::before {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
+}
+/* 合并板块内的小分区标题（如 模型配置 → AI 命理/多模态/本地模型状态） */
+.setting-sublabel {
+  margin: 12px 0 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--card-border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-dim);
+  letter-spacing: 0.5px;
+}
+.setting-sublabel:first-of-type {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: none;
+}
+/* 技能配置卡片（双击技能展开，如邮件配置；默认隐藏） */
+.skill-config-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--card-border);
+  animation: cardIn 0.24s ease;
+}
+.skill-config-card.hidden {
+  display: none;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .setting-options {
   display: flex;

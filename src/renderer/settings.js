@@ -22,8 +22,8 @@ const SettingsManager = {
     const activity = this.settings.activity || 'clingy';
     PetState.setActivity(activity);
 
-    // 界面主题（默认浅色）
-    const uiTheme = this.settings.uiTheme || 'light';
+    // 界面主题（默认深色）
+    const uiTheme = this.settings.uiTheme || 'dark';
     this.applyUiTheme(uiTheme);
 
     // Update UI buttons
@@ -34,11 +34,27 @@ const SettingsManager = {
     this.applyPartner();
     this.applySkills();
     this.applyMail();
+    // 亲密度/心情展示（财宠名字板块）+ 技能配置卡片初始收起
+    this.applyAffinity();
+    this.hideSkillConfigCard();
+  },
+
+  // 亲密度/心情展示（财宠名字板块；由 PetState.refreshAffinityMenu 实时刷新）
+  applyAffinity() {
+    try {
+      if (window.PetState && PetState.refreshAffinityMenu) PetState.refreshAffinityMenu();
+    } catch (e) { /* ignore */ }
+  },
+
+  // 收起技能配置卡片（双击展开 / 保存/清除后收起）
+  hideSkillConfigCard() {
+    const card = document.getElementById('skill-config-card');
+    if (card) card.classList.add('hidden');
   },
 
   // 技能开关（settings.skills，默认全开）
   applySkills() {
-    const def = { calculator: true, weather: true, translate: true, luckyNumber: true };
+    const def = { calculator: true, weather: true, translate: true, luckyNumber: true, mail: true };
     const s = this.settings.skills || {};
     document.querySelectorAll('#skills-options .activity-option').forEach((b) => {
       const key = b.dataset.skill;
@@ -65,7 +81,7 @@ const SettingsManager = {
     const ok = !!(m.email && m.imapServer && m.smtpServer);
     el.textContent = ok
       ? `✅ 邮件技能已配置（${m.email}），聊天框输入「收邮件」或「发邮件: 主题|收件人|正文」`
-      : '📮 邮件技能：未配置（在下方配置后自动启用「收邮件」「发邮件」）';
+      : '📮 邮件技能：未配置（双击 📮 邮件展开配置后自动启用「收邮件」「发邮件」）';
   },
 
   // 捣蛋模式开关（settings.prankMode，默认关闭）
@@ -196,7 +212,7 @@ const SettingsManager = {
       this.settings.petName = name;
       if (PetState) PetState._petName = name;
       await this.save();
-      showToast(`✅ 宠物名字已设为：${name}`);
+      showToast(`✅ 财宠名字已设为：${name}`);
     });
 
     // Custom pet image upload
@@ -298,7 +314,7 @@ const SettingsManager = {
           b.classList.toggle('active', b === btn)
         );
         await this.save();
-        showToast(on ? '😜 捣蛋模式已开启，小财会偶尔调皮一下~' : '🙂 捣蛋模式已关闭');
+        showToast(on ? '😜 捣蛋模式已开启（活跃度 60%，小财会偶尔调皮一下~）' : '🙂 捣蛋模式已关闭');
       });
     });
 
@@ -314,7 +330,13 @@ const SettingsManager = {
         await this.save();
         // 立即唤醒窗口感知探测一次（无需等 60s 轮询）
         if (on && window.PetState && PetState._partnerCheck) PetState._partnerCheck();
-        showToast(on ? '🤝 伙伴模式已开启，小财会主动提供帮助~' : '🙈 伙伴模式已关闭');
+        const ph = document.getElementById('partner-hint');
+        if (ph) {
+          ph.textContent = on
+            ? '🔓 已打开技能权限：小财可感知你在做什么，选中内容按 Ctrl+Alt+S 总结，聊天框发链接可解析文章（🔒 仅本机处理，不上传窗口内容）'
+            : '开启后「🔓 已打开技能权限」：小财可感知你在做什么，选中内容按 Ctrl+Alt+S 总结，聊天框发链接可解析文章（🔒 仅本机处理，不上传窗口内容）';
+        }
+        showToast(on ? '🤝 伙伴模式已开启，🔓 已打开技能权限' : '🙈 伙伴模式已关闭');
       });
     });
 
@@ -380,22 +402,43 @@ const SettingsManager = {
       showToast(`✅ 唤醒口令：${this.settings.wakeWord}`);
     });
 
-    // 技能开关（计算器/天气/翻译/数字吉凶，默认全开）
+    // 技能开关（计算器/天气/翻译/数字吉凶/邮件，默认全开；双击=展开配置卡片）
     this.applySkills();
-    document.getElementById('skills-options').addEventListener('click', async (e) => {
+    const skillsBox = document.getElementById('skills-options');
+    skillsBox.addEventListener('click', async (e) => {
       const btn = e.target.closest('.activity-option');
       if (!btn || !btn.dataset.skill) return;
       const key = btn.dataset.skill;
-      this.settings.skills = { ...(this.settings.skills || {}) };
-      // 基于当前按钮 active 态切换（settings.skills 未初始化时默认全开显示 active）
-      const on = !btn.classList.contains('active');
-      this.settings.skills[key] = on;
-      btn.classList.toggle('active', on);
-      await this.save();
-      showToast(on ? `✅ ${btn.textContent.trim()} 已开启` : `⏸ ${btn.textContent.trim()} 已关闭`);
+      // 双击会先触发 click：延迟 220ms 执行切换，双击时取消（改为展开配置卡片）
+      if (btn._skillDbl) { clearTimeout(btn._skillDbl); btn._skillDbl = null; return; }
+      btn._skillDbl = setTimeout(async () => {
+        btn._skillDbl = null;
+        this.settings.skills = { ...(this.settings.skills || {}) };
+        const on = !btn.classList.contains('active');
+        this.settings.skills[key] = on;
+        btn.classList.toggle('active', on);
+        await this.save();
+        showToast(on ? `✅ ${btn.textContent.trim()} 已开启` : `⏸ ${btn.textContent.trim()} 已关闭`);
+      }, 220);
+    });
+    skillsBox.addEventListener('dblclick', async (e) => {
+      const btn = e.target.closest('.activity-option');
+      if (!btn || !btn.dataset.skill) return;
+      const key = btn.dataset.skill;
+      if (btn._skillDbl) { clearTimeout(btn._skillDbl); btn._skillDbl = null; }
+      const card = document.getElementById('skill-config-card');
+      if (!card) return;
+      // 再双击同一技能 → 收起；否则展开该技能配置卡片
+      if (card.dataset.skill === key && !card.classList.contains('hidden')) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.dataset.skill = key;
+      card.classList.remove('hidden');
+      showToast(`📂 已展开「${btn.textContent.trim()}」配置卡片`);
     });
 
-    // 邮件服务保存 / 清除
+    // 邮件服务保存 / 清除（配置卡片内；保存/清除后收起卡片）
     this.applyMail();
     document.getElementById('btn-save-mail').addEventListener('click', async () => {
       this.settings.mail = {
@@ -408,6 +451,7 @@ const SettingsManager = {
       };
       await this.save();
       this.applyMailStatus();
+      this.hideSkillConfigCard();
       showToast(this.settings.mail.imapServer && this.settings.mail.email && this.settings.mail.smtpServer
         ? '✅ 邮件配置已保存，可在聊天框收/发邮件'
         : '⚠️ 邮件配置不完整，请填全 IMAP/SMTP/账号');
@@ -418,6 +462,7 @@ const SettingsManager = {
         .forEach((id) => { document.getElementById(id).value = ''; });
       await this.save();
       this.applyMailStatus();
+      this.hideSkillConfigCard();
       showToast('🗑️ 邮件配置已清除');
     });
 
@@ -468,24 +513,19 @@ const SettingsManager = {
       showToast('🗑️ 动画宠物已清除');
     });
 
-    // Main wish (主求方向)
+    // Main wish (主求方向；✨推荐 默认)
     this.applyWish();
     document.querySelectorAll('#wish-options .activity-option').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const wish = btn.dataset.wish;
-        this.settings.mainWish = wish;
-        document.querySelectorAll('#wish-options .activity-option').forEach((b) =>
-          b.classList.toggle('active', b.dataset.wish === wish)
-        );
+        // ✨推荐 用空值表示（与旧版未设主求兼容）
+        this.settings.mainWish = wish === 'recommend' ? '' : wish;
+        this.applyWish();
         await this.save();
-        showToast(`🎯 主求方向已设为：${btn.textContent.trim()}`);
+        showToast(wish === 'recommend'
+          ? '✨ 已设为推荐模式：按当天运势动态播报财运/桃花/事业'
+          : `🎯 主求方向已设为：${btn.textContent.trim()}`);
       });
-    });
-    document.getElementById('btn-clear-wish').addEventListener('click', async () => {
-      this.settings.mainWish = '';
-      document.querySelectorAll('#wish-options .activity-option').forEach((b) => b.classList.remove('active'));
-      await this.save();
-      showToast('✖️ 已清除主求，全面提醒');
     });
 
     // Calendar mode
@@ -521,11 +561,11 @@ const SettingsManager = {
     });
   },
 
-  // --- Main wish (主求方向) ---
+  // --- Main wish (主求方向；✨推荐=未设主求/空值，默认) ---
   applyWish() {
     const wish = this.settings.mainWish || '';
     document.querySelectorAll('#wish-options .activity-option').forEach((b) => {
-      b.classList.toggle('active', b.dataset.wish === wish);
+      b.classList.toggle('active', b.dataset.wish === 'recommend' ? wish === '' : b.dataset.wish === wish);
     });
   },
 

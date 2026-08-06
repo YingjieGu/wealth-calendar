@@ -16,25 +16,60 @@ html, body {
   overflow: hidden;
   background: transparent;
   user-select: none;
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* ============================================================
-   界面主题 CSS 变量（深色默认；body.theme-light 覆盖为浅色）
+   界面主题 CSS 变量 —— Design Tokens v3
+   深色默认；body.theme-light 覆盖为暖米色浅色主题。
+   所有组件只引用 token 层，深浅主题切换自动级联。
    ============================================================ */
 :root {
-  /* 面板/整体 */
+  /* ---- 色板 tokens ---- */
+  --color-primary: #d4a017;        /* 财神金（主品牌色） */
+  --color-accent: #ffd700;         /* 亮金点缀（深色主题） */
+  --color-accent-soft: rgba(255, 215, 0, 0.14);
+  --bg: #141226;                   /* 基础背景 */
+  --surface: rgba(255, 255, 255, 0.05);   /* 表面 1（卡片底） */
+  --surface-2: rgba(255, 255, 255, 0.09); /* 表面 2（浮层/小卡） */
+  --surface-3: rgba(255, 255, 255, 0.14); /* 表面 3（按压/hover 高亮） */
+  --text: #e8e6f2;                 /* 主文字 */
+  --text-dim: #8a86a8;             /* 弱文字 */
+
+  /* ---- 圆角 tokens ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  /* ---- 阴影 tokens ---- */
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.32);
+  --shadow-3: 0 12px 36px rgba(0, 0, 0, 0.45);
+
+  /* ---- 间距 tokens（4px 基数） ---- */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-7: 32px;
+  --spacing-8: 40px;
+
+  /* ---- 字体 tokens ---- */
+  --font-sans: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  /* ---- 派生变量（既有选择器继续可用，全部级联自 token） ---- */
+  --accent: var(--color-accent);
+  --accent-dim: #e8c766;
   --panel-bg: linear-gradient(170deg, rgba(22, 20, 36, 0.97) 0%, rgba(16, 14, 30, 0.98) 100%);
   --panel-bg2: linear-gradient(170deg, rgba(22, 20, 36, 0.97) 0%, rgba(14, 12, 28, 0.99) 100%);
   --menu-bg: rgba(28, 26, 40, 0.96);
   --toast-bg: rgba(20, 18, 34, 0.92);
-  /* 文字 */
-  --text: #e8e6f2;
   --text-strong: #eee;
   --text-mid: #b9b4d8;
-  --text-dim: #8a86a8;
-  /* 卡片/输入/边框 */
-  --card: rgba(255, 255, 255, 0.05);
+  --card: var(--surface);
   --card-border: rgba(255, 255, 255, 0.08);
   --input-bg: rgba(255, 255, 255, 0.05);
   --input-border: rgba(255, 255, 255, 0.13);
@@ -44,20 +79,29 @@ html, body {
   --scrollbar: rgba(255, 255, 255, 0.16);
   --scrollbar-hover: rgba(255, 255, 255, 0.32);
   --schedule-item: rgba(255, 255, 255, 0.06);
-  /* 金色主题点缀（深色下亮金，浅色下暗金保证对比度） */
-  --accent: #ffd700;
-  --accent-dim: #e8c766;
 }
 body.theme-light {
+  /* 暖米色浅色主题：米白底 + 金色点缀 + 深色文字 */
+  --color-primary: #b8860b;        /* 暗金，浅色下保证对比度 */
+  --color-accent: #a06a00;
+  --color-accent-soft: rgba(212, 160, 23, 0.16);
+  --bg: #faf6ee;                   /* 暖米色 */
+  --surface: rgba(212, 160, 23, 0.07);
+  --surface-2: rgba(212, 160, 23, 0.12);
+  --surface-3: rgba(212, 160, 23, 0.18);
+  --text: #3a3548;
+  --text-dim: #8a7f68;
+  --shadow-1: 0 2px 8px rgba(120, 100, 60, 0.12);
+  --shadow-2: 0 6px 20px rgba(120, 100, 60, 0.16);
+  --shadow-3: 0 12px 36px rgba(120, 100, 60, 0.22);
+  /* 派生覆盖（硬编码色值需在浅色主题重写） */
+  --accent-dim: #8a5a10;
   --panel-bg: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 246, 238, 0.99) 100%);
   --panel-bg2: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 242, 232, 0.99) 100%);
   --menu-bg: rgba(250, 248, 242, 0.97);
   --toast-bg: rgba(42, 38, 56, 0.94);
-  --text: #3a3548;
   --text-strong: #2a2438;
   --text-mid: #6a6380;
-  --text-dim: #8a7f68;
-  --card: rgba(120, 100, 60, 0.06);
   --card-border: rgba(120, 100, 60, 0.16);
   --input-bg: rgba(120, 100, 60, 0.05);
   --input-border: rgba(120, 100, 60, 0.22);
@@ -67,8 +111,6 @@ body.theme-light {
   --scrollbar: rgba(120, 100, 60, 0.24);
   --scrollbar-hover: rgba(120, 100, 60, 0.42);
   --schedule-item: rgba(120, 100, 60, 0.06);
-  --accent: #a06a00;
-  --accent-dim: #8a5a10;
 }
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
@@ -409,7 +451,7 @@ body.platform-win32 #pet-stage::before {
   z-index: 40;
   opacity: 1;
   transition: opacity 0.3s ease, transform 0.3s ease;
-  animation: bubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bubbleIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
   word-break: break-word;
   cursor: pointer;
   pointer-events: auto; /* clickable: opens the chat panel (Doubao-style) */
@@ -439,8 +481,10 @@ body.platform-win32 #pet-stage::before {
   user-select: none;
 }
 @keyframes bubbleIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.9); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  0%   { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.7); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-3px) scale(1.07); }
+  80%  { opacity: 1; transform: translateX(-50%) translateY(1px) scale(0.98); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 /* ============================================================
@@ -513,15 +557,15 @@ body.platform-win32 #pet-stage::before {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 215, 0, 0.22);
-  border-radius: 14px;
-  padding: 5px;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-1);
   display: flex;
   flex-direction: column;
   min-width: 112px;
   /* 200x250 悬浮窗内保证全部菜单项可见：超出时容器滚动 */
   max-height: calc(100% - 8px);
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-2);
   animation: menuIn 0.2s ease;
 }
 #context-menu.hidden {
@@ -530,6 +574,19 @@ body.platform-win32 #pet-stage::before {
 @keyframes menuIn {
   from { opacity: 0; transform: scale(0.94); }
   to { opacity: 1; transform: scale(1); }
+}
+/* 面板弹出弹性动画（设置/聊天/日历共用）：scale 0.96→1 + translateY 回弹 */
+@keyframes panelPop {
+  0%   { opacity: 0; transform: scale(0.96) translateY(14px); }
+  55%  { opacity: 1; transform: scale(1.015) translateY(-3px); }
+  80%  { opacity: 1; transform: scale(0.995) translateY(1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* 运势雷达图生长动画：path/polygon 从中心渐显放大 */
+@keyframes radarGrow {
+  0%   { opacity: 0; transform: scale(0.65); }
+  70%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
 }
 #context-menu button {
   background: none;
@@ -544,7 +601,7 @@ body.platform-win32 #pet-stage::before {
   transition: background 0.15s ease, color 0.15s ease;
 }
 #context-menu button:hover {
-  background: rgba(255, 215, 0, 0.14);
+  background: linear-gradient(90deg, var(--color-accent-soft), rgba(240, 168, 48, 0.05));
   color: var(--accent);
 }
 /* 右键菜单顶部亲密度条 */
@@ -574,6 +631,7 @@ body.platform-win32 #pet-stage::before {
   display: flex;
   flex-direction: column;
   z-index: 12;
+  animation: panelPop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 #chat-panel.hidden {
   display: none;
@@ -743,6 +801,9 @@ body.platform-win32 #pet-stage::before {
   transform: scale(0.96) translateY(8px);
   pointer-events: none;
 }
+#settings-panel:not(.hidden) {
+  animation: panelPop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 .settings-header {
   display: flex;
   justify-content: space-between;
@@ -762,11 +823,17 @@ body.platform-win32 #pet-stage::before {
   font-size: 12px;
 }
 .setting-group {
-  margin-bottom: 16px;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--card);
+  margin-bottom: var(--spacing-4);
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.setting-group:hover {
+  border-color: rgba(255, 215, 0, 0.32);
+  box-shadow: var(--shadow-2);
 }
 .setting-group label {
   display: block;
@@ -808,6 +875,10 @@ body.platform-win32 #pet-stage::before {
 .activity-option:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+.theme-option:active,
+.activity-option:active {
+  transform: scale(0.95);
+}
 .action-btn {
   width: 100%;
   padding: 9px;
@@ -826,7 +897,8 @@ body.platform-win32 #pet-stage::before {
   transform: translateY(-1px);
 }
 .action-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.95);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 .setting-input {
   width: 100%;
@@ -920,6 +992,7 @@ body.platform-win32 #pet-stage::before {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: panelPop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 #calendar-view[style*="display: none"] {
   display: none !important;
@@ -951,6 +1024,10 @@ body.platform-win32 #pet-stage::before {
 .cal-header button:hover {
   background: rgba(255, 215, 0, 0.18);
   color: var(--accent);
+}
+.cal-header button:active,
+.cal-cell:active {
+  transform: scale(0.95);
 }
 #cal-month-label {
   flex: 1;
@@ -1150,12 +1227,11 @@ body.platform-win32 #pet-stage::before {
 
 /* ---------- 运势区块 ---------- */
 #fortune-section {
-  margin: 8px 0;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(240, 168, 48, 0.05));
-  border: 1px solid rgba(255, 215, 0, 0.28);
+  margin: var(--spacing-2) 0;
   animation: slideUp 0.35s ease;
+}
+#fortune-section.hidden {
+  display: none;
 }
 .fortune-header {
   display: flex;
@@ -1163,7 +1239,7 @@ body.platform-win32 #pet-stage::before {
   align-items: center;
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-2);
   font-size: 13px;
   letter-spacing: 1px;
 }
@@ -1174,38 +1250,101 @@ body.platform-win32 #pet-stage::before {
   font-size: 15px;
   color: var(--accent);
   transition: transform 0.4s ease;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
 }
 .fortune-refresh:hover {
   transform: rotate(180deg);
 }
-.fortune-overall {
-  font-size: 13px;
-  color: var(--text-strong);
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.fortune-refresh:active {
+  transform: scale(0.9);
 }
-.fortune-overall b {
-  font-size: 22px;
-  color: var(--accent);
-  text-shadow: 0 2px 12px rgba(255, 215, 0, 0.4);
+/* 运势报告卡片：大分数 + 雷达 + 三列迷你卡，视觉层级清晰 */
+.fortune-card {
+  padding: var(--spacing-3) var(--spacing-3) var(--spacing-2);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--surface-2), var(--surface));
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  box-shadow: var(--shadow-1);
+}
+.fortune-score-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-1);
+}
+.fortune-score-label {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-strong);
+  letter-spacing: 1px;
+}
+.fortune-score-num-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 var(--spacing-2);
+}
+.fortune-score-num {
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 800;
+  font-family: var(--font-num);
+  color: var(--color-primary);
+  text-shadow: 0 2px 16px rgba(212, 160, 23, 0.38);
+}
+.fortune-score-total {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-family: var(--font-num);
 }
 .fortune-source {
   font-size: 10px;
   color: var(--text-dim);
-  background: var(--card);
+  background: var(--surface-2);
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .fortune-line {
-  background: rgba(255, 215, 0, 0.12);
-  border-radius: 10px;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   font-size: 12px;
   color: var(--accent-dim);
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-2);
   line-height: 1.5;
+}
+/* 三列迷你卡：幸运数字 / 财神方位 / 吉时 */
+.fortune-minicards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-2);
+  margin: var(--spacing-2) 0;
+}
+.mini-card {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mini-icon {
+  font-size: 15px;
+}
+.mini-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+.mini-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.4;
+  word-break: break-word;
 }
 .fortune-dims {
   display: flex;
@@ -1214,14 +1353,30 @@ body.platform-win32 #pet-stage::before {
 }
 /* 今日运势雷达图（纯 SVG，全平台渲染安全） */
 .fortune-radar {
-  margin-top: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: var(--card);
+  margin-top: var(--spacing-2);
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   border: 1px solid var(--card-border);
 }
 .fortune-radar svg {
   display: block;
+  animation: radarFade 0.6s ease both;
+}
+/* 数据多边形从中心生长 */
+.radar-fill {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radarGrow 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.radar-dots {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radarGrow 0.7s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes radarFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .fortune-dim {
   display: flex;
@@ -1249,20 +1404,16 @@ body.platform-win32 #pet-stage::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.fortune-meta {
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--accent-dim);
-}
 .fortune-disclaimer {
-  margin-top: 4px;
+  margin-top: var(--spacing-1);
   font-size: 10px;
   color: var(--text-dim);
+  line-height: 1.5;
 }
 .fortune-empty, .fortune-loading {
   font-size: 12px;
   color: var(--text-mid);
-  padding: 8px 0;
+  padding: var(--spacing-2) 0;
 }
 
 /* ---------- 日程表单模态 ---------- */
@@ -1370,4 +1521,16 @@ body.platform-win32 #pet-stage::before {
 #toast.hidden {
   opacity: 0;
   transform: translateX(-50%) translateY(8px);
+}
+
+/* ============================================================
+   无障碍：尊重系统"减少动态效果"设置，关闭全部动画
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

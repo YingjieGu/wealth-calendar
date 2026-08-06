@@ -300,7 +300,7 @@ const CalendarView = {
       const anchor = lp.x > cx + 5 ? 'start' : (lp.x < cx - 5 ? 'end' : 'middle');
       axes += `<text x="${lp.x.toFixed(1)}" y="${(lp.y + 4).toFixed(1)}" font-size="11" fill="var(--accent)" text-anchor="${anchor}" dominant-baseline="middle">${labels[keys[i]]}</text>`;
     }
-    // 数据多边形（金色渐变）+ 顶点
+    // 数据多边形（金色渐变）+ 顶点（radar-fill/radar-dots 触发生长动画）
     const dataPts = keys.map((k, i) => pt(i, R * (score(k) / 100))).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
     const dots = keys.map((k, i) => {
       const p = pt(i, R * (score(k) / 100));
@@ -316,8 +316,8 @@ const CalendarView = {
   </defs>
   ${grid}
   ${axes}
-  <polygon points="${dataPts}" fill="url(#radarGold)" stroke="#ffd700" stroke-width="2" stroke-linejoin="round"/>
-  ${dots}
+  <polygon class="radar-fill" points="${dataPts}" fill="url(#radarGold)" stroke="#ffd700" stroke-width="2" stroke-linejoin="round"/>
+  <g class="radar-dots">${dots}</g>
 </svg>`;
   },
 
@@ -361,16 +361,47 @@ const CalendarView = {
 
     const luckyTime = (f.luckyTime || []).join('、') || '—';
     const dirWealth = (f.directions && f.directions.wealth) || '—';
+    const luckyNum = Array.isArray(f.luckyNumber) ? f.luckyNumber.join('、') : (f.luckyNumber || '—');
     const sourceTag = result.source === 'llm' ? '✨ AI 命理' : '📜 模板推算';
     const reminderLine = (f.reminderLines && f.reminderLines[0]) || '';
+    const overall = Number(f.overall) || 0;
 
     body.innerHTML = `
-      <div class="fortune-overall">总分 <b>${f.overall}</b> <span class="fortune-source">${sourceTag}</span></div>
-      ${reminderLine ? `<div class="fortune-line">💬 ${this.escapeHtml(reminderLine)}</div>` : ''}
-      <div class="fortune-dims">${dimHtml}</div>
-      <div class="fortune-radar">${this.buildRadarSVG(dims)}</div>
-      <div class="fortune-meta">🕐 吉时：${this.escapeHtml(luckyTime)} ｜ 🧭 财神方位：${this.escapeHtml(dirWealth)}</div>
-      <div class="fortune-disclaimer">${this.escapeHtml(f.disclaimer || '')}</div>`;
+      <div class="fortune-card">
+        <div class="fortune-score-head">
+          <span class="fortune-score-label">今日综合运势</span>
+          <span class="fortune-source">${sourceTag}</span>
+        </div>
+        <div class="fortune-score-num-row">
+          <span class="fortune-score-num" id="fortune-score-value">0</span>
+          <span class="fortune-score-total">/ 100</span>
+        </div>
+        ${reminderLine ? `<div class="fortune-line">💬 ${this.escapeHtml(reminderLine)}</div>` : ''}
+        <div class="fortune-radar">${this.buildRadarSVG(dims)}</div>
+        <div class="fortune-minicards">
+          <div class="mini-card"><span class="mini-icon">🍀</span><span class="mini-label">幸运数字</span><span class="mini-value">${this.escapeHtml(String(luckyNum))}</span></div>
+          <div class="mini-card"><span class="mini-icon">🧭</span><span class="mini-label">财神方位</span><span class="mini-value">${this.escapeHtml(dirWealth)}</span></div>
+          <div class="mini-card"><span class="mini-icon">🕐</span><span class="mini-label">吉时</span><span class="mini-value">${this.escapeHtml(luckyTime)}</span></div>
+        </div>
+        <div class="fortune-dims">${dimHtml}</div>
+        <div class="fortune-disclaimer">${this.escapeHtml(f.disclaimer || '')}</div>
+      </div>`;
+    this._animateNumber(document.getElementById('fortune-score-value'), overall);
+  },
+
+  // 运势分数数字滚动动画（0 → 目标分，easeOutCubic，仅 transform/opacity 无关——数字滚动用 rAF）
+  _animateNumber(el, target) {
+    if (!el) return;
+    const dur = 900;
+    const start = performance.now();
+    const from = 0;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(from + (target - from) * ease);
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   },
 
   closeScheduleDetail() {

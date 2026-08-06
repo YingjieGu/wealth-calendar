@@ -75,6 +75,15 @@ const PetState = {
         this._broadcast(data.text);
       });
     } catch (e) { /* ignore */ }
+    // 伙伴模式：主进程剪贴板总结结果 → 气泡 + 聊天对话框
+    try {
+      window.wealthCalendar.onPartnerSummary((data) => {
+        if (!data || !data.text) return;
+        this._broadcast(data.text);
+      });
+    } catch (e) { /* ignore */ }
+    // 伙伴模式：窗口感知（60s 轮询活跃窗口标题，切换时概率主动提供帮助）
+    this.startPartnerWatch();
     // 启动阶段循环：若 SettingsManager.init 已按保存模式调 setActivity 并启动阶段循环，
     // 则此处跳过（_phaseBooted）；默认 active 在此启动
     this._currentPhase = null;
@@ -85,6 +94,58 @@ const PetState = {
       this._firstSleep = (this._activityMode() === 'clingy');
       this._beginPhase();
     }, 1500);
+  },
+
+  // ---- 伙伴模式 L1：窗口感知 ----
+  // 每 60s 拉取活跃窗口标题，标题变化（用户切换工作）时 20% 概率主动提供帮助；
+  // 每次切换冷却 10 分钟。仅在 settings.partnerMode 开启时工作（隐私：不上传任何窗口内容）。
+  PARTNER_POLL_MS: 60000,
+  PARTNER_COOLDOWN_MS: 10 * 60 * 1000,
+  PARTNER_TRIGGER_CHANCE: 0.2,
+  // 标题关键词 → 主动提供帮助文案（伙伴模式，甜系友好）
+  PARTNER_LINES: [
+    { keywords: ['代码', 'code', 'vscode', 'idea', 'clion', 'pycharm', 'terminal', 'git', 'npm', '编译', '开发', '编程'], line: '需要我帮你查个 API 吗？或者一起理理思路~' },
+    { keywords: ['word', 'doc', '文档', 'office', 'ppt', 'excel', '报表', 'pdf'], line: '需要我帮忙总结这段文档吗？扔给我就好~' },
+    { keywords: ['chrome', 'edge', 'firefox', '浏览器', '搜索', '知乎', 'bilibili', '微博'], line: '在看什么好玩的？要我帮你解析一下吗？' },
+  ],
+  PARTNER_FALLBACK: '需要帮忙随时叫我～',
+
+  startPartnerWatch() {
+    this._lastPartnerTitle = null;
+    this._lastPartnerOfferAt = 0;
+    if (this._partnerWatchTimer) clearInterval(this._partnerWatchTimer);
+    this._partnerWatchTimer = setInterval(() => this._partnerCheck(), this.PARTNER_POLL_MS);
+    // 启动后先探测一次（若开关已开启）
+    setTimeout(() => this._partnerCheck(), 3000);
+  },
+
+  async _partnerCheck() {
+    if (!window.wealthCalendar || !window.wealthCalendar.getActiveWindowTitle) return;
+    try {
+      const s = await window.wealthCalendar.loadSettings();
+      if (s.partnerMode !== true) return; // 隐私：默认关，只在开启时工作
+      const title = await window.wealthCalendar.getActiveWindowTitle();
+      if (!title) return; // 标题获取失败 → 不触发
+      // 自家宠物窗口（用户正在和小财互动）不算"切换工作"
+      if (/财神日历|Wealth Calendar|财富日历/.test(title)) return;
+      const changed = title !== this._lastPartnerTitle;
+      this._lastPartnerTitle = title;
+      if (!changed) return;
+      const now = Date.now();
+      if (now - this._lastPartnerOfferAt < this.PARTNER_COOLDOWN_MS) return; // 10 分钟冷却
+      if (Math.random() >= this.PARTNER_TRIGGER_CHANCE) return; // 20% 概率
+      this._lastPartnerOfferAt = now;
+      this.say(this._partnerLine(title));
+    } catch (e) { /* ignore */ }
+  },
+
+  // 标题关键词 → 主动文案（通用兜底）
+  _partnerLine(title) {
+    const t = (title || '').toLowerCase();
+    for (const group of this.PARTNER_LINES) {
+      if (group.keywords.some((kw) => t.includes(kw.toLowerCase()))) return group.line;
+    }
+    return this.PARTNER_FALLBACK;
   },
 
   // 当前宠物模式：active | quiet | clingy(粘人)

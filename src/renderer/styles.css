@@ -864,6 +864,11 @@ body.platform-win32 #pet-stage::before {
   font-style: italic;
   line-height: 1.6;
 }
+.privacy-note {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 500;
+}
 #user-zodiac {
   margin-bottom: 8px;
   color: var(--accent);

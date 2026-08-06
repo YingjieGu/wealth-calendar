@@ -31,6 +31,7 @@ const SettingsManager = {
     this.updateActivityUI(activity);
     this.applyUserInfo();
     this.applyPrank();
+    this.applyPartner();
   },
 
   // 捣蛋模式开关（settings.prankMode，默认关闭）
@@ -38,6 +39,14 @@ const SettingsManager = {
     const on = this.settings.prankMode === true;
     document.querySelectorAll('#prank-options .activity-option').forEach((b) => {
       b.classList.toggle('active', (b.dataset.prank === '1') === on);
+    });
+  },
+
+  // 伙伴模式开关（settings.partnerMode，默认关闭）
+  applyPartner() {
+    const on = this.settings.partnerMode === true;
+    document.querySelectorAll('#partner-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.partner === '1') === on);
     });
   },
 
@@ -256,6 +265,22 @@ const SettingsManager = {
         );
         await this.save();
         showToast(on ? '😜 捣蛋模式已开启，小财会偶尔调皮一下~' : '🙂 捣蛋模式已关闭');
+      });
+    });
+
+    // 伙伴模式开关（settings.partnerMode，默认关；开启后小财感知你在做什么）
+    this.applyPartner();
+    document.querySelectorAll('#partner-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const on = btn.dataset.partner === '1';
+        this.settings.partnerMode = on;
+        document.querySelectorAll('#partner-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        // 立即唤醒窗口感知探测一次（无需等 60s 轮询）
+        if (on && window.PetState && PetState._partnerCheck) PetState._partnerCheck();
+        showToast(on ? '🤝 伙伴模式已开启，小财会主动提供帮助~' : '🙈 伙伴模式已关闭');
       });
     });
 

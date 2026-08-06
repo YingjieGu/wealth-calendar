@@ -43,6 +43,7 @@
         <button data-action="fortune">🔮 今日运势</button>
         <button data-action="stick">🎋 摇一支签</button>
         <button data-action="tasks">📋 今日任务</button>
+        <button data-action="partner-summary">📌 解析选中内容</button>
         <button data-action="calendar">📅 日历</button>
         <button data-action="settings">⚙️ 设置</button>
         <button data-action="hide">🙈 隐藏宠物（Ctrl+Alt+W）</button>
@@ -137,6 +138,16 @@
               <button class="activity-option" data-prank="1">😜 开启</button>
             </div>
             <p class="placeholder-text">小财会偶尔调皮一下~（每 25-45 分钟随机吐槽你正在做的事，偶尔敲几下键盘，每天最多 5 次）</p>
+          </div>
+
+          <div class="setting-group">
+            <label>伙伴模式</label>
+            <div class="setting-options" id="partner-options">
+              <button class="activity-option active" data-partner="0">🙈 关闭</button>
+              <button class="activity-option" data-partner="1">🤝 开启</button>
+            </div>
+            <p class="placeholder-text">让小财感知你在做什么，主动提供帮助~（选中内容按 Ctrl+Alt+S 总结；聊天框发链接可解析文章）</p>
+            <p class="placeholder-text privacy-note">🔒 隐私说明：仅本机处理，不上传窗口内容</p>
           </div>
 
           <div class="setting-group">

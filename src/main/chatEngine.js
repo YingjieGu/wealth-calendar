@@ -85,6 +85,83 @@ async function callLLM(mc, messages) {
   }
 }
 
+// --- 伙伴模式 L2：选中文本/URL 总结 ---
+
+// 简单抓取 URL 正文并去标签（无外链依赖，超时 15s；抓取失败返回 null）
+async function fetchUrlText(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (WealthCalendar) Chrome/120.0' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 6000);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 检测消息是否以 URL 开头（http/https）
+function extractUrl(message) {
+  const m = String(message || '').trim().match(/^https?:\/\/[^\s]+/i);
+  return m ? m[0] : null;
+}
+
+// URL 文章总结：fetch 正文 → LLM 总结 3 条要点
+async function summarizeUrl(url, mc) {
+  let text;
+  try {
+    text = await fetchUrlText(url);
+  } catch (e) {
+    return { reply: `🔗 链接抓取失败（${e.message}）。可能是网络不通或被反爬，换个链接试试？`, toolExecuted: false, url };
+  }
+  if (!text || text.length < 50) {
+    return { reply: '🔗 这个页面正文太短或抓不到内容，换篇文章试试？', toolExecuted: false, url };
+  }
+  const messages = [
+    { role: 'system', content: '你是桌面宠物小财。用户给了一段从网页提取的正文，请用中文总结成 3 条要点：每条一行、简短口语化、带「• 」前缀、小财口吻（可加 ~）。只输出要点，不要其他内容。' },
+    { role: 'user', content: `链接: ${url}\n\n网页正文：\n${text}` },
+  ];
+  try {
+    const reply = await callLLM(mc, messages);
+    return { reply: `📄 ${url}\n${reply}`, toolExecuted: false, url };
+  } catch (e) {
+    return { reply: `🔗 总结失败：${e.message}`, toolExecuted: false, url };
+  }
+}
+
+// 选中文本总结：LLM 总结成 3 条要点（剪贴板读取在主进程 main.js 完成）
+async function summarize(text) {
+  const settings = loadSettings();
+  const mc = settings.modelConfig || {};
+  if (!mc.llmApiKey) {
+    return '小财的 AI 大脑还没接上呢～去 ⚙️设置 → AI 命理 填一下 API Key，我就能帮你总结选中内容啦！';
+  }
+  const messages = [
+    { role: 'system', content: '你是桌面宠物小财。请把用户选中的内容总结成 3 条要点：每条一行、简短口语化、带「• 」前缀、小财口吻（可加 ~）。只输出要点，不要其他内容。' },
+    { role: 'user', content: String(text).slice(0, 8000) },
+  ];
+  try {
+    return await callLLM(mc, messages);
+  } catch (e) {
+    console.error('[partner] summarize failed:', e.message);
+    return `总结失败：${e.message}`;
+  }
+}
+
 function parseAction(reply) {
   // Find the JSON object containing "action", using brace balancing so nested
   // objects (e.g. params:{...}) don't truncate the match.
@@ -122,6 +199,12 @@ async function chatSend(userMessage, deps) {
       reply: '小财的 AI 大脑还没接上呢～去 ⚙️设置 → AI 命理 填一下 API Key，我就能陪你聊天、帮你记日程啦！',
       toolExecuted: false,
     };
+  }
+
+  // 伙伴模式 L2：URL 开头 → 抓正文 + LLM 总结（不走普通闲聊，直接返回摘要）
+  const url = extractUrl(userMessage);
+  if (url) {
+    return summarizeUrl(url, mc);
   }
 
   const history = loadHistory();
@@ -173,4 +256,7 @@ function clearHistory() {
   saveHistory([]);
 }
 
-module.exports = { chatSend, clearHistory, parseAction, _internals: { SYSTEM_PROMPT, buildSystemWithDate } };
+module.exports = {
+  chatSend, clearHistory, parseAction, summarize, summarizeUrl, extractUrl, fetchUrlText,
+  _internals: { SYSTEM_PROMPT, buildSystemWithDate },
+};

@@ -9,6 +9,7 @@
 // - 触发的吐槽通过 webContents.send('pet-prank') 广播，渲染进程走 PetState._broadcast
 //   进气泡 + 聊天对话框
 const { execFileSync } = require('child_process');
+const { getActiveWindowTitle } = require('./windowInfo');
 
 let prankTimer = null;
 let mainWindow = null;
@@ -23,45 +24,6 @@ const DAILY_LIMIT = 5;
 const INTERVAL_MIN = 25;
 const INTERVAL_MAX = 45;
 const TRIGGER_CHANCE = 0.3;
-
-// --- 活跃窗口标题（平台适配；失败一律返回 null 走降级） ---
-function getActiveWindowTitle() {
-  try {
-    if (process.platform === 'win32') {
-      const script = [
-        'Add-Type -TypeDefinition @"',
-        'using System;',
-        'using System.Runtime.InteropServices;',
-        'using System.Text;',
-        'public class WcWinTitle {',
-        '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
-        '  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
-        '}',
-        '"@',
-        '$h = [WcWinTitle]::GetForegroundWindow()',
-        '$sb = New-Object System.Text.StringBuilder 512',
-        '[WcWinTitle]::GetWindowText($h, $sb, $sb.Capacity) | Out-Null',
-        '$sb.ToString()',
-      ].join('\n');
-      const out = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', timeout: 4000 });
-      const t = String(out).trim();
-      return t ? t : null;
-    }
-    if (process.platform === 'linux') {
-      try {
-        const out = execFileSync('xdotool', ['getactivewindow', 'getwindowname'], { encoding: 'utf8', timeout: 3000 });
-        const t = String(out).trim();
-        return t ? t : null;
-      } catch (e) {
-        return null; // xdotool 不可用 → 无法获取标题
-      }
-    }
-    // darwin / 其他平台暂不实现
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
 
 // --- 甜系吐槽池（按窗口标题关键词匹配，全卖萌甜系） ---
 const PRANK_POOL = [

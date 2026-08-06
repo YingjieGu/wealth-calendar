@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor, clipboard } = require('electron');
 
 // Software rendering keeps the internal render buffer healthy on this box
 // (without it capturePage turns black). Screen presentation is validated
@@ -23,6 +23,7 @@ const chatEngine = require('./chatEngine');
 const wallpaper = require('./wallpaper');
 const multimodal = require('./multimodal');
 const prank = require('./prank');
+const windowInfo = require('./windowInfo');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -725,6 +726,41 @@ function getActiveWindowRect() {
   }
 }
 
+// --- 伙伴模式 L2：选中文本总结 ---
+// 读系统剪贴板：Linux 优先 PRIMARY 选区（高亮即选中，无需 Ctrl+C），回退 CLIPBOARD；
+// Windows/macOS 读剪贴板。文本 >20 字才交给 LLM 总结成 3 条要点。
+async function summarizeSelection() {
+  let text = '';
+  try {
+    if (process.platform === 'linux') {
+      try { text = clipboard.readText('selection') || ''; } catch (e) { text = ''; }
+      if (!text || text.trim().length <= 20) {
+        text = clipboard.readText() || '';
+      }
+    } else {
+      text = clipboard.readText() || '';
+    }
+  } catch (e) {
+    text = '';
+  }
+  text = String(text).trim();
+  if (text.length <= 20) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('partner-summary', {
+        ok: false,
+        reason: 'too-short',
+        text: '没找到超过 20 字的选中内容～先选一段文字（或 Ctrl+C 复制），再按 Ctrl+Alt+S 让我总结 📌',
+      });
+    }
+    return { ok: false, reason: 'too-short' };
+  }
+  const summary = await chatEngine.summarize(text);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('partner-summary', { ok: true, text: summary });
+  }
+  return { ok: true, summary };
+}
+
 // 把宠物窗口摆到目标窗口顶边居中趴着；target 为 null 时用随机屏幕位置（降级）。
 // 粘人趴窗口: 顶边 y = 工作窗口 y - 宠物高 + 10, 水平居中; 若顶部空间不足(超出屏幕顶)
 // 则贴下沿 y = 工作窗口 y + 高 + 10; 结果 clamp 到显示器 workArea。
@@ -1027,6 +1063,25 @@ function setupIPC() {
   } catch (e) {
     console.error('[main] global shortcut failed:', e.message);
   }
+
+  // 伙伴模式 L2：全局快捷键 Ctrl+Alt+S 总结选中内容（剪贴板）
+  try {
+    const { globalShortcut } = require('electron');
+    const ok = globalShortcut.register('CommandOrControl+Alt+S', () => {
+      summarizeSelection();
+    });
+    if (!ok) console.warn('[main] Ctrl+Alt+S 已被占用，快捷键不可用（右键菜单仍可用）');
+  } catch (e) {
+    console.error('[main] partner shortcut failed:', e.message);
+  }
+
+  // 伙伴模式：渲染进程 60s 轮询活跃窗口标题（窗口感知）用
+  ipcMain.handle('get-active-window-title', () => {
+    try { return windowInfo.getActiveWindowTitle(); } catch (e) { return null; }
+  });
+
+  // 伙伴模式 L2：右键菜单「📌 解析选中内容」→ 同剪贴板总结
+  ipcMain.handle('partner:summarize-clipboard', () => summarizeSelection());
 
   // --- Chat ---
   const executeTool = async (action, params) => {

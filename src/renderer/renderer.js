@@ -249,6 +249,12 @@ function convertToPng(dataUrl) {
         // 今日任务：气泡展示完成情况
         PetState.showDailyTasks();
         break;
+      case 'partner-summary':
+        // 伙伴模式 L2：总结选中内容（剪贴板；主进程读选区优先，>20字才总结）
+        try {
+          await window.wealthCalendar.summarizeClipboard();
+        } catch (err) { /* ignore */ }
+        break;
       case 'calendar':
         await window.wealthCalendar.openCalendar();
         CalendarView.open();

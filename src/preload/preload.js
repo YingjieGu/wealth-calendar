@@ -59,6 +59,13 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   },
   prankTriggerTest: (mode) => ipcRenderer.invoke('prank:trigger-test', mode),
 
+  // 伙伴模式：窗口感知 + 选中文本总结
+  getActiveWindowTitle: () => ipcRenderer.invoke('get-active-window-title'),
+  summarizeClipboard: () => ipcRenderer.invoke('partner:summarize-clipboard'),
+  onPartnerSummary: (callback) => {
+    ipcRenderer.on('partner-summary', (_event, data) => callback && callback(data));
+  },
+
   // Quit app (from context menu)
   quitApp: () => ipcRenderer.send('app-quit'),
   hideWindow: () => ipcRenderer.send('hide-window'),

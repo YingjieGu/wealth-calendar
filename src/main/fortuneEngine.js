@@ -150,12 +150,44 @@ function buildTemplateFortune(paipan, almanac, dateStr, wish, zodiac) {
       ];
   const reminderLines = lines;
 
+  // 幸运数字：从日期 + 日干五行推导（河图洛书五行数：木3/8 火2/7 土5/10 金4/9 水1/6）
+  const WUXING_NUM = { 木: [3, 8], 火: [2, 7], 土: [5, 10], 金: [4, 9], 水: [1, 6] };
+  const wxNums = WUXING_NUM[dayGanWuXing] || WUXING_NUM['土'];
+  const dateParts = (dateStr || '').split('-');
+  const monthNum = parseInt(dateParts[1] || '0', 10) || 1;
+  const dayNum = parseInt(dateParts[2] || '0', 10) || 1;
+  const luckySeed = [dayNum % 10 === 0 ? 10 : dayNum % 10, wxNums[(dayNum + monthNum) % 2], ((monthNum * 7 + dayNum) % 9) + 1];
+  const luckyNumber = [...new Set(luckySeed)];
+  let fill = 1;
+  while (luckyNumber.length < 3) { luckyNumber.push(((dayNum + fill * 3) % 9) + 1); fill++; }
+  luckyNumber.length = 3;
+
+  // 彩票/意外之财建议：从黄历宜忌生成（娱乐向，鼓励量力而行）
+  const wealthYiWords = ['求财', '交易', '开市', '纳财', '招财'];
+  const wealthJiWords = ['破财', '耗财'];
+  const yiJoined = almanacYi.join('、');
+  const jiJoined = almanacJi.join('、');
+  const hasWealthYi = wealthYiWords.some((w) => yiJoined.includes(w));
+  const hasWealthJi = wealthJiWords.some((w) => jiJoined.includes(w));
+  let lotteryTip;
+  if (hasWealthYi) {
+    lotteryTip = '今日宜求财，偏财机会在线，可小试手气（彩票娱乐，量力而行）~';
+  } else if (hasWealthJi) {
+    lotteryTip = '今日忌破财，小财提醒偏财宜守不宜搏，娱乐为主~';
+  } else if (caiShen) {
+    lotteryTip = `今日财神方位在${caiShen}，意外之财可遇不可求，顺其自然就好~`;
+  } else {
+    lotteryTip = '小财建议量力而行，娱乐为主，开心就好～';
+  }
+
   return {
     date: dateStr,
     overall,
     dimensions: dims,
     luckyTime: ['09:00-11:00', '15:00-17:00'],
     directions: { wealth: caiShen || '—', love: '西南' },
+    luckyNumber,
+    lotteryTip,
     reminderLines,
     disclaimer: '仅供参考娱乐',
   };
@@ -205,7 +237,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
             {
               role: 'system',
               content:
-                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
+                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
             },
             { role: 'user', content: userPrompt },
           ],
@@ -372,6 +404,8 @@ function normalizeFortune(f, dateStr) {
     dimensions: dims,
     luckyTime: Array.isArray(f.luckyTime) ? f.luckyTime.slice(0, 3) : [],
     directions: f.directions || {},
+    luckyNumber: Array.isArray(f.luckyNumber) ? f.luckyNumber.slice(0, 3) : [],
+    lotteryTip: f.lotteryTip || '',
     reminderLines: Array.isArray(f.reminderLines) ? f.reminderLines.slice(0, 3) : [],
     disclaimer: f.disclaimer || '仅供参考娱乐',
   };

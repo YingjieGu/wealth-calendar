@@ -25,6 +25,10 @@
     ],
     "extraResources": [
       {
+        "from": "icon.png",
+        "to": "icon.png"
+      },
+      {
         "from": "python/server.py",
         "to": "python/server.py"
       },

@@ -130,36 +130,61 @@ function centerWindow(win, width, height) {
   };
 }
 
-// --- 托盘图标：用 萌宠1 睡觉.gif 首帧转 PNG（python PIL），存 userData/tray-icon.png ---
-// win 托盘用 16x16，其余平台用 64x64；生成失败记录日志并返回 null（tray.js 退回占位图）。
+// --- 托盘图标：用项目根目录 icon.png 去白底生成多尺寸 PNG（python PIL），存 userData ---
+// win 托盘用 16x16，其余平台用 64x64；内置 python-win 无 PIL 时降级用 nativeImage resize。
 function ensureTrayIcon() {
   try {
-    const dev = path.join(app.getAppPath(), 'assets', 'themes', 'cat1', '睡觉.gif');
-    const gifPath = fs.existsSync(dev)
+    const dev = path.join(app.getAppPath(), 'icon.png');
+    const iconPath = fs.existsSync(dev)
       ? dev
-      : path.join(process.resourcesPath || '', 'themes', 'cat1', '睡觉.gif');
-    if (!fs.existsSync(gifPath)) {
-      appendStartupLog('tray-icon: 睡觉.gif 不存在', gifPath);
+      : path.join(process.resourcesPath || '', 'icon.png');
+    if (!fs.existsSync(iconPath)) {
+      appendStartupLog('tray-icon: icon.png 不存在', iconPath);
       return null;
     }
-    const png64 = path.join(app.getPath('userData'), 'tray-icon.png');
-    const png16 = path.join(app.getPath('userData'), 'tray-icon-16.png');
-    const need64 = !fs.existsSync(png64);
-    const need16 = process.platform === 'win32' && !fs.existsSync(png16);
-    if (need64 || need16) {
-      const script = [
-        'from PIL import Image',
-        `im = Image.open(${JSON.stringify(gifPath)})`,
-        'im.seek(0)',
-        "im = im.convert('RGBA')",
-        'im.thumbnail((64, 64))',
-        `im.save(${JSON.stringify(png64)}, 'PNG')`,
-        `im16 = im.copy(); im16.thumbnail((16, 16)); im16.save(${JSON.stringify(png16)}, 'PNG')`,
-      ].join('\n');
-      execFileSync('python3', ['-c', script], { timeout: 6000 });
+    const sizes = [16, 32, 64];
+    const files = sizes.map((s) => path.join(app.getPath('userData'), `tray-icon-${s}.png`));
+    const need = files.some((f) => !fs.existsSync(f));
+    if (need) {
+      try {
+        // PIL: RGBA + 四角 flood-fill 去白底 + 缩放多尺寸
+        const script = [
+          'from PIL import Image',
+          'from collections import deque',
+          `im = Image.open(${JSON.stringify(iconPath)}).convert('RGBA')`,
+          'w, h = im.size',
+          'px = im.load()',
+          'target = px[0, 0][:3]',
+          'tol = 24',
+          'visited = [[False] * w for _ in range(h)]',
+          'q = deque([(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)])',
+          'for x, y in q: visited[y][x] = True',
+          'while q:',
+          '    x, y = q.popleft()',
+          '    r, g, b, a = px[x, y]',
+          '    if abs(r - target[0]) <= tol and abs(g - target[1]) <= tol and abs(b - target[2]) <= tol:',
+          '        px[x, y] = (r, g, b, 0)',
+          '        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):',
+          '            if 0 <= nx < w and 0 <= ny < h and not visited[ny][nx]:',
+          '                visited[ny][nx] = True',
+          '                q.append((nx, ny))',
+          `for s, f in zip([16, 32, 64], [${files.map((f) => JSON.stringify(f)).join(', ')}]):`,
+          '    t = im.copy(); t.thumbnail((s, s)); t.save(f, "PNG")',
+        ].join('\n');
+        execFileSync('python3', ['-c', script], { timeout: 8000 });
+      } catch (e) {
+        // 降级：无 PIL（如内置 python-win）→ nativeImage resize
+        appendStartupLog('tray-icon: PIL 生成失败，走 nativeImage 降级', String((e && e.message) || e));
+        const src = nativeImage.createFromPath(iconPath);
+        for (let i = 0; i < sizes.length; i++) {
+          if (!fs.existsSync(files[i])) {
+            const resized = src.resize({ width: sizes[i], quality: 'good' });
+            fs.writeFileSync(files[i], resized.toPNG());
+          }
+        }
+      }
     }
-    // win 托盘要求 16x16；其余平台用 64x64
-    const usePath = process.platform === 'win32' ? png16 : png64;
+    const usePath = process.platform === 'win32' ? files[0] : files[2];
     const icon = nativeImage.createFromPath(usePath);
     if (icon.isEmpty()) {
       appendStartupLog('tray-icon: nativeImage 为空', usePath);
@@ -964,11 +989,14 @@ function setupIPC() {
   });
 
   // Quit from renderer context menu
-  ipcMain.on('app-quit', () => {
+  const handleQuit = () => {
     isQuitting = true;
     if (tray) tray.destroy();
     app.quit();
-  });
+  };
+  ipcMain.on('app-quit', handleQuit);
+  // 兼容旧 preload 的 quit-app channel（防御性）
+  ipcMain.on('quit-app', handleQuit);
 
   // Hide pet window (context menu) — Ctrl+Alt+W to show again
   ipcMain.on('hide-window', () => {
@@ -1449,7 +1477,7 @@ app.whenReady().then(() => {
   tray = createTray(mainWindow, () => {
     isQuitting = true;
     app.quit();
-  }, ensureTrayIcon()); // 托盘图标：睡觉.gif 首帧 PNG（PIL 转换）
+  }, ensureTrayIcon()); // 托盘图标：icon.png 去白底多尺寸 PNG
   startReminder(mainWindow);
   // Start fortune sidecar (non-blocking on failure)
   sidecar.startSidecar().then((ok) => {

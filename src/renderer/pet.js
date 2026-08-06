@@ -604,9 +604,10 @@ const PetState = {
 
   async sayDailyFortune() {
     try {
-      const fortune = await window.wealthCalendar.getDailyFortune();
-      if (!fortune || !fortune.overall) return;
-      const dir = fortune.caiShenDir || '';
+      const result = await window.wealthCalendar.getDailyFortune();
+      if (!result || !result.data) return;
+      const fortune = result.data;
+      const dir = (fortune.directions && fortune.directions.wealth) || '';
       // 主求方向提示（从设置读取）
       let wishHint = '';
       try {
@@ -616,17 +617,20 @@ const PetState = {
       } catch (e) { /* ignore */ }
       let line = `📅 今日运势 ${fortune.overall} 分`;
       if (dir) line += `，财神方位${dir}`;
+      // 意外财运 / 幸运数字 / 彩票建议元素
+      if (fortune.luckyNumber && fortune.luckyNumber.length) line += `，幸运数字 ${fortune.luckyNumber.join(' ')}`;
+      if (fortune.lotteryTip) line += `。${fortune.lotteryTip}`;
       line += wishHint;
       if (fortune.reminderLines && fortune.reminderLines[0]) {
         line += `。${fortune.reminderLines[0]}`;
       }
-      this.say(line);
+      this._broadcast(line);
     } catch (e) { /* ignore */ }
   },
 
-  // ---- 每日运势分段播报（上午/中午/下午/晚上 四时段, 每时段 2-3 条, 每天 10+ 条）----
-  // 时段内间歇播报(间隔 60-90 分钟), 复用 say 气泡; 主求方向内容约占一半,
-  // 另一半播报当天最强两维度。
+  // ---- 每日运势分段播报（上午/中午/下午/晚上 四时段, 每时段 4-6 条, 每天 16-24 条）----
+  // 时段内均匀铺开(间隔 23-35 分钟), 每条同时发到聊天框(只追加不打断);
+  // 内容池: 主求方向约一半, 另一半轮换 幸运数字/彩票建议/最强维度/吉时。
   startFortuneSlots() {
     this._scheduleNextFortuneBroadcast();
   },
@@ -642,13 +646,13 @@ const PetState = {
       { start: 15 * 60, end: 17 * 60 + 30 },
       { start: 19 * 60, end: 21 * 60 + 30 },
     ];
-    // 每时段 2-3 条（按日期做轻微变化）, 间隔 65-95 分钟
+    // 每时段 4-6 条（按日期做轻微变化）, 均匀铺在时段前 140 分钟内（间隔约 23-35 分钟）
     const daySeed = now.getDate();
     const times = [];
     for (const s of slots) {
-      const n = 2 + ((daySeed * 7 + s.start) % 2);
+      const n = 4 + ((daySeed * 7 + s.start) % 3);
       for (let i = 0; i < n; i++) {
-        times.push(s.start + 20 + i * (65 + ((daySeed + i) % 2) * 30));
+        times.push(s.start + 8 + i * Math.floor(140 / n));
       }
     }
     const future = times.filter((t) => t > nowMin);
@@ -666,37 +670,62 @@ const PetState = {
 
   async _doFortuneBroadcast() {
     try {
-      const fortune = await window.wealthCalendar.getDailyFortune();
-      if (!fortune || !fortune.overall) return;
-      this.say(this._buildFortuneLine(fortune));
+      const result = await window.wealthCalendar.getDailyFortune();
+      if (!result || !result.data) return;
+      const line = this._buildFortuneLine(result.data);
+      if (line) this._broadcast(line);
+    } catch (e) { /* ignore */ }
+  },
+
+  // 播报：宠物气泡说话 + 同步追加到聊天对话框（只追加，不打断用户对话）
+  _broadcast(line) {
+    this.say(line);
+    try {
+      if (typeof ChatPanel !== 'undefined' && ChatPanel && ChatPanel.addMessage) {
+        ChatPanel.addMessage('assistant', line);
+      }
     } catch (e) { /* ignore */ }
   },
 
   _buildFortuneLine(fortune) {
-    // 主求方向内容约占一半
-    const useWish = Math.random() < 0.5;
-    let wish = '';
-    try { wish = (SettingsManager.settings && SettingsManager.settings.mainWish) || ''; } catch (e) { /* ignore */ }
-    const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
-    if (useWish && wish && wishMap[wish] && this._wishTips[wish]) {
-      const tips = this._wishTips[wish];
-      const tip = tips[Math.floor(Math.random() * tips.length)];
-      const dir = (fortune.directions && fortune.directions.wealth) || '';
-      return `🎯 主求${wishMap[wish]}：${tip}` + (dir ? `，财神方位${dir}` : '');
-    }
-    // 另一半：播报当天最强两维度
+    // 内容池轮换：主求方向 / 幸运数字+彩票 / 最强维度 / 吉时，约占一半的多样性
+    const roll = Math.random();
     const dimLabels = { wealth: '财运', career: '事业', love: '桃花', health: '健康', study: '学业', travel: '出行', signing: '签约' };
     const dims = fortune.dimensions || {};
+    const dir = (fortune.directions && fortune.directions.wealth) || '';
+
+    // 1) 幸运数字 + 彩票建议（新元素）
+    if (fortune.luckyNumber && fortune.luckyNumber.length && roll < 0.3) {
+      let s = `🍀 今日幸运数字 ${fortune.luckyNumber.join(' ')}，多留意带这些数字的事物~`;
+      if (fortune.lotteryTip) s += `。${fortune.lotteryTip}`;
+      if (dir) s += `，财神在${dir}方位~`;
+      return s;
+    }
+    // 2) 主求方向（约占 1/3）
+    if (roll < 0.63) {
+      let wish = '';
+      try { wish = (SettingsManager.settings && SettingsManager.settings.mainWish) || ''; } catch (e) { /* ignore */ }
+      const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
+      if (wish && wishMap[wish] && this._wishTips[wish]) {
+        const tips = this._wishTips[wish];
+        const tip = tips[Math.floor(Math.random() * tips.length)];
+        return `🎯 主求${wishMap[wish]}：${tip}` + (dir ? `，财神方位${dir}` : '');
+      }
+    }
+    // 3) 吉时播报
+    if (fortune.luckyTime && fortune.luckyTime.length && roll < 0.8) {
+      return `⏰ 今日吉时 ${fortune.luckyTime.join('、')}，重要的事安排在这个时间段更顺~`;
+    }
+    // 4) 当天最强两维度
     const scored = Object.keys(dimLabels)
       .map((k) => ({ label: dimLabels[k], score: (dims[k] && dims[k].score) || 0 }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 2);
-    if (scored.length) {
+    if (scored.length && scored[0].score > 0) {
       return `✨ 今日最旺：${scored.map((d) => `${d.label}${d.score}分`).join('、')}，把握住好运气~`;
     }
     // 兜底
-    const dir2 = (fortune.directions && fortune.directions.wealth) || '';
-    return `📅 今日运势 ${fortune.overall} 分` + (dir2 ? `，财神方位${dir2}` : '');
+    return `📅 今日运势 ${fortune.overall} 分` + (dir ? `，财神方位${dir}` : '');
   },
 
   // 主求方向播报文案池
@@ -711,13 +740,21 @@ const PetState = {
 
   checkGoodHour() {
     try {
-      window.wealthCalendar.getDailyFortune().then((fortune) => {
-        if (!fortune || !fortune.goodHours || !fortune.goodHours.length) return;
+      window.wealthCalendar.getDailyFortune().then((result) => {
+        const fortune = result && result.data;
+        if (!fortune || !fortune.luckyTime || !fortune.luckyTime.length) return;
         const now = new Date();
         const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        const inGood = fortune.goodHours.some((g) => hm >= g.start && hm <= g.end);
+        // luckyTime 格式 "HH:mm-HH:mm"
+        const inGood = fortune.luckyTime.some((g) => {
+          if (typeof g === 'string' && g.includes('-')) {
+            const [s, e] = g.split('-');
+            return hm >= s && hm <= e;
+          }
+          return hm >= g.start && hm <= g.end;
+        });
         if (inGood) {
-          this.say(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`);
+          this._broadcast(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`);
         }
       });
     } catch (e) { /* ignore */ }

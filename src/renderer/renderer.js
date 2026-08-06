@@ -217,9 +217,9 @@ function convertToPng(dataUrl) {
     const rect = petStage.getBoundingClientRect();
     let x = e.clientX - rect.left;
     let y = e.clientY - rect.top;
-    // 200x250 悬浮窗内保证全部菜单项可见（紧凑菜单约 190px 高，clamp 到底部留白）
+    // 悬浮窗内保证全部菜单项可见（3 项菜单约 130px 高，clamp 到底部留白）
     x = Math.max(4, Math.min(x, rect.width - 112));
-    y = Math.max(4, Math.min(y, rect.height - 196));
+    y = Math.max(4, Math.min(y, rect.height - 140));
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.classList.remove('hidden');
@@ -252,9 +252,6 @@ function convertToPng(dataUrl) {
       case 'tasks':
         // 今日任务：气泡展示完成情况
         PetState.showDailyTasks();
-        break;
-      case 'hide':
-        window.wealthCalendar.hideWindow();
         break;
     }
   });

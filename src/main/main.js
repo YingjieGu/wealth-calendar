@@ -34,7 +34,7 @@ let isQuitting = false;
 let isCalendarMode = false;
 
 // 宠物窗口：紧凑贴合宠物的尺寸（宠物固定在中心 ~150px + 顶部气泡 + 底部按钮）
-const PET_WIDTH = 200;
+const PET_WIDTH = 267; // 200 → 267（加宽 1/3，气泡/宠物/菜单定位全部按此常量自动适配）
 const PET_HEIGHT = 250;
 const CAL_WIDTH = 420;
 const CAL_HEIGHT = 560;

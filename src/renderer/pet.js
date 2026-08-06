@@ -480,20 +480,23 @@ const PetState = {
     const lv = this._affinityLevel(this._petAffinity);
     return `亲密度: ${this._petAffinity}/100 (Lv.${lv} ${this._affinityTitle(lv)})`;
   },
-  // 右键菜单顶部刷新亲密度显示；同步设置面板「财宠名字」板块的亲密度/心情展示
+  // 右键菜单顶部刷新亲密度显示；同步设置面板「财宠名字」板块的亲密度/心情卡片展示
   refreshAffinityMenu() {
     try {
       const el = document.getElementById('context-menu-affinity');
       if (el) el.textContent = `💗 ${this.affinityText()}`;
     } catch (e) { /* ignore */ }
     try {
-      const d = document.getElementById('affinity-display');
-      if (d) {
-        const lv = this._affinityLevel(this._petAffinity);
-        const title = this._affinityTitle(lv);
-        const moodText = { happy: '开心', normal: '平静', sad: '低落', excited: '兴奋' }[this._mood] || '平静';
-        d.textContent = `💗 亲密度：${this._petAffinity}/100（Lv.${lv} ${title}）｜心情：${this.MOOD_EMOJI[this._mood] || '😐'} ${moodText}`;
-      }
+      const lv = this._affinityLevel(this._petAffinity);
+      const title = this._affinityTitle(lv);
+      const moodText = { happy: '开心', normal: '平静', sad: '低落', excited: '兴奋' }[this._mood] || '平静';
+      const moodEmoji = this.MOOD_EMOJI[this._mood] || '😐';
+      const set = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
+      set('affinity-level', (el) => { el.textContent = `Lv.${lv} ${title}`; });
+      set('affinity-bar-fill', (el) => { el.style.width = `${Math.max(0, Math.min(100, this._petAffinity))}%`; });
+      set('affinity-value', (el) => { el.textContent = `${this._petAffinity}/100`; });
+      set('mood-emoji', (el) => { el.textContent = moodEmoji; });
+      set('mood-text', (el) => { el.textContent = moodText; });
     } catch (e) { /* ignore */ }
   },
 

@@ -81,36 +81,39 @@ html, body {
   --schedule-item: rgba(255, 255, 255, 0.06);
 }
 body.theme-light {
-  /* 暖米色浅色主题：米白底 + 金色点缀 + 深色文字 */
-  --color-primary: #b8860b;        /* 暗金，浅色下保证对比度 */
-  --color-accent: #a06a00;
-  --color-accent-soft: rgba(212, 160, 23, 0.16);
-  --bg: #faf6ee;                   /* 暖米色 */
-  --surface: rgba(212, 160, 23, 0.07);
-  --surface-2: rgba(212, 160, 23, 0.12);
-  --surface-3: rgba(212, 160, 23, 0.18);
-  --text: #3a3548;
-  --text-dim: #8a7f68;
-  --shadow-1: 0 2px 8px rgba(120, 100, 60, 0.12);
-  --shadow-2: 0 6px 20px rgba(120, 100, 60, 0.16);
-  --shadow-3: 0 12px 36px rgba(120, 100, 60, 0.22);
-  /* 派生覆盖（硬编码色值需在浅色主题重写） */
+  /* 清新浅色主题：暖白底 + 纯白卡片细边框 + 深灰高对比文字 + 深金主色 */
+  --color-primary: #b8860b;        /* 深金，白底可读 */
+  --color-accent: #9a6a00;
+  --color-accent-soft: rgba(184, 134, 11, 0.14);
+  --bg: #fdfbf7;                   /* 暖白 */
+  --surface: #ffffff;              /* 卡片纯白 */
+  --surface-2: #ffffff;
+  --surface-3: #f3f4f6;
+  --text: #1f2937;                 /* 深灰主文字（高对比） */
+  --text-dim: #6b7280;             /* 次要文字 */
+  --shadow-1: 0 2px 8px rgba(31, 41, 55, 0.06);
+  --shadow-2: 0 6px 20px rgba(31, 41, 55, 0.1);
+  --shadow-3: 0 12px 36px rgba(31, 41, 55, 0.14);
+  /* 派生覆盖：--card/--accent 在 :root 用 var() 定义，解析值在根元素就定死，
+     必须在浅色主题重新覆盖，否则落到暗色值（白底上亮金/暗半透明=看不清） */
+  --accent: #9a6a00;
+  --card: var(--surface);
   --accent-dim: #8a5a10;
-  --panel-bg: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 246, 238, 0.99) 100%);
-  --panel-bg2: linear-gradient(170deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 242, 232, 0.99) 100%);
-  --menu-bg: rgba(250, 248, 242, 0.97);
-  --toast-bg: rgba(42, 38, 56, 0.94);
-  --text-strong: #2a2438;
-  --text-mid: #6a6380;
-  --card-border: rgba(120, 100, 60, 0.16);
-  --input-bg: rgba(120, 100, 60, 0.05);
-  --input-border: rgba(120, 100, 60, 0.22);
-  --border-soft: rgba(120, 100, 60, 0.14);
-  --btn-bg: rgba(120, 100, 60, 0.06);
-  --btn-hover: rgba(120, 100, 60, 0.14);
-  --scrollbar: rgba(120, 100, 60, 0.24);
-  --scrollbar-hover: rgba(120, 100, 60, 0.42);
-  --schedule-item: rgba(120, 100, 60, 0.06);
+  --panel-bg: linear-gradient(170deg, #ffffff 0%, #fdfbf7 100%);
+  --panel-bg2: linear-gradient(170deg, #ffffff 0%, #faf7f1 100%);
+  --menu-bg: rgba(255, 255, 255, 0.98);
+  --toast-bg: rgba(31, 41, 55, 0.95);
+  --text-strong: #111827;
+  --text-mid: #4b5563;
+  --card-border: rgba(31, 41, 55, 0.12);
+  --input-bg: #ffffff;
+  --input-border: rgba(31, 41, 55, 0.24);
+  --border-soft: rgba(31, 41, 55, 0.1);
+  --btn-bg: #f3f4f6;
+  --btn-hover: #e5e7eb;
+  --scrollbar: rgba(31, 41, 55, 0.2);
+  --scrollbar-hover: rgba(31, 41, 55, 0.38);
+  --schedule-item: rgba(31, 41, 55, 0.06);
 }
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
@@ -164,12 +167,62 @@ body.theme-light {
 body.theme-light #app.theme-cat,
 body.theme-light #app.theme-fortune,
 body.theme-light #app.theme-bagua {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92) 0%, rgba(251, 247, 238, 0.95) 60%, rgba(245, 241, 231, 0.96) 100%);
+  background: linear-gradient(160deg, rgba(253, 251, 247, 0.98) 0%, rgba(253, 251, 247, 0.99) 60%, rgba(249, 247, 242, 1) 100%);
 }
 body.theme-light .setting-input,
 body.theme-light .form-group input,
 body.theme-light .form-group textarea {
   color-scheme: light; /* 输入控件原生配色跟随浅色 */
+}
+/* ---------- 浅色主题覆盖：白色悬浮叠加在浅色底上不可见 → 改深灰叠色/深色文字 ---------- */
+body.theme-light .theme-option:hover,
+body.theme-light .activity-option:hover {
+  background: rgba(31, 41, 55, 0.06);
+}
+body.theme-light .chat-mic-btn:hover {
+  background: var(--btn-hover);
+}
+body.theme-light .cal-cell {
+  background: #ffffff;
+  border-color: rgba(31, 41, 55, 0.08);
+}
+body.theme-light .cal-cell:hover {
+  background: #f3f4f6;
+}
+body.theme-light .cal-cell-empty {
+  background: transparent;
+}
+body.theme-light .cal-cell-today {
+  background: rgba(184, 134, 11, 0.12);
+  border-color: #b8860b;
+}
+body.theme-light .cal-cell-selected {
+  background: rgba(120, 90, 255, 0.16) !important;
+  border-color: rgba(120, 90, 255, 0.6);
+}
+body.theme-light .skill-config-card {
+  background: rgba(31, 41, 55, 0.04);
+}
+body.theme-light .settings-header,
+body.theme-light .cal-header {
+  border-bottom: 1px solid rgba(31, 41, 55, 0.1);
+}
+body.theme-light #context-menu {
+  border-color: rgba(31, 41, 55, 0.12);
+}
+body.theme-light #context-menu-affinity {
+  border-bottom-color: rgba(31, 41, 55, 0.1);
+}
+/* 宜/忌/标记红绿在浅色底加深保证可读 */
+body.theme-light .cal-mark,
+body.theme-light .almanac-jieqi,
+body.theme-light .almanac-ji {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+body.theme-light .cal-yi,
+body.theme-light .almanac-yi {
+  color: #15803d;
 }
 
 /* Windows 透明桌宠模式：整个悬浮框就是宠物本身，纯透明无边框无阴影。
@@ -441,18 +494,20 @@ body.platform-win32 #pet-stage::before {
   left: 50%;
   transform: translateX(-50%);
   max-width: 100%;
+  width: fit-content;
   background: rgba(255, 255, 255, 0.96);
   color: #2a2438;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: 16px 16px 16px 4px;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.55;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   z-index: 40;
   opacity: 1;
   transition: opacity 0.3s ease, transform 0.3s ease;
   animation: bubbleIn 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
   word-break: break-word;
+  overflow-wrap: break-word;
   cursor: pointer;
   pointer-events: auto; /* clickable: opens the chat panel (Doubao-style) */
 }
@@ -463,6 +518,7 @@ body.platform-win32 #pet-stage::before {
 }
 #reminder-bubble-text {
   white-space: pre-line; /* 今日任务列表换行 */
+  display: block;
 }
 
 /* 亲密度爱心：左上角动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
@@ -882,6 +938,106 @@ body.platform-win32 #pet-stage::before {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* 财宠名字板块：亲密度/心情卡片 + 唤醒口令并列 */
+.setting-inline-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.setting-inline-input {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+.setting-inline-btn {
+  width: auto;
+  padding: 9px 14px;
+  flex-shrink: 0;
+}
+.affinity-cards-row {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0 6px;
+}
+.affinity-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1.1;
+  min-width: 0;
+}
+.wake-word-box {
+  flex: 0 0 126px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px dashed var(--card-border);
+}
+.wake-word-box .setting-sublabel {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.wake-word-box .action-btn {
+  padding: 8px 6px;
+  font-size: 11px;
+}
+.mini-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 9px 11px;
+  box-shadow: var(--shadow-1);
+}
+.mini-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-mid);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.affinity-card {
+  border-left: 3px solid #ff6b9d;
+}
+.mood-card {
+  border-left: 3px solid #f0a830;
+}
+.affinity-level {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.affinity-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--btn-bg);
+  overflow: hidden;
+  margin: 7px 0 5px;
+}
+.affinity-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ff6b9d, #d4a017);
+  transition: width 0.4s ease;
+}
+.affinity-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: right;
+}
+.mood-emoji {
+  font-size: 26px;
+  line-height: 1.1;
+  text-align: center;
+}
+.mood-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+  text-align: center;
+  margin-top: 3px;
+}
 .setting-options {
   display: flex;
   gap: 6px;
@@ -945,7 +1101,7 @@ body.platform-win32 #pet-stage::before {
   border-radius: 10px;
   border: 1px solid var(--input-border);
   background: var(--card);
-  color: var(--text-dim);
+  color: var(--text);
   font-size: 12px;
   outline: none;
   color-scheme: dark;

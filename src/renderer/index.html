@@ -43,7 +43,6 @@
         <button data-action="fortune">🔮 今日运势</button>
         <button data-action="stick">🎋 摇一支签</button>
         <button data-action="tasks">📋 今日任务</button>
-        <button data-action="hide">🙈 隐藏宠物（Ctrl+Alt+W）</button>
       </div>
 
       <!-- Chat panel -->
@@ -114,16 +113,35 @@
             <button id="btn-save-userinfo" class="action-btn">💾 保存用户信息</button>
           </div>
 
-          <!-- 3. 财宠名字 + 亲密度/心情 + 唤醒口令 -->
+          <!-- 3. 财宠名字 + 亲密度/心情卡片 + 唤醒口令 -->
           <div class="setting-group">
             <label>财宠名字（气泡台词中“小财”会替换为这个名字）</label>
-            <input type="text" id="pet-name" class="setting-input" placeholder="默认：小财" maxlength="12">
-            <button id="btn-save-petname" class="action-btn">💾 保存财宠名字</button>
-            <p class="placeholder-text" id="affinity-display">💗 亲密度：--/100（Lv.- 学徒）｜心情：😐 平静</p>
-            <div class="setting-sublabel">唤醒口令（语音对话用）</div>
-            <p class="placeholder-text">财宠名字喊两遍即可唤醒，如「小财小财」</p>
-            <input type="text" id="wake-word" class="setting-input" placeholder="默认：小财小财">
-            <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
+            <div class="setting-inline-row">
+              <input type="text" id="pet-name" class="setting-input setting-inline-input" placeholder="默认：小财" maxlength="12">
+              <button id="btn-save-petname" class="action-btn setting-inline-btn">💾 保存</button>
+            </div>
+            <!-- 亲密度/心情卡片 + 唤醒口令并列 -->
+            <div class="affinity-cards-row">
+              <div class="affinity-cards">
+                <div class="mini-card affinity-card" id="affinity-card">
+                  <div class="mini-card-title">💗 亲密度</div>
+                  <div class="affinity-level" id="affinity-level">Lv.1 学徒</div>
+                  <div class="affinity-bar"><div class="affinity-bar-fill" id="affinity-bar-fill" style="width:0%"></div></div>
+                  <div class="affinity-value" id="affinity-value">0/100</div>
+                </div>
+                <div class="mini-card mood-card" id="mood-card">
+                  <div class="mini-card-title">😊 心情</div>
+                  <div class="mood-emoji" id="mood-emoji">😐</div>
+                  <div class="mood-text" id="mood-text">平静</div>
+                </div>
+              </div>
+              <div class="wake-word-box">
+                <div class="setting-sublabel">唤醒口令（语音对话用）</div>
+                <p class="placeholder-text">财宠名字喊两遍即可唤醒，如「小财小财」</p>
+                <input type="text" id="wake-word" class="setting-input" placeholder="默认：小财小财">
+                <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
+              </div>
+            </div>
           </div>
 
           <!-- 4. 主题 -->

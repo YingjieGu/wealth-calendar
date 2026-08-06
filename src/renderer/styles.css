@@ -81,39 +81,39 @@ html, body {
   --schedule-item: rgba(255, 255, 255, 0.06);
 }
 body.theme-light {
-  /* 清新浅色主题：暖白底 + 纯白卡片细边框 + 深灰高对比文字 + 深金主色 */
+  /* 清爽浅色主题：极浅灰底 + 纯白卡片浅灰细边框 + 深灰高对比文字 + 金色系强调 */
   --color-primary: #b8860b;        /* 深金，白底可读 */
-  --color-accent: #9a6a00;
+  --color-accent: #a06a00;
   --color-accent-soft: rgba(184, 134, 11, 0.14);
-  --bg: #fdfbf7;                   /* 暖白 */
+  --bg: #f7f8fa;                   /* 极浅灰 */
   --surface: #ffffff;              /* 卡片纯白 */
   --surface-2: #ffffff;
   --surface-3: #f3f4f6;
-  --text: #1f2937;                 /* 深灰主文字（高对比） */
+  --text: #1a1a1a;                 /* 深灰主文字 */
   --text-dim: #6b7280;             /* 次要文字 */
   --shadow-1: 0 2px 8px rgba(31, 41, 55, 0.06);
   --shadow-2: 0 6px 20px rgba(31, 41, 55, 0.1);
   --shadow-3: 0 12px 36px rgba(31, 41, 55, 0.14);
   /* 派生覆盖：--card/--accent 在 :root 用 var() 定义，解析值在根元素就定死，
      必须在浅色主题重新覆盖，否则落到暗色值（白底上亮金/暗半透明=看不清） */
-  --accent: #9a6a00;
+  --accent: #a06a00;
   --card: var(--surface);
   --accent-dim: #8a5a10;
-  --panel-bg: linear-gradient(170deg, #ffffff 0%, #fdfbf7 100%);
-  --panel-bg2: linear-gradient(170deg, #ffffff 0%, #faf7f1 100%);
+  --panel-bg: linear-gradient(170deg, #ffffff 0%, #f7f8fa 100%);
+  --panel-bg2: linear-gradient(170deg, #ffffff 0%, #f4f5f7 100%);
   --menu-bg: rgba(255, 255, 255, 0.98);
   --toast-bg: rgba(31, 41, 55, 0.95);
   --text-strong: #111827;
   --text-mid: #4b5563;
-  --card-border: rgba(31, 41, 55, 0.12);
+  --card-border: #e5e7eb;          /* 浅灰细边框 */
   --input-bg: #ffffff;
-  --input-border: rgba(31, 41, 55, 0.24);
-  --border-soft: rgba(31, 41, 55, 0.1);
+  --input-border: #d1d5db;         /* 输入框浅灰边框 */
+  --border-soft: #eef0f3;
   --btn-bg: #f3f4f6;
   --btn-hover: #e5e7eb;
-  --scrollbar: rgba(31, 41, 55, 0.2);
-  --scrollbar-hover: rgba(31, 41, 55, 0.38);
-  --schedule-item: rgba(31, 41, 55, 0.06);
+  --scrollbar: rgba(31, 41, 55, 0.18);
+  --scrollbar-hover: rgba(31, 41, 55, 0.35);
+  --schedule-item: rgba(31, 41, 55, 0.05);
 }
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
@@ -167,7 +167,7 @@ body.theme-light {
 body.theme-light #app.theme-cat,
 body.theme-light #app.theme-fortune,
 body.theme-light #app.theme-bagua {
-  background: linear-gradient(160deg, rgba(253, 251, 247, 0.98) 0%, rgba(253, 251, 247, 0.99) 60%, rgba(249, 247, 242, 1) 100%);
+  background: linear-gradient(160deg, rgba(247, 248, 250, 0.98) 0%, rgba(247, 248, 250, 0.99) 60%, rgba(242, 243, 246, 1) 100%);
 }
 body.theme-light .setting-input,
 body.theme-light .form-group input,
@@ -521,11 +521,11 @@ body.platform-win32 #pet-stage::before {
   display: block;
 }
 
-/* 亲密度爱心：左上角动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
+/* 亲密度爱心：左上角(距左上各 1/4)动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
 #pet-heart {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 25%;
+  left: 25%;
   font-size: 14px;
   font-weight: 700;
   line-height: 1;
@@ -548,6 +548,16 @@ body.platform-win32 #pet-stage::before {
   55%  { opacity: 1; transform: translateX(-50%) translateY(-3px) scale(1.07); }
   80%  { opacity: 1; transform: translateX(-50%) translateY(1px) scale(0.98); }
   100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+/* 捣蛋吐槽时气泡的表情弹跳动效（弹跳/抖动一次后恢复） */
+#reminder-bubble.prank-pop {
+  animation: bubblePrank 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes bubblePrank {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1) rotate(0deg); }
+  25% { transform: translateX(-50%) translateY(-10px) scale(1.08) rotate(-2deg); }
+  50% { transform: translateX(-50%) translateY(2px) scale(0.95) rotate(1.5deg); }
+  75% { transform: translateX(-50%) translateY(-4px) scale(1.04) rotate(-1deg); }
 }
 
 /* ============================================================
@@ -673,7 +683,10 @@ body.platform-win32 #pet-stage::before {
   font-size: 12px;
   text-align: left;
   padding: 6px 10px 4px;
-  white-space: nowrap;
+  /* "Lv.10 财神爷"等长内容允许换到第二行（不截断） */
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.45;
   border-bottom: 1px solid rgba(255, 215, 0, 0.2);
   margin-bottom: 4px;
 }
@@ -944,15 +957,22 @@ body.platform-win32 #pet-stage::before {
   gap: 8px;
   margin-bottom: 8px;
 }
-.setting-inline-input {
-  margin-bottom: 0;
+/* 加 .setting-inline-row 前缀提特异性：压在 .setting-input(1115)/.action-btn(1094) 之后生效 */
+.setting-inline-row .setting-inline-input {
+  width: auto;        /* 覆盖 .setting-input 的 width:100%：flex 布局下由 flex:1 撑满 */
+  margin-bottom: 0;   /* 覆盖 .setting-input 的 margin-bottom:8px */
   flex: 1;
   min-width: 0;
+  padding: 10px 12px; /* 输入框调大：高度正常、宽度铺满板块（减按钮） */
+  font-size: 13px;
 }
-.setting-inline-btn {
-  width: auto;
-  padding: 9px 14px;
+.setting-inline-row .setting-inline-btn {
+  width: auto;        /* 覆盖 .action-btn 的 width:100%：紧凑同排 */
+  padding: 8px 12px;  /* 保存按钮调小：紧凑、不超出板块边框 */
+  font-size: 11px;
+  border-radius: 8px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .affinity-cards-row {
   display: flex;

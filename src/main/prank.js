@@ -1,29 +1,34 @@
 // 捣蛋模式引擎（娱乐互动，主进程）
 // - getActiveWindowTitle()：平台适配获取活跃窗口标题（获取失败/工具缺失返回 null）
-// - 随机触发：开启后每 15-30 分钟按 50% 概率触发一次，每天上限 8 次
+// - 双通道定时触发：吐槽（标题甜话）每 5-8 分钟一次；捣蛋操作（打字/窗口抖动）
+//   每 10-15 分钟一次；触发概率 100%（定时到点即触发）；每天上限 20 次
 //   （settings.prankCount 按日期重置，settings.prankMode 开关）
 // - 抢键盘打字：Windows SendKeys / Linux xdotool type；平台工具不可用时跳过该玩法
 //   （⚠ 抢键盘打字需 Windows 实机验证 —— 本机 xdotool 不可用）
+// - 窗口抖动：小幅位移 2-3 次后回原位（互动小动作）
 // - 窗口标题吐槽：按活跃窗口标题关键词匹配甜系吐槽池，通用兜底「主人辛苦啦~」
 // - 分寸控制：吐槽池全部卖萌甜系，禁止攻击性
 // - 触发的吐槽通过 webContents.send('pet-prank') 广播，渲染进程走 PetState._broadcast
-//   进气泡 + 聊天对话框
+//   进气泡 + 聊天对话框（吐槽时气泡带表情动效）
 const { execFileSync } = require('child_process');
 const { getActiveWindowTitle } = require('./windowInfo');
 
-let prankTimer = null;
+let roastTimer = null;
+let actionTimer = null;
 let mainWindow = null;
 let getSettings = () => ({});
 let saveSettingsFn = () => {};
 // typeText 可注入（测试用假实现；生产默认走真实平台实现）
 let typeTextImpl = null;
 
-// 每日次数上限
-const DAILY_LIMIT = 8;
-// 触发间隔 15-30 分钟；触发概率 50%（活跃度 60%）
-const INTERVAL_MIN = 15;
-const INTERVAL_MAX = 30;
-const TRIGGER_CHANCE = 0.5;
+// 每日次数上限（吐槽 + 捣蛋操作共享名额）
+const DAILY_LIMIT = 20;
+// 吐槽间隔 5-8 分钟；捣蛋操作（打字/窗口抖动）间隔 10-15 分钟；定时触发概率 100%
+const ROAST_INTERVAL_MIN = 5;
+const ROAST_INTERVAL_MAX = 8;
+const ACTION_INTERVAL_MIN = 10;
+const ACTION_INTERVAL_MAX = 15;
+const TRIGGER_CHANCE = 1;
 
 // --- 甜系吐槽池（按窗口标题关键词匹配，全卖萌甜系） ---
 const PRANK_POOL = [
@@ -82,6 +87,8 @@ const FALLBACK_LINES = [
 
 // 抢键盘打字内容（不按回车、不发送，纯卖萌；SendKeys 特殊字符需避开）
 const TYPING_LINES = ['meow', 'owo', 'nya', 'purr', 'cute', 'zZz', 'hello', 'hi']; // 不含 SendKeys 特殊字符
+// 打字吐槽随机插入的表情符号（约 70% 概率追加一个，互动性增强）
+const PRANK_EMOJI = ['🐾', '✨', '🌸', '💗', '🐱', '🫶', '😝', '⭐', '🍀', '🎀'];
 
 // --- 每日次数（settings.prankCount 按日期重置） ---
 function todayStr() {
@@ -170,8 +177,44 @@ function titleRoast() {
   return { type: 'title', ...matchTitleRoast(title) };
 }
 
+// 窗口抖动：小幅位移 2-3 次后回原位（互动小动作）。自家窗口聚焦时不抖（避免挪自己）。
+function wiggleWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  try {
+    const [x, y] = mainWindow.getPosition();
+    const steps = 2 + Math.floor(Math.random() * 2); // 2-3 次
+    let i = 0;
+    const step = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      i += 1;
+      const dx = Math.round((Math.random() - 0.5) * 18); // ±9px 小幅抖动
+      const dy = Math.round((Math.random() - 0.5) * 18);
+      mainWindow.setPosition(x + dx, y + dy);
+      if (i < steps) setTimeout(step, 70);
+      else mainWindow.setPosition(x, y); // 回原位
+    };
+    step();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 纯吐槽（标题甜话/兜底）：走 5-8 分钟通道，占名额
+function doRoast() {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, reason: 'no-window' };
+  if (!remainingSlots()) return { ok: false, reason: 'daily-limit' };
+  const s = getSettings() || {};
+  if (s.prankMode !== true) return { ok: false, reason: 'disabled' };
+  const result = titleRoast();
+  takeSlot();
+  broadcast(result);
+  return result;
+}
+
 // 执行一次完整捣蛋（占名额 → 挑玩法），返回描述供诊断/测试。
-// opts.mode：'typed' 强制打字玩法 / 'title' 强制标题吐槽 / null 随机（约一半打字）
+// opts.mode：'typed' 强制打字 / 'wiggle' 强制窗口抖动 / 'title' 强制标题吐槽 /
+// null 随机（打字/窗口抖动二选一，工具不可用自动降级标题吐槽）
 function doPrank(opts = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, reason: 'no-window' };
   if (!remainingSlots()) return { ok: false, reason: 'daily-limit' };
@@ -179,18 +222,34 @@ function doPrank(opts = {}) {
   if (s.prankMode !== true) return { ok: false, reason: 'disabled' };
 
   const title = getActiveWindowTitle();
-  // 自家窗口聚焦时只做标题吐槽，不抢键盘（避免往宠物聊天框里乱打字）
+  // 自家窗口聚焦时只做标题吐槽，不抢键盘/不抖自己窗口（避免往宠物聊天框里乱打字）
   const canType = title === null || !isOwnWindow(title);
-  const rollTyping = opts.mode === 'typed' ||
-    (opts.mode === null && (process.platform === 'win32' || process.platform === 'linux') && canType && Math.random() < 0.5);
-  const tryType = rollTyping && canType;
 
-  // 打字玩法（工具不可用时自动降级到标题吐槽）
-  if (tryType) {
-    const text = TYPING_LINES[Math.floor(Math.random() * TYPING_LINES.length)];
+  // 玩法选择：显式 mode / 随机（打字或窗口抖动）
+  let mode = opts.mode;
+  if (!mode) {
+    mode = (process.platform === 'win32' || process.platform === 'linux')
+      ? (Math.random() < 0.6 ? 'typed' : 'wiggle')
+      : 'title';
+  }
+
+  // 打字玩法（随机插入表情符号；工具不可用时自动降级到标题吐槽）
+  if (mode === 'typed' && canType) {
+    let text = TYPING_LINES[Math.floor(Math.random() * TYPING_LINES.length)];
+    if (Math.random() < 0.7) text += ' ' + PRANK_EMOJI[Math.floor(Math.random() * PRANK_EMOJI.length)];
     if (typeText(text)) {
       takeSlot();
       const result = { type: 'typed', text: `喵（敲了一行 "${text}" 然后溜走~）`, typedText: text };
+      broadcast(result);
+      return result;
+    }
+  }
+
+  // 窗口抖动玩法（小幅位移 2-3 次后回原位）
+  if (mode === 'wiggle' && canType) {
+    if (wiggleWindow()) {
+      takeSlot();
+      const result = { type: 'wiggle', text: '咦？小财把窗口晃了两下就跑啦~ 😝' };
       broadcast(result);
       return result;
     }
@@ -214,25 +273,55 @@ function broadcast(result) {
   } catch (e) { /* ignore */ }
 }
 
-// --- 调度 ---
+// --- 调度：双通道（吐槽 5-8 分钟 / 捣蛋操作 10-15 分钟），到点 100% 触发 ---
 function scheduleNext() {
-  if (prankTimer) { clearTimeout(prankTimer); prankTimer = null; }
+  stopTimers();
   const s = getSettings() || {};
   if (s.prankMode !== true) return; // 未开启 → 不排程
   if (!remainingSlots()) return; // 当日已达上限 → 本日不再排程
-  const delayMs = (INTERVAL_MIN + Math.floor(Math.random() * (INTERVAL_MAX - INTERVAL_MIN + 1))) * 60000;
-  prankTimer = setTimeout(() => {
-    prankTimer = null;
+  scheduleRoast();
+  scheduleAction();
+}
+
+function scheduleRoast() {
+  if (roastTimer) { clearTimeout(roastTimer); roastTimer = null; }
+  const s = getSettings() || {};
+  if (s.prankMode !== true) return;
+  if (!remainingSlots()) return;
+  const delayMs = (ROAST_INTERVAL_MIN + Math.floor(Math.random() * (ROAST_INTERVAL_MAX - ROAST_INTERVAL_MIN + 1))) * 60000;
+  roastTimer = setTimeout(() => {
+    roastTimer = null;
     try {
       const cur = getSettings() || {};
       if (cur.prankMode === true && remainingSlots()) {
-        if (Math.random() < TRIGGER_CHANCE) {
-          doPrank();
-        }
+        if (Math.random() < TRIGGER_CHANCE) doRoast();
       }
     } catch (e) { /* ignore */ }
-    scheduleNext(); // 无论是否触发，都续排下一轮
+    scheduleRoast(); // 到点触发后续排
   }, delayMs);
+}
+
+function scheduleAction() {
+  if (actionTimer) { clearTimeout(actionTimer); actionTimer = null; }
+  const s = getSettings() || {};
+  if (s.prankMode !== true) return;
+  if (!remainingSlots()) return;
+  const delayMs = (ACTION_INTERVAL_MIN + Math.floor(Math.random() * (ACTION_INTERVAL_MAX - ACTION_INTERVAL_MIN + 1))) * 60000;
+  actionTimer = setTimeout(() => {
+    actionTimer = null;
+    try {
+      const cur = getSettings() || {};
+      if (cur.prankMode === true && remainingSlots()) {
+        if (Math.random() < TRIGGER_CHANCE) doPrank();
+      }
+    } catch (e) { /* ignore */ }
+    scheduleAction(); // 到点触发后续排
+  }, delayMs);
+}
+
+function stopTimers() {
+  if (roastTimer) { clearTimeout(roastTimer); roastTimer = null; }
+  if (actionTimer) { clearTimeout(actionTimer); actionTimer = null; }
 }
 
 function startPrank(window, deps = {}) {
@@ -244,7 +333,7 @@ function startPrank(window, deps = {}) {
 }
 
 function stopPrank() {
-  if (prankTimer) { clearTimeout(prankTimer); prankTimer = null; }
+  stopTimers();
 }
 
 // 设置变化（捣蛋开关切换）后重排：开启→续排；关闭→停表
@@ -257,7 +346,7 @@ function onSettingsChanged() {
   }
 }
 
-// 手动触发一次（测试/诊断）：force=true 跳过 50% 概率骰；mode 透传给 doPrank
+// 手动触发一次（测试/诊断）：force=true 跳过概率骰；mode 透传给 doPrank
 function doTick({ force, mode } = {}) {
   const s = getSettings() || {};
   if (s.prankMode !== true) return { ok: false, reason: 'disabled' };
@@ -267,5 +356,5 @@ function doTick({ force, mode } = {}) {
 }
 
 module.exports = {
-  startPrank, stopPrank, onSettingsChanged, doTick, doPrank, getActiveWindowTitle, matchTitleRoast,
+  startPrank, stopPrank, onSettingsChanged, doTick, doPrank, doRoast, wiggleWindow, getActiveWindowTitle, matchTitleRoast,
 };

@@ -17,6 +17,7 @@ const PetState = {
     this._phaseBooted = false;     // 阶段循环是否已由 setActivity 启动
     this._phaseGen = 0;            // 阶段代数：异步 _beginPhase 期间被唤醒/新阶段打断则放弃
     this._lastMouseFollow = 0;     // 粘人「跟鼠标」上次跟随时间(冷却 15s)
+    this._panelCount = 0;          // 打开中的面板计数(对话/日历/设置)：>0 时完全暂停位置阶段切换
     // 豆包式玩法状态
     this._theme = 'cat1';          // 当前主题（默认素材主题 cat1；内置 cat/fortune/bagua 仅作素材失败兜底）
     this._platform = (window.wealthCalendar && window.wealthCalendar.platform) || 'linux';
@@ -53,26 +54,35 @@ const PetState = {
     this.startIdleWatch();
     this.startWaterReminder();
     this.startFortuneSlots();
-    // 面板打开：暂停阶段调度与动作切换（避免面板期间瞬移挪动面板窗口）
+    // 面板打开：暂停阶段调度与动作切换（避免面板期间瞬移挪动面板窗口）。
+    // 计数器：对话/日历/设置三个面板各自发一次 pet-panel / pet-resume，
+    // 全部关闭（计数归零）后才恢复位置变动 —— 避免开着多个面板时关一个就提前恢复。
     try {
       window.wealthCalendar.onPetPanel(() => {
+        this._panelCount += 1;
         if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
         if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
       });
     } catch (e) { /* ignore */ }
-    // 面板关闭：从当前位置继续阶段循环（下个阶段再瞬移）
+    // 面板关闭：全部面板关完才从当前位置继续阶段循环（下个阶段再瞬移）
     try {
-      window.wealthCalendar.onPetResume(() => this._rearmPhase());
+      window.wealthCalendar.onPetResume(() => {
+        this._panelCount = Math.max(0, this._panelCount - 1);
+        if (this._panelCount === 0) this._rearmPhase();
+      });
     } catch (e) { /* ignore */ }
+    // 面板暂停中：阶段/瞬移/跟随/拖动恢复一律不生效（位置完全不动）
+    this._isPanelPaused = () => this._panelCount > 0;
     // 粘人「跟鼠标」：鼠标在工作窗口内快速移动时概率性挪过去互动
     try {
       window.wealthCalendar.onPetMouseFast((evt) => this._handleMouseFast(evt));
     } catch (e) { /* ignore */ }
-    // 捣蛋模式（主进程触发）：吐槽进气泡 + 聊天对话框
+    // 捣蛋模式（主进程触发）：吐槽进气泡 + 聊天对话框（吐槽时气泡带表情动效）
     try {
       window.wealthCalendar.onPetPrank((data) => {
         if (!data || !data.text) return;
         this._broadcast(data.text);
+        this._prankBubblePop();
       });
     } catch (e) { /* ignore */ }
     // 伙伴模式：主进程剪贴板总结结果 → 气泡 + 聊天对话框
@@ -213,6 +223,7 @@ const PetState = {
   // forcedType: 强制瞬移到指定位置类型（如点击唤醒后 'workEdge' 趴窗玩）；
   // _firstSleep 时强制 homeBase（粘人切模式先睡一轮再进入正常权重循环）。
   async _beginPhase(forcedType) {
+    if (this._isPanelPaused()) return; // 面板打开中：完全暂停位置阶段切换
     const gen = ++this._phaseGen;
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
@@ -244,6 +255,7 @@ const PetState = {
   // 瞬移到指定位置并强制展示玩耍状态（点击唤醒后趴窗玩/换新位置）。
   // forcedType 为 null 时按当前模式权重选位置。
   async _teleportAndPlay(forcedType) {
+    if (this._isPanelPaused()) return; // 面板打开中：不瞬移
     const gen = ++this._phaseGen;
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     if (this._actionTimer) { clearTimeout(this._actionTimer); this._actionTimer = null; }
@@ -259,8 +271,9 @@ const PetState = {
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
   },
 
-  // 重新武装阶段计时器 + 动作计时器（拖动松手/面板关闭后从当前位置继续）
+  // 重新武装阶段计时器 + 动作计时器（拖动松手/面板全部关闭后从当前位置继续）
   _rearmPhase() {
+    if (this._isPanelPaused()) return; // 面板打开中：不恢复位置变动
     ++this._phaseGen; // 使在途 _beginPhase 的 await 结果失效
     if (this._behaviorTimer) { clearTimeout(this._behaviorTimer); this._behaviorTimer = null; }
     this._behaviorTimer = setTimeout(() => this._beginPhase(), this._phaseDuration());
@@ -282,6 +295,7 @@ const PetState = {
   // 互动 8s 后恢复当前阶段位置的状态并重新武装阶段计时器。
   async _handleMouseFast(evt) {
     if (this._activityMode() !== 'clingy') return;
+    if (this._isPanelPaused()) return; // 面板打开中：不跟鼠标挪动窗口
     if (!evt || Math.random() > 0.35) return;     // 概率性
     const now = Date.now();
     if (this._lastMouseFollow && now - this._lastMouseFollow < 15000) return; // 冷却 15s
@@ -951,8 +965,11 @@ const PetState = {
       } catch (e) { /* ignore */ }
       let line = `📅 今日运势 ${fortune.overall} 分`;
       if (dir) line += `，财神方位${dir}`;
-      // 意外财运 / 幸运数字 / 彩票建议元素
+      // 意外财运 / 幸运数字 / 幸运色开运物 / 彩票建议元素
       if (fortune.luckyNumber && fortune.luckyNumber.length) line += `，幸运数字 ${fortune.luckyNumber.join(' ')}`;
+      if (fortune.luckyColor || fortune.luckyItem) {
+        line += `。幸运色：${fortune.luckyColor || '—'}，开运物：${fortune.luckyItem || '—'}（仅供参考）`;
+      }
       if (fortune.lotteryTip) line += `。${fortune.lotteryTip}`;
       line += wishHint;
       if (fortune.reminderLines && fortune.reminderLines[0]) {
@@ -1024,6 +1041,18 @@ const PetState = {
       }
     } catch (e) { /* ignore */ }
   },
+  // 捣蛋吐槽时气泡带表情动效（弹跳/抖动一次后恢复）
+  _prankBubblePop() {
+    try {
+      const bubble = document.getElementById('reminder-bubble');
+      if (!bubble || bubble.classList.contains('hidden')) return;
+      bubble.classList.remove('prank-pop');
+      // 强制重排以重启动画
+      void bubble.offsetWidth;
+      bubble.classList.add('prank-pop');
+      setTimeout(() => bubble.classList.remove('prank-pop'), 520);
+    } catch (e) { /* ignore */ }
+  },
 
   // ---- 运势类语音播报：先"叮~"提示音再"小财帮你瞄了一眼：..."语音 ----
   // 提示音与 TTS 均走现有 sidecar /tts/synthesize；交互类台词不播报
@@ -1067,14 +1096,20 @@ const PetState = {
       const hot = Object.keys(recLabels).filter((k) => (dims[k] && dims[k].score) >= 75);
       if (hot.length) {
         let s = `✨ 今日推荐：${hot.map((k) => `${recLabels[k]}${dims[k].score}分`).join('、')}${hot.length === 3 ? '，三路全旺' : ''}，都可以好好把握~`;
+        if (fortune.luckyColor || fortune.luckyItem) {
+          s += ` 幸运色：${fortune.luckyColor || '—'}，开运物：${fortune.luckyItem || '—'}（仅供参考）`;
+        }
         if (fortune.reminderLines && fortune.reminderLines[0]) s += ` 小财提醒：${fortune.reminderLines[0]}`;
         return s;
       }
     }
 
-    // 1) 幸运数字 + 彩票建议（新元素）
+    // 1) 幸运数字 + 幸运色开运物 + 彩票建议（新元素）
     if (fortune.luckyNumber && fortune.luckyNumber.length && roll < 0.3) {
       let s = `🍀 今日幸运数字 ${fortune.luckyNumber.join(' ')}，多留意带这些数字的事物~`;
+      if (fortune.luckyColor || fortune.luckyItem) {
+        s += `。幸运色：${fortune.luckyColor || '—'}，开运物：${fortune.luckyItem || '—'}（仅供参考）`;
+      }
       if (fortune.lotteryTip) s += `。${fortune.lotteryTip}`;
       if (dir) s += `，财神在${dir}方位~`;
       return s;

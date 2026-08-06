@@ -231,6 +231,37 @@
             <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
           </div>
           <div class="setting-group">
+            <label>技能（聊天框输入命令直接触发）</label>
+            <div class="setting-options" id="skills-options">
+              <button class="activity-option active" data-skill="calculator">🧮 计算器</button>
+              <button class="activity-option active" data-skill="weather">🌤 天气</button>
+              <button class="activity-option active" data-skill="translate">🌐 翻译</button>
+              <button class="activity-option active" data-skill="luckyNumber">🔢 数字吉凶</button>
+            </div>
+            <p class="placeholder-text">示例：123*45= ｜ 天气 北京 ｜ 翻译 hello ｜ 数字 8（前四项无需 AI Key 即可用）</p>
+            <p class="placeholder-text" id="mail-skill-status">📮 邮件技能：未配置（在下方邮件服务配置后自动启用「收邮件」「发邮件」）</p>
+          </div>
+
+          <div class="setting-group">
+            <label>邮件服务（可选；配置后聊天支持「收邮件」/「发邮件: 主题|收件人|正文」）</label>
+            <div class="setting-row">
+              <input type="text" id="mail-imap-server" class="setting-input" placeholder="IMAP服务器，如 imap.qq.com">
+              <input type="number" id="mail-imap-port" class="setting-input" placeholder="端口(993)" style="width:110px;flex-shrink:0;">
+            </div>
+            <div class="setting-row">
+              <input type="text" id="mail-smtp-server" class="setting-input" placeholder="SMTP服务器，如 smtp.qq.com">
+              <input type="number" id="mail-smtp-port" class="setting-input" placeholder="端口(465)" style="width:110px;flex-shrink:0;">
+            </div>
+            <div class="setting-row">
+              <input type="text" id="mail-email" class="setting-input" placeholder="邮箱账号">
+              <input type="password" id="mail-password" class="setting-input" placeholder="密码/授权码">
+            </div>
+            <button id="btn-save-mail" class="action-btn">💾 保存邮件配置</button>
+            <button id="btn-clear-mail" class="action-btn">🗑️ 清除邮件配置</button>
+            <p class="placeholder-text">🔒 邮箱密码仅保存在本机 settings.json，经本机 Python 标准库收发，不上传</p>
+          </div>
+
+          <div class="setting-group">
             <label>AI 命理（DeepSeek 兼容 API）</label>
             <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
             <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com）">

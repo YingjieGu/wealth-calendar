@@ -357,6 +357,116 @@ class RequestHandler(BaseHTTPRequestHandler):
             _log_tts_error(f"TTS failed: {e}\n{traceback.format_exc()}")
             self._error(500, f"TTS failed: {e}", traceback.format_exc())
 
+    # --- Mail handlers (stdlib imaplib/smtplib, zero extra deps) ---
+    # 收件箱前 5 封；配置来自请求体（由 Electron 从 settings.mail 读出）
+
+    def _handle_mail_list(self):
+        try:
+            body = self._read_body() or {}
+            server = (body.get("imapServer") or "").strip()
+            port = int(body.get("imapPort") or 993)
+            email = (body.get("email") or "").strip()
+            password = (body.get("password") or "").strip()
+            if not (server and email and password):
+                self._error(400, "邮箱配置不完整")
+                return
+            import imaplib
+            from email.header import decode_header
+            from email import message_from_bytes
+
+            M = imaplib.IMAP4_SSL(server, port)
+            try:
+                M.login(email, password)
+                M.select("INBOX")
+                typ, data = M.search(None, "ALL")
+                if typ != "OK":
+                    self._error(500, f"IMAP 搜索失败: {typ}")
+                    return
+                ids = data[0].split()[-5:]  # 最近 5 封
+                emails = []
+                for i in ids:
+                    typ2, msg_data = M.fetch(i, "(RFC822)")
+                    if typ2 != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
+                        continue
+                    msg = message_from_bytes(msg_data[0][1])
+
+                    def dec(v):
+                        if not v:
+                            return ""
+                        out = []
+                        for t, enc in decode_header(v):
+                            if isinstance(t, bytes):
+                                try:
+                                    t = t.decode(enc or "utf-8", errors="replace")
+                                except Exception:
+                                    t = t.decode("utf-8", errors="replace")
+                            out.append(t)
+                        return "".join(out)
+
+                    snippet = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                snippet = part.get_payload(decode=True)
+                                break
+                    else:
+                        snippet = msg.get_payload(decode=True)
+                    if isinstance(snippet, bytes):
+                        snippet = snippet.decode("utf-8", errors="replace")
+                    snippet = " ".join(str(snippet).split())[:80]
+                    emails.append({
+                        "from": dec(msg.get("From")),
+                        "subject": dec(msg.get("Subject")),
+                        "date": dec(msg.get("Date")),
+                        "snippet": snippet,
+                    })
+                self._send_json(200, {"emails": emails, "count": len(emails)})
+            finally:
+                try:
+                    M.logout()
+                except Exception:
+                    pass
+        except Exception as e:
+            self._error(500, f"收件失败: {e}", traceback.format_exc())
+
+    def _handle_mail_send(self):
+        try:
+            body = self._read_body() or {}
+            smtp_server = (body.get("smtpServer") or "").strip()
+            smtp_port = int(body.get("smtpPort") or 465)
+            email = (body.get("email") or "").strip()
+            password = (body.get("password") or "").strip()
+            to = (body.get("to") or "").strip()
+            subject = (body.get("subject") or "").strip()
+            text = (body.get("body") or "").strip()
+            if not (smtp_server and email and password and to):
+                self._error(400, "发信配置不完整")
+                return
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.header import Header
+
+            msg = MIMEText(text, "plain", "utf-8")
+            msg["Subject"] = Header(subject, "utf-8")
+            msg["From"] = email
+            msg["To"] = to
+            if smtp_port == 465:
+                s = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
+            else:
+                s = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
+                s.starttls()
+            try:
+                s.login(email, password)
+                s.sendmail(email, [to], msg.as_string())
+            finally:
+                try:
+                    s.quit()
+                except Exception:
+                    pass
+            self._send_json(200, {"ok": True})
+        except Exception as e:
+            self._error(500, f"发送失败: {e}", traceback.format_exc())
+
     # --- Routing ---
 
     def do_GET(self):
@@ -410,6 +520,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._handle_asr()
         elif path == "/tts/synthesize":
             self._handle_tts()
+        elif path == "/mail/list":
+            self._handle_mail_list()
+        elif path == "/mail/send":
+            self._handle_mail_send()
         else:
             self._error(404, f"Not found: {path}")
 

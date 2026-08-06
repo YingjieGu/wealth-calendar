@@ -32,6 +32,40 @@ const SettingsManager = {
     this.applyUserInfo();
     this.applyPrank();
     this.applyPartner();
+    this.applySkills();
+    this.applyMail();
+  },
+
+  // 技能开关（settings.skills，默认全开）
+  applySkills() {
+    const def = { calculator: true, weather: true, translate: true, luckyNumber: true };
+    const s = this.settings.skills || {};
+    document.querySelectorAll('#skills-options .activity-option').forEach((b) => {
+      const key = b.dataset.skill;
+      b.classList.toggle('active', key ? (s[key] !== undefined ? s[key] : def[key]) : false);
+    });
+  },
+
+  // 邮件服务配置（settings.mail，可选；未配置时聊天触发「收邮件/发邮件」会提示先配置）
+  applyMail() {
+    const m = this.settings.mail || {};
+    document.getElementById('mail-imap-server').value = m.imapServer || '';
+    document.getElementById('mail-imap-port').value = m.imapPort || '';
+    document.getElementById('mail-smtp-server').value = m.smtpServer || '';
+    document.getElementById('mail-smtp-port').value = m.smtpPort || '';
+    document.getElementById('mail-email').value = m.email || '';
+    document.getElementById('mail-password').value = m.password || '';
+    this.applyMailStatus();
+  },
+
+  applyMailStatus() {
+    const el = document.getElementById('mail-skill-status');
+    if (!el) return;
+    const m = this.settings.mail || {};
+    const ok = !!(m.email && m.imapServer && m.smtpServer);
+    el.textContent = ok
+      ? `✅ 邮件技能已配置（${m.email}），聊天框输入「收邮件」或「发邮件: 主题|收件人|正文」`
+      : '📮 邮件技能：未配置（在下方配置后自动启用「收邮件」「发邮件」）';
   },
 
   // 捣蛋模式开关（settings.prankMode，默认关闭）
@@ -344,6 +378,47 @@ const SettingsManager = {
       this.settings.wakeWord = w || '小财小财';
       await this.save();
       showToast(`✅ 唤醒口令：${this.settings.wakeWord}`);
+    });
+
+    // 技能开关（计算器/天气/翻译/数字吉凶，默认全开）
+    this.applySkills();
+    document.getElementById('skills-options').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.activity-option');
+      if (!btn || !btn.dataset.skill) return;
+      const key = btn.dataset.skill;
+      this.settings.skills = { ...(this.settings.skills || {}) };
+      // 基于当前按钮 active 态切换（settings.skills 未初始化时默认全开显示 active）
+      const on = !btn.classList.contains('active');
+      this.settings.skills[key] = on;
+      btn.classList.toggle('active', on);
+      await this.save();
+      showToast(on ? `✅ ${btn.textContent.trim()} 已开启` : `⏸ ${btn.textContent.trim()} 已关闭`);
+    });
+
+    // 邮件服务保存 / 清除
+    this.applyMail();
+    document.getElementById('btn-save-mail').addEventListener('click', async () => {
+      this.settings.mail = {
+        imapServer: document.getElementById('mail-imap-server').value.trim(),
+        imapPort: parseInt(document.getElementById('mail-imap-port').value, 10) || 993,
+        smtpServer: document.getElementById('mail-smtp-server').value.trim(),
+        smtpPort: parseInt(document.getElementById('mail-smtp-port').value, 10) || 465,
+        email: document.getElementById('mail-email').value.trim(),
+        password: document.getElementById('mail-password').value,
+      };
+      await this.save();
+      this.applyMailStatus();
+      showToast(this.settings.mail.imapServer && this.settings.mail.email && this.settings.mail.smtpServer
+        ? '✅ 邮件配置已保存，可在聊天框收/发邮件'
+        : '⚠️ 邮件配置不完整，请填全 IMAP/SMTP/账号');
+    });
+    document.getElementById('btn-clear-mail').addEventListener('click', async () => {
+      this.settings.mail = {};
+      ['mail-imap-server', 'mail-imap-port', 'mail-smtp-server', 'mail-smtp-port', 'mail-email', 'mail-password']
+        .forEach((id) => { document.getElementById(id).value = ''; });
+      await this.save();
+      this.applyMailStatus();
+      showToast('🗑️ 邮件配置已清除');
     });
 
     this.applyModelStatus();

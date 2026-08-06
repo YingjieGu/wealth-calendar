@@ -1128,7 +1128,10 @@ function setupIPC() {
   };
 
   ipcMain.handle('chat:send', (_event, message) => {
-    return chatEngine.chatSend(String(message || '').slice(0, 500), { executeTool });
+    return chatEngine.chatSend(String(message || '').slice(0, 500), {
+      executeTool,
+      requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
+    });
   });
 
   ipcMain.handle('chat:clear', () => {

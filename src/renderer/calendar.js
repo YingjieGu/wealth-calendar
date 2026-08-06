@@ -11,6 +11,11 @@ const CalendarView = {
     this.bindEvents();
   },
 
+  _todayStr() {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  },
+
   bindEvents() {
     document.getElementById('btn-calendar-close').addEventListener('click', () => {
       this.close();
@@ -47,7 +52,8 @@ const CalendarView = {
     });
 
     document.getElementById('btn-refresh-fortune').addEventListener('click', () => {
-      this.loadFortune(true);
+      // 刷新当前展示日期的运势（默认今日）
+      this.loadFortuneForDate(this._fortuneDate || this._todayStr(), true);
     });
   },
 
@@ -57,7 +63,7 @@ const CalendarView = {
     this.currentYear = new Date().getFullYear();
     this.currentMonth = new Date().getMonth() + 1;
     await this.render();
-    this.loadFortune(false);
+    this.loadFortuneForDate(this._todayStr(), false);
   },
 
   async close() {
@@ -190,6 +196,8 @@ const CalendarView = {
     if (cell) cell.classList.add('cal-cell-selected');
 
     this.showScheduleDetail(dateStr);
+    // 点击任意日期 → 查询该日期运势（含日期标签）
+    this.loadFortuneForDate(dateStr, false);
   },
 
   async showScheduleDetail(dateStr) {
@@ -321,16 +329,23 @@ const CalendarView = {
 </svg>`;
   },
 
-  async loadFortune(force) {
+  // 查询并展示指定日期的运势（日历点击任意日期 / 刷新）；日期标签如 "8月15日运势"
+  async loadFortuneForDate(dateStr, force) {
     const section = document.getElementById('fortune-section');
     const body = document.getElementById('fortune-body');
     section.classList.remove('hidden');
-    body.innerHTML = '<div class="fortune-loading">🔮 正在推算今日运势...</div>';
+    this._fortuneDate = dateStr;
 
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    // 日期标签：今天 → 今日运势；其它日期 → "M月D日运势"
+    const dateObj = new Date(String(dateStr || this._todayStr()) + 'T00:00:00');
+    const isToday = dateStr === this._todayStr();
+    const label = isToday ? '今日运势' : `${dateObj.getMonth() + 1}月${dateObj.getDate()}日运势`;
+    const titleEl = document.getElementById('fortune-title');
+    if (titleEl) titleEl.textContent = `✨ ${label}`;
 
-    const result = await window.wealthCalendar.getDailyFortune(todayStr, !!force);
+    body.innerHTML = `<div class="fortune-loading">🔮 正在推算${label}...</div>`;
+
+    const result = await window.wealthCalendar.getFortuneByDate(dateStr || this._todayStr(), !!force);
     if (result && result.error) {
       if (result.error === 'noUserInfo') {
         body.innerHTML = '<div class="fortune-empty">⚠️ 请先在设置中填写出生信息，才能生成专属运势</div>';
@@ -341,8 +356,10 @@ const CalendarView = {
     }
 
     const f = result.data;
-    // 查看运势互动：亲密度 +5 + 每日任务(查看运势)
-    try { if (window.PetState && PetState.onInteract) PetState.onInteract('fortune', 5); } catch (e) { /* ignore */ }
+    // 查看运势互动：亲密度 +5 + 每日任务(查看运势)（仅查看今日运势时计入；历史日期不计）
+    if (isToday) {
+      try { if (typeof PetState !== 'undefined' && PetState.onInteract) PetState.onInteract('fortune', 5); } catch (e) { /* ignore */ }
+    }
     const dims = f.dimensions || {};
     const dimLabels = {
       wealth: '💰 财运', career: '💼 事业', love: '💘 桃花',
@@ -369,7 +386,7 @@ const CalendarView = {
     body.innerHTML = `
       <div class="fortune-card">
         <div class="fortune-score-head">
-          <span class="fortune-score-label">今日综合运势</span>
+          <span class="fortune-score-label">${this.escapeHtml(label)}</span>
           <span class="fortune-source">${sourceTag}</span>
         </div>
         <div class="fortune-score-num-row">

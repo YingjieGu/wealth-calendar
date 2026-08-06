@@ -395,6 +395,14 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   return { data: fortune, source };
 }
 
+// 按日期查询运势：八字/星盘按出生信息（固定），黄历按目标日期；缓存 key 按日期。
+// 日历点击任意日期调用；getDailyFortune(dateStr) 已支持任意 dateStr（almanac?date= 任意日期），
+// 这里做明确语义的薄封装并导出。
+async function getFortuneByDate(dateStr, forceRefresh, deps = {}) {
+  const date = dateStr || new Date().toISOString().slice(0, 10);
+  return getDailyFortune(date, !!forceRefresh, deps);
+}
+
 function normalizeFortune(f, dateStr) {
   const dims = {};
   for (const key of ['wealth', 'career', 'love', 'health', 'study', 'travel', 'signing']) {
@@ -465,6 +473,7 @@ function __setDataDir(dir) {
 
 module.exports = {
   getDailyFortune,
+  getFortuneByDate,
   buildTemplateFortune,
   normalizeFortune,
   sendFortuneReminder,

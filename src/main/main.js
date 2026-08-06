@@ -1032,6 +1032,11 @@ function setupIPC() {
     return fortuneEngine.getDailyFortune(dateStr, !!force, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
   });
 
+  // 按日期查询运势（日历点击任意日期）：八字/星盘固定、黄历按目标日期；缓存 key 按日期
+  ipcMain.handle('fortune:by-date', (_event, dateStr, force) => {
+    return fortuneEngine.getFortuneByDate(dateStr, !!force, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
+  });
+
   // Quit from renderer context menu
   const handleQuit = () => {
     isQuitting = true;

@@ -161,6 +161,12 @@ body.theme-light {
 #app.theme-bagua {
   background: linear-gradient(160deg, rgba(16, 46, 60, 0.85) 0%, rgba(10, 30, 48, 0.88) 55%, rgba(6, 18, 34, 0.92) 100%);
 }
+/* 财神金主（元宝兑换解锁限定主题）：金色渐变底 + 金色边框 */
+#app.theme-gold {
+  background: linear-gradient(160deg, rgba(90, 60, 8, 0.92) 0%, rgba(60, 40, 10, 0.94) 55%, rgba(40, 28, 8, 0.95) 100%);
+  border: 2px solid #ffd700;
+  box-shadow: inset 0 0 24px rgba(255, 215, 0, 0.22);
+}
 
 /* 浅色主题：宠物悬浮窗整体转浅色（面板/卡片由上方 CSS 变量覆盖）；
    不设边框（避免浅色下残留 1px 小边框）；win32 透明模式由下方规则保持纯透明 */
@@ -168,6 +174,11 @@ body.theme-light #app.theme-cat,
 body.theme-light #app.theme-fortune,
 body.theme-light #app.theme-bagua {
   background: linear-gradient(160deg, rgba(247, 248, 250, 0.98) 0%, rgba(247, 248, 250, 0.99) 60%, rgba(242, 243, 246, 1) 100%);
+}
+body.theme-light #app.theme-gold {
+  background: linear-gradient(160deg, #fffdf5 0%, #fff8e6 60%, #fff3d6 100%);
+  border: 2px solid #d4af37;
+  box-shadow: inset 0 0 24px rgba(212, 175, 55, 0.2);
 }
 body.theme-light .setting-input,
 body.theme-light .form-group input,
@@ -519,6 +530,38 @@ body.platform-win32 #pet-stage::before {
 #reminder-bubble-text {
   white-space: pre-line; /* 今日任务列表换行 */
   display: block;
+}
+
+/* 财神金主限定主题：金色称号徽标（宠物下方） */
+#gold-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #5a3a00;
+  background: linear-gradient(135deg, #ffe9a8, #ffd700 60%, #f0b840);
+  border: 1px solid #d4af37;
+  border-radius: 12px;
+  padding: 3px 12px;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
+  z-index: 7;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+body.theme-light #gold-badge {
+  color: #6b4a00;
+}
+
+/* 财神金主限定主题：特殊气泡样式（金色描边 + 淡金底） */
+#app.theme-gold #reminder-bubble {
+  background: linear-gradient(160deg, #fffdf2 0%, #fff7dd 100%);
+  color: #5a3a00;
+  border: 1.5px solid #ffd700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 215, 0, 0.35);
 }
 
 /* 亲密度爱心：左上角(距左上各 1/4)动态漂浮粉色爱心，内部显示亲密度数值（如 ♥42） */
@@ -1020,6 +1063,38 @@ body.platform-win32 #pet-stage::before {
 }
 .mood-card {
   border-left: 3px solid #f0a830;
+}
+/* 元宝卡片（财宠板块）：金色描边 + 金色数字 */
+.coin-card {
+  border-left: 3px solid #ffd700;
+}
+.coin-count {
+  font-size: 20px;
+  font-weight: 800;
+  color: #d4af37;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.coin-hint {
+  font-size: 10.5px;
+  color: var(--text-mid);
+  line-height: 1.4;
+}
+/* 元宝兑换解锁行：按钮 + 提示 */
+.coin-unlock-row {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+.coin-unlock-row .setting-inline-btn {
+  flex-shrink: 0;
+}
+.coin-unlock-row .setting-inline-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.coin-unlock-hint {
+  margin-top: 2px;
 }
 .affinity-level {
   font-size: 13px;

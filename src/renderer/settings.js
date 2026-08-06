@@ -37,12 +37,56 @@ const SettingsManager = {
     // 亲密度/心情展示（财宠名字板块）+ 技能配置卡片初始收起
     this.applyAffinity();
     this.hideSkillConfigCard();
+    // 元宝卡片 + 财神金主兑换解锁状态
+    this.applyCoins();
+    this.applyGoldUnlock();
+  },
+
+  // ---- 元宝系统：卡片展示 + 兑换解锁「财神金主」限定主题 ----
+  // 元宝数量（settings.petCoins）；兑换解锁条件：元宝 >= 10，解锁写入 settings.unlockedThemes
+  applyCoins() {
+    const coins = (typeof PetState !== 'undefined' && PetState._petCoins != null)
+      ? Number(PetState._petCoins) || 0
+      : (Number(this.settings.petCoins) || 0);
+    const el = document.getElementById('coin-count');
+    if (el) el.textContent = String(coins);
+    const unlocked = (this.settings.unlockedThemes || []).includes('gold');
+    const btn = document.getElementById('btn-unlock-gold');
+    if (btn) {
+      if (unlocked) {
+        btn.textContent = '✅ 财神金主已解锁';
+        btn.disabled = true;
+      } else if (coins >= 10) {
+        btn.textContent = '👑 兑换解锁财神金主（10 元宝）';
+        btn.disabled = false;
+      } else {
+        btn.textContent = `🔒 兑换解锁（还差${Math.max(0, 10 - coins)}个元宝）`;
+        btn.disabled = true;
+      }
+    }
+    const hint = document.getElementById('coin-unlock-hint');
+    if (hint) {
+      hint.textContent = unlocked
+        ? '👑 已解锁「财神金主」限定主题，可到上方主题板块选用（金色边框 + 金色称号 + 特殊气泡）'
+        : `累计 10 元宝可兑换解锁「👑 财神金主」限定主题（当前 ${coins} 元宝，${coins >= 10 ? '可以兑换啦！' : `还差 ${Math.max(0, 10 - coins)} 元宝`}）`;
+    }
+  },
+  // 元宝获得后实时刷新卡片（pet.js 领取元宝时调用）
+  refreshCoinUI() {
+    this.applyCoins();
+  },
+  // 财神金主主题按钮：解锁后显示在主题板块可选
+  applyGoldUnlock() {
+    const btn = document.getElementById('theme-option-gold');
+    if (!btn) return;
+    const unlocked = (this.settings.unlockedThemes || []).includes('gold');
+    btn.style.display = unlocked ? '' : 'none';
   },
 
   // 亲密度/心情展示（财宠名字板块；由 PetState.refreshAffinityMenu 实时刷新）
   applyAffinity() {
     try {
-      if (window.PetState && PetState.refreshAffinityMenu) PetState.refreshAffinityMenu();
+      if (typeof PetState !== 'undefined' && PetState.refreshAffinityMenu) PetState.refreshAffinityMenu();
     } catch (e) { /* ignore */ }
   },
 
@@ -206,6 +250,25 @@ const SettingsManager = {
       this.save();
     });
 
+    // 元宝兑换解锁「财神金主」主题：元宝 >= 10 可点，兑换实时扣减 10 元宝并写入 unlockedThemes
+    document.getElementById('btn-unlock-gold').addEventListener('click', async () => {
+      const coins = (typeof PetState !== 'undefined' && PetState._petCoins != null)
+        ? Number(PetState._petCoins) || 0
+        : (Number(this.settings.petCoins) || 0);
+      if (coins < 10) {
+        showToast(`还差 ${10 - coins} 个元宝才能兑换「财神金主」`);
+        return;
+      }
+      this.settings.unlockedThemes = Array.from(new Set([...(this.settings.unlockedThemes || []), 'gold']));
+      this.settings.petCoins = coins - 10;
+      if (typeof PetState !== 'undefined') PetState._petCoins = this.settings.petCoins;
+      await this.save();
+      this.applyCoins();
+      this.applyGoldUnlock();
+      this.updateThemeUI(this.settings.theme);
+      showToast('👑 已解锁「财神金主」限定主题！可到主题板块选用');
+    });
+
     // 宠物名字保存：同步 PetState + settings.petName 持久化
     document.getElementById('btn-save-petname').addEventListener('click', async () => {
       const name = (document.getElementById('pet-name').value || '').trim() || '小财';
@@ -276,7 +339,7 @@ const SettingsManager = {
         await this.save();
         if (window.wealthCalendar.roamSet) window.wealthCalendar.roamSet(on);
         // 位置阶段切换开关：开启→瞬移循环，关闭→原地状态循环
-        if (window.PetState && PetState.onRoamSettingChange) PetState.onRoamSettingChange(on);
+        if (typeof PetState !== 'undefined' && PetState.onRoamSettingChange) PetState.onRoamSettingChange(on);
         showToast(on ? '🚶 已开启位置阶段切换' : '🚫 已关闭位置阶段切换');
       });
     });
@@ -329,7 +392,7 @@ const SettingsManager = {
         );
         await this.save();
         // 立即唤醒窗口感知探测一次（无需等 60s 轮询）
-        if (on && window.PetState && PetState._partnerCheck) PetState._partnerCheck();
+        if (on && typeof PetState !== 'undefined' && PetState._partnerCheck) PetState._partnerCheck();
         const ph = document.getElementById('partner-hint');
         if (ph) {
           ph.textContent = on

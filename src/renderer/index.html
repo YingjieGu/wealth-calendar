@@ -23,6 +23,8 @@
         <div id="pet-zzz">💤</div>
         <!-- 亲密度爱心（左上角动态漂浮粉色爱心，显示亲密度数值） -->
         <div id="pet-heart">♥0</div>
+        <!-- 财神金主限定主题称号（金色边框主题下显示） -->
+        <div id="gold-badge" style="display:none;">👑 财神金主</div>
       </div>
 
       <!-- Reminder speech bubble -->
@@ -134,6 +136,11 @@
                   <div class="mood-emoji" id="mood-emoji">😐</div>
                   <div class="mood-text" id="mood-text">平静</div>
                 </div>
+                <div class="mini-card coin-card" id="coin-card">
+                  <div class="mini-card-title">🪙 元宝</div>
+                  <div class="coin-count" id="coin-count">0</div>
+                  <div class="coin-hint">亲密度每天满 100 得 1 元宝</div>
+                </div>
               </div>
               <div class="wake-word-box">
                 <div class="setting-sublabel">唤醒口令（语音对话用）</div>
@@ -142,6 +149,11 @@
                 <button id="btn-save-wakeword" class="action-btn">💾 保存唤醒口令</button>
               </div>
             </div>
+            <!-- 元宝兑换解锁财神金主主题 -->
+            <div class="coin-unlock-row">
+              <button id="btn-unlock-gold" class="action-btn setting-inline-btn" disabled>🔒 兑换解锁</button>
+            </div>
+            <p class="placeholder-text coin-unlock-hint" id="coin-unlock-hint">累计 10 元宝可兑换解锁「👑 财神金主」限定主题（金色边框 + 金色称号 + 特殊气泡）</p>
           </div>
 
           <!-- 4. 主题 -->
@@ -152,6 +164,8 @@
               <button class="theme-option" data-theme="cat2">🐱 萌宠2-猫咪</button>
               <button class="theme-option" data-theme="caishen">🧧 财神-素材</button>
               <button class="theme-option" data-theme="custom">🖼️ 自定义</button>
+              <!-- 财神金主：元宝兑换解锁后显示可选 -->
+              <button class="theme-option" data-theme="gold" id="theme-option-gold" style="display:none;">👑 财神金主</button>
             </div>
             <input type="file" id="pet-upload" accept="image/*" style="display:none;">
             <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>

@@ -34,6 +34,10 @@ const PetState = {
     this._petDailyTask = null;     // 今日任务进度（settings.petDailyTask，按日期重置）
     this._interactionLog = [];     // 互动时间戳（24h 内用于计算心情）
     this._mood = 'normal';         // happy / normal / sad / excited
+    // ---- 语音播报队列（FIFO 依次播放不重叠；同一文本去重）----
+    this._ttsQueue = [];           // 待播队列 [{ text, chime }]
+    this._ttsPlaying = false;      // 是否正在播放
+    this._ttsCurrent = null;       // 当前正在播放的文本（去重用）
   },
 
   // 加载时恢复互动时间戳（settings.petInteractions，24h 窗口内）
@@ -434,6 +438,7 @@ const PetState = {
       const s = await window.wealthCalendar.loadSettings();
       this._petAffinity = Math.min(100, Math.max(0, Number(s.petAffinity) || 0));
       this._petCoins = Number(s.petCoins) || 0;
+      this._lastCoinDate = s.lastCoinDate || null;   // 亲密度每日结算：上次领元宝的日期
       this._petName = (s.petName && s.petName.trim()) || '小财';
       this._petDailyTask = this._normalizeDailyTask(s.petDailyTask);
       this._restoreInteractions(s.petInteractions); // 恢复互动时间戳（心情）
@@ -514,17 +519,39 @@ const PetState = {
     } catch (e) { /* ignore */ }
   },
 
-  // 增加亲密度（0-100 封顶），升级时气泡庆祝
+  // 增加亲密度（0-100 封顶），升级时气泡庆祝；每日首次亲密度达到 100 → +1 元宝
   async addAffinity(points) {
     const before = this._petAffinity;
     const beforeLv = this._affinityLevel(before);
     this._petAffinity = Math.min(100, before + (points || 0));
     const afterLv = this._affinityLevel(this._petAffinity);
+    await this._maybeDailyCoin(); // 亲密度每日结算：满 100 +1 元宝（每天限 1 次）
     await this._savePetGrowth();
     this._updateHeart();
     if (afterLv > beforeLv) {
       this.say(`🎉 ${this._petName}升级啦! Lv.${afterLv} ${this._affinityTitle(afterLv)}！`);
     }
+  },
+
+  // 亲密度每日结算：每日首次达到 100 时 +1 元宝（settings.lastCoinDate 按日期去重）
+  async _maybeDailyCoin() {
+    try {
+      if (this._petAffinity < 100) return;
+      const today = this._todayStr();
+      if (this._lastCoinDate === today) return;
+      this._lastCoinDate = today;
+      this._petCoins = Number(this._petCoins) || 0;
+      this._petCoins += 1;
+      await window.wealthCalendar.saveSettings({ petCoins: this._petCoins, lastCoinDate: today });
+      // 同步内存副本，避免后续整份保存覆盖
+      if (typeof SettingsManager !== 'undefined' && SettingsManager.settings) {
+        SettingsManager.settings.petCoins = this._petCoins;
+        SettingsManager.settings.lastCoinDate = today;
+      }
+      // 元宝获得时气泡提示
+      this.say('🪙 亲密度满啦! 获得1元宝');
+      if (typeof SettingsManager !== 'undefined' && SettingsManager.refreshCoinUI) SettingsManager.refreshCoinUI();
+    } catch (e) { /* ignore */ }
   },
 
   // ---- 心情：由 24h 内互动次数计算 ----
@@ -1054,18 +1081,43 @@ const PetState = {
     } catch (e) { /* ignore */ }
   },
 
-  // ---- 运势类语音播报：先"叮~"提示音再"小财帮你瞄了一眼：..."语音 ----
-  // 提示音与 TTS 均走现有 sidecar /tts/synthesize；交互类台词不播报
-  async speakFortune(line) {
+  // ---- 语音播报队列（FIFO 依次播放不重叠；同一文本去重）----
+  // 入队：文本在队列中或正在播放时不再重复入队；排队项依次播放
+  _ttsEnqueue(text, opts = {}) {
+    if (!text) return;
+    if (this._ttsCurrent === text) return;                         // 正在播放
+    if (this._ttsQueue.some((t) => t.text === text)) return;       // 队列中已有同内容
+    this._ttsQueue.push({ text, chime: !!opts.chime });
+    this._ttsDrain();
+  },
+  async _ttsDrain() {
+    if (this._ttsPlaying || this._ttsQueue.length === 0) return;
+    this._ttsPlaying = true;
+    const item = this._ttsQueue.shift();
+    this._ttsCurrent = item.text;
     try {
       const s = await window.wealthCalendar.loadSettings();
-      if (s.ttsEnabled === false) return;
-      const chime = await window.wealthCalendar.ttsSynthesize('叮～');
-      if (chime && chime.audioBase64) await this._playAudio(chime.audioBase64);
-      const full = `小财帮你瞄了一眼：${String(line || '')}`;
-      const r = await window.wealthCalendar.ttsSynthesize(full);
-      if (r && r.audioBase64) await this._playAudio(r.audioBase64);
-    } catch (e) { console.warn('[tts] speakFortune:', e.message); }
+      if (s.ttsEnabled !== false) {
+        // 运势类：先"叮~"提示音再播报；普通对话回复不带提示音
+        if (item.chime) {
+          const chime = await window.wealthCalendar.ttsSynthesize('叮～');
+          if (chime && chime.audioBase64) await this._playAudio(chime.audioBase64);
+        }
+        const r = await window.wealthCalendar.ttsSynthesize(item.text);
+        if (r && r.audioBase64) await this._playAudio(r.audioBase64);
+      }
+    } catch (e) { console.warn('[tts] queue:', e.message); }
+    this._ttsCurrent = null;
+    this._ttsPlaying = false;
+    this._ttsDrain(); // 播完下一句
+  },
+  // 对外播报（聊天回复等普通台词）：入队依次播放，不带提示音
+  speak(text) {
+    this._ttsEnqueue(text, {});
+  },
+  // 运势类语音播报：先"叮~"提示音再"小财帮你瞄了一眼：..."语音
+  speakFortune(line) {
+    this._ttsEnqueue(`小财帮你瞄了一眼：${String(line || '')}`, { chime: true });
   },
   // 播放 base64 音频，等待播完或超时（15s 兜底，避免阻塞后续播报）
   _playAudio(base64) {
@@ -1262,10 +1314,18 @@ const PetState = {
 
   svgPet(theme, customEmoji) {
     // 内置主题 → 对应 SVG；素材主题失败兜底时也按主题匹配（caishen→财神，cat1/cat2→萌猫）；
-    // custom 在软渲染 Linux 下兜底为萌猫
-    if (theme === 'fortune' || theme === 'caishen') return this.svgFortune();
+    // custom 在软渲染 Linux 下兜底为萌猫；gold 财神金主复用财神 SVG（金色样式走 CSS）
+    if (theme === 'fortune' || theme === 'caishen' || theme === 'gold') return this.svgFortune();
     if (theme === 'bagua') return this.svgBagua();
     return this.svgCat();
+  },
+
+  // 金色称号（财神金主限定主题）：显示/隐藏 👑 称号徽标
+  _updateGoldBadge(show) {
+    try {
+      const badge = document.getElementById('gold-badge');
+      if (badge) badge.style.display = show ? 'block' : 'none';
+    } catch (e) { /* ignore */ }
   },
 
   // 隐藏 pet 内除指定元素外的所有子内容（SVG/emoji/img/video/canvas/bg/action 互斥显示）
@@ -1279,10 +1339,12 @@ const PetState = {
 
   setTheme(theme, customEmoji) {
     // 素材主题 cat1/cat2/caishen（设置面板可选）；内置 cat/fortune/bagua 保留渲染
-    // 逻辑仅作素材主题加载失败时的 SVG 兜底；custom 走自定义图/AI 视频
+    // 逻辑仅作素材主题加载失败时的 SVG 兜底；custom 走自定义图/AI 视频；
+    // gold（财神金主）为元宝兑换解锁的限定主题：金色边框+金色称号+特殊气泡
     const appEl = document.getElementById('app');
-    appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua');
+    appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua', 'theme-gold');
     this._theme = theme;
+    this._updateGoldBadge(theme === 'gold');
 
     const svgEl = document.getElementById('pet-svg');
     const img = document.getElementById('pet-img');
@@ -1294,6 +1356,15 @@ const PetState = {
     // themeAsset 加载失败时 _applyStateVisual 内部自动兜底为 SVG。
     if (theme === 'cat1' || theme === 'cat2' || theme === 'caishen') {
       appEl.classList.add(theme === 'caishen' ? 'theme-fortune' : 'theme-cat');
+      this._applyStateVisual(this.currentState || 'idle');
+      return;
+    }
+
+    // 财神金主（元宝兑换解锁限定主题）：财神 SVG + 金色边框/称号/气泡由 CSS .theme-gold 提供
+    if (theme === 'gold') {
+      this._showPetElement(svgEl);
+      svgEl.innerHTML = this.svgPet('gold');
+      appEl.classList.add('theme-gold');
       this._applyStateVisual(this.currentState || 'idle');
       return;
     }

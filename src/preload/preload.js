@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   natalChart: (birth) => ipcRenderer.invoke('fortune:chart', birth),
   todayAlmanac: (dateStr) => ipcRenderer.invoke('fortune:almanac', dateStr),
   getDailyFortune: (dateStr, force) => ipcRenderer.invoke('fortune:daily', dateStr, force),
+  getFortuneByDate: (dateStr, force) => ipcRenderer.invoke('fortune:by-date', dateStr, force),
 
   // Reminder listener
   onScheduleReminder: (callback) => {

@@ -33,7 +33,7 @@ const ChatPanel = {
     if (text === undefined) input.value = '';
     this.addMessage('user', message);
     // 聊天互动：亲密度 +3 + 每日任务(聊天)
-    try { if (window.PetState && PetState.onInteract) PetState.onInteract('chat', 3); } catch (e) { /* ignore */ }
+    try { if (typeof PetState !== 'undefined' && PetState.onInteract) PetState.onInteract('chat', 3); } catch (e) { /* ignore */ }
 
     const sendBtn = document.getElementById('btn-chat-send');
     sendBtn.disabled = true;
@@ -51,7 +51,13 @@ const ChatPanel = {
   },
 
   // ---- Voice output ----
+  // 统一走 PetState 语音播报队列（FIFO 依次播放不重叠；同一文本去重），
+  // 避免与运势播报等同时发音重叠。
   async speak(text) {
+    if (typeof PetState !== 'undefined' && PetState.speak) {
+      PetState.speak(text);
+      return;
+    }
     try {
       const settings = await window.wealthCalendar.loadSettings();
       if (settings.ttsEnabled === false) return;

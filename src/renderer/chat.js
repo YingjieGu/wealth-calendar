@@ -56,9 +56,11 @@ const ChatPanel = {
       const r = await window.wealthCalendar.ttsSynthesize(text);
       if (r && r.audioBase64) {
         const audio = new Audio(`data:audio/mpeg;base64,${r.audioBase64}`);
-        audio.play().catch(() => { /* autoplay ok inside user gesture chain */ });
+        audio.play().catch((e) => console.warn('[tts] audio play failed:', e));
+      } else {
+        console.warn('[tts] 合成失败（主进程已记录 tts-error.log）:', r && r.error);
       }
-    } catch (e) { /* TTS failure is non-fatal */ }
+    } catch (e) { console.warn('[tts] exception:', e); /* TTS failure is non-fatal */ }
   },
 
   // ---- Voice input (mic -> ASR -> chat) ----

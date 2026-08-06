@@ -71,10 +71,7 @@
           <div class="setting-group">
             <label>主题</label>
             <div class="setting-options" id="theme-options">
-              <button class="theme-option active" data-theme="cat">🐱 萌宠</button>
-              <button class="theme-option" data-theme="fortune">🧧 财神</button>
-              <button class="theme-option" data-theme="bagua">☯️ 八卦</button>
-              <button class="theme-option" data-theme="cat1">🐱 Q版猫咪-素材</button>
+              <button class="theme-option active" data-theme="cat1">🐱 Q版猫咪-素材</button>
               <button class="theme-option" data-theme="cat2">🐱 萌宠2-猫咪</button>
               <button class="theme-option" data-theme="caishen">🧧 财神-素材</button>
               <button class="theme-option" data-theme="custom">🖼️ 自定义</button>
@@ -112,6 +109,15 @@
 
           <div class="setting-group">
             <button id="btn-restore-position" class="action-btn">📍 恢复默认位置</button>
+          </div>
+
+          <div class="setting-group">
+            <label>开机启动</label>
+            <div class="setting-options" id="autostart-options">
+              <button class="activity-option" data-autostart="1">🚀 开启</button>
+              <button class="activity-option active" data-autostart="0">🚫 关闭</button>
+            </div>
+            <p class="placeholder-text">开机自动启动财神日历（Windows/macOS 登录项；Linux 创建 ~/.config/autostart 自启动项，默认关闭）</p>
           </div>
 
           <div class="setting-group">
@@ -205,13 +211,6 @@
             <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
           </div>
 
-          <div class="setting-group">
-            <label>配置备份与迁移（重装后一键恢复）</label>
-            <button id="btn-export-config" class="action-btn">⬇️ 导出配置（含 API Key，保存为 JSON）</button>
-            <button id="btn-import-config" class="action-btn">⬆️ 导入配置（恢复备份）</button>
-            <input type="file" id="cfg-import" accept=".json,application/json" style="display:none;">
-            <p class="placeholder-text">卸载安装程序默认保留用户数据（settings.json + settings.backup.json）；换机或重装后可用「导出配置」生成的 JSON 文件一键恢复全部设置。</p>
-          </div>
         </div>
       </div>
     </div>

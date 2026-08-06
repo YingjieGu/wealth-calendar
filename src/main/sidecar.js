@@ -171,7 +171,8 @@ function startSidecar() {
     console.log('[sidecar] starting:', cmd, args.join(' '));
     child = spawn(cmd, args, {
       cwd: path.dirname(path.dirname(script)),
-      env: { ...process.env },
+      // 注入 userData 路径：sidecar 用它定位 tts-error.log 等诊断日志
+      env: { ...process.env, WC_USER_DATA_DIR: app.getPath('userData') },
     });
 
     child.stdout.on('data', (d) => process.stdout.write(`[sidecar] ${d}`));

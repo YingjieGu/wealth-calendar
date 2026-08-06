@@ -78,6 +78,35 @@ async def synthesize_speech(text, voice="zh-CN-XiaoxiaoNeural"):
             buf.write(chunk["data"])
     return buf.getvalue()
 
+# --- TTS 诊断日志（tts-error.log，由 Electron 注入 userData 路径） ---
+_TTS_LOG_PATH = None
+
+def _resolve_tts_log_path():
+    global _TTS_LOG_PATH
+    if _TTS_LOG_PATH is None:
+        base = os.environ.get("WC_USER_DATA_DIR")
+        _TTS_LOG_PATH = os.path.join(base, "debug", "tts-error.log") if base else None
+    return _TTS_LOG_PATH
+
+def _log_tts_error(msg):
+    p = _resolve_tts_log_path()
+    if not p:
+        return
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+    except Exception:
+        pass
+
+def edge_tts_available():
+    """edge-tts 是否可用（缺依赖/网络情况在调用时才能暴露，这里只报 import）。"""
+    try:
+        import edge_tts
+        return True, getattr(edge_tts, "__version__", "unknown")
+    except Exception as e:
+        return False, str(e)
+
 VERSION = "0.1"
 
 # ---------------------------------------------------------------------------
@@ -320,9 +349,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             voice = body.get("voice") or "zh-CN-XiaoxiaoNeural"
             audio = asyncio.run(synthesize_speech(text, voice))
             self._send_bytes(200, audio, "audio/mpeg")
-        except ImportError:
+        except ImportError as e:
+            _log_tts_error(f"edge-tts 未安装/导入失败: {e}")
             self._error(500, "edge-tts not installed; run: pip3 install edge-tts")
         except Exception as e:
+            # 记录到 tts-error.log（含完整 traceback），供诊断内置 python 下 edge-tts 失效原因
+            _log_tts_error(f"TTS failed: {e}\n{traceback.format_exc()}")
             self._error(500, f"TTS failed: {e}", traceback.format_exc())
 
     # --- Routing ---
@@ -352,7 +384,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._error(500, str(e), traceback.format_exc())
 
         elif path == "/models/status":
-            status = {"model_dir": MODEL_DIR}
+            avail, ver = edge_tts_available()
+            status = {
+                "model_dir": MODEL_DIR,
+                "tts": {"engine": "edge-tts", "available": avail, "version": ver, "voice": "zh-CN-XiaoxiaoNeural"},
+            }
             if _asr_model is not None:
                 status["asr"] = {"loaded": True, "size": _asr_model_size}
             else:

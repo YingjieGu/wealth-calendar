@@ -8,8 +8,8 @@ const SettingsManager = {
   },
 
   applyAll() {
-    // Theme
-    const theme = this.settings.theme || 'cat';
+    // Theme（默认素材主题 cat1）
+    const theme = this.settings.theme || 'cat1';
     PetState.setTheme(theme, this.settings.petEmoji);
 
     // Activity（默认粘人 clingy）
@@ -112,6 +112,14 @@ const SettingsManager = {
     });
   },
 
+  // 开机启动开关（settings.autostart，默认关闭）
+  applyAutoStart() {
+    const on = this.settings.autostart === true;
+    document.querySelectorAll('#autostart-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.autostart === '1') === on);
+    });
+  },
+
   bindUI() {
     // Theme selection
     document.getElementById('theme-options').addEventListener('click', (e) => {
@@ -196,6 +204,23 @@ const SettingsManager = {
       showToast('已恢复默认位置');
     });
 
+    // 开机启动开关（settings.autostart，默认关）
+    this.applyAutoStart();
+    document.querySelectorAll('#autostart-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const on = btn.dataset.autostart === '1';
+        this.settings.autostart = on;
+        document.querySelectorAll('#autostart-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        const r = await window.wealthCalendar.setAutoStart(on);
+        showToast(r && r.ok
+          ? (on ? '🚀 已开启开机启动' : '🚫 已关闭开机启动')
+          : `❌ 开机启动设置失败：${(r && r.error) || '未知错误'}`);
+      });
+    });
+
     // User info: birth datetime change -> update zodiac preview + auto 生肖
     document.getElementById('user-birth').addEventListener('change', (e) => {
       this.updateZodiac(e.target.value ? e.target.value.replace('T', ' ') : null);
@@ -247,41 +272,6 @@ const SettingsManager = {
       this.settings.fortuneReminderEnabled = document.getElementById('fortune-reminder-enabled').checked;
       await this.save();
       showToast(key ? '✅ 模型配置已保存（AI 命理已启用）' : '✅ 已保存（未填 Key，使用本地模板推算）');
-    });
-
-    // 导出配置：主进程弹出保存对话框，把 settings.json（含 API Key）写为 JSON 文件
-    document.getElementById('btn-export-config').addEventListener('click', async () => {
-      const r = await window.wealthCalendar.exportConfig();
-      if (r && r.ok) {
-        showToast(`✅ 配置已导出：${r.path}`);
-      } else if (r && r.canceled) {
-        showToast('已取消导出');
-      } else {
-        showToast(`❌ 导出失败：${(r && r.error) || '未知错误'}`);
-      }
-    });
-
-    // 导入配置：读取 JSON → 校验 → 合并保存 → 重载应用全部设置（重装后一键恢复）
-    document.getElementById('btn-import-config').addEventListener('click', () => {
-      document.getElementById('cfg-import').click();
-    });
-    document.getElementById('cfg-import').addEventListener('change', async (e) => {
-      const file = e.target.files && e.target.files[0];
-      e.target.value = '';
-      if (!file) return;
-      try {
-        const parsed = JSON.parse(await file.text());
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          showToast('❌ 配置文件格式不正确（需为 JSON 对象）');
-          return;
-        }
-        await window.wealthCalendar.saveSettings(parsed); // 主进程做浅合并保存
-        showToast('✅ 配置已导入，正在应用…');
-        setTimeout(() => location.reload(), 1200);
-      } catch (err) {
-        console.error('[config] import failed:', err);
-        showToast('❌ 导入失败：JSON 解析错误');
-      }
     });
 
     // Wake word
@@ -441,7 +431,11 @@ const SettingsManager = {
       }
       const asr = r.asr || {};
       const loaded = asr.loaded ? '✅ 已加载' : '🕐 按需加载（首次语音输入自动下载）';
-      el.textContent = `语音识别(ASR)：${loaded}${asr.size ? ` (${asr.size})` : ''}｜语音合成(TTS)：✅ edge-tts 在线`;
+      const tts = r.tts || {};
+      const ttsText = tts.available
+        ? `✅ edge-tts${tts.version ? ` ${tts.version}` : ''}`
+        : `⚠️ edge-tts 不可用（${tts.version || '未知'}，语音播报会走本地降级）`;
+      el.textContent = `语音识别(ASR)：${loaded}${asr.size ? ` (${asr.size})` : ''}｜语音合成(TTS)：${ttsText}`;
     } catch (e) {
       el.textContent = '❌ 获取失败';
     }

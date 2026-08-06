@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen, nativeImage, powerMonitor } = require('electron');
 
 // Software rendering keeps the internal render buffer healthy on this box
 // (without it capturePage turns black). Screen presentation is validated
@@ -187,6 +187,119 @@ function appendStartupLog(...parts) {
     const stamp = new Date().toISOString();
     fs.appendFileSync(path.join(diagnosticsDir(), 'startup.log'), `[${stamp}] ${parts.join(' ')}\n`);
   } catch (e) { /* ignore */ }
+}
+
+// --- 开机启动（settings.autostart，默认关） ---
+// Windows/macOS 用系统登录项 app.setLoginItemSettings；
+// Linux 用 XDG autostart desktop 文件（~/.config/autostart/wealth-calendar.desktop）。
+function autostartDesktopPath() {
+  return path.join(app.getPath('home'), '.config', 'autostart', 'wealth-calendar.desktop');
+}
+
+function applyAutoStart(enabled) {
+  const on = !!enabled;
+  try {
+    if (process.platform === 'linux') {
+      const p = autostartDesktopPath();
+      if (on) {
+        // dev 模式 Exec 需带 app 路径；打包后直接指向可执行文件
+        const execLine = app.isPackaged
+          ? `Exec="${process.execPath}"`
+          : `Exec="${process.execPath}" "${app.getAppPath()}"`;
+        const content = [
+          '[Desktop Entry]',
+          'Type=Application',
+          'Name=财神日历',
+          'Comment=Wealth Calendar desktop pet',
+          execLine,
+          'Terminal=false',
+          'X-GNOME-Autostart-enabled=true',
+          'X-KDE-autostart-after=panel',
+        ].join('\n') + '\n';
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, content, 'utf-8');
+        appendStartupLog(`autostart: desktop 文件已创建 -> ${p}`);
+      } else if (fs.existsSync(p)) {
+        fs.unlinkSync(p);
+        appendStartupLog(`autostart: desktop 文件已删除 -> ${p}`);
+      }
+    } else {
+      // Windows / macOS 登录项
+      app.setLoginItemSettings({ openAtLogin: on });
+      appendStartupLog(`autostart: setLoginItemSettings openAtLogin=${on}`);
+    }
+    return { ok: true, enabled: on };
+  } catch (e) {
+    console.error('[autostart] failed:', e.message);
+    appendStartupLog(`autostart: 设置失败 ${e.message}`);
+    return { ok: false, error: e.message };
+  }
+}
+
+function currentAutoStart() {
+  try {
+    if (process.platform === 'linux') {
+      return fs.existsSync(autostartDesktopPath());
+    }
+    return app.getLoginItemSettings().openAtLogin;
+  } catch (e) {
+    return false;
+  }
+}
+
+// --- TTS 诊断日志（tts-error.log，位于 userData/debug/） ---
+function appendTtsLog(...parts) {
+  try {
+    const stamp = new Date().toISOString();
+    fs.appendFileSync(path.join(diagnosticsDir(), 'tts-error.log'), `[${stamp}] ${parts.join(' ')}\n`);
+  } catch (e) { /* ignore */ }
+}
+
+// edge-tts 不可用/网络失败时的降级合成：
+// - win32: PowerShell System.Speech（本地离线，不依赖网络，输出 wav）
+// - 通用: 系统 python3 + edge-tts（若系统已装）
+// 返回 { buffer, engine } 或 null。
+async function synthesizeFallbackTTS(text) {
+  if (process.platform === 'win32') {
+    try {
+      const tmpWav = path.join(app.getPath('temp'), `wc-tts-${Date.now()}.wav`);
+      const script = [
+        'Add-Type -AssemblyName System.Speech',
+        'try {',
+        '  $s = New-Object System.Speech.Synthesis.SpeechSynthesizer',
+        '  $s.Rate = 1',
+        `  $s.SetOutputToWaveFile(${JSON.stringify(tmpWav)})`,
+        `  $s.Speak(${JSON.stringify(text)})`,
+        '  $s.Dispose()',
+        '} catch { Write-Error $_; exit 1 }',
+      ].join('\n');
+      execFileSync('powershell', ['-NoProfile', '-Command', script], { timeout: 30000 });
+      const buf = fs.readFileSync(tmpWav);
+      try { fs.unlinkSync(tmpWav); } catch (e) { /* ignore */ }
+      if (buf.length > 0) return { buffer: buf, engine: 'system-speech' };
+    } catch (e) {
+      appendTtsLog(`降级 system-speech 失败: ${e.message}`);
+    }
+  }
+  // 通用回退：系统 python3 跑 edge-tts（需系统已 pip install edge-tts）
+  try {
+    const script = [
+      'import asyncio, io, sys',
+      'import edge_tts',
+      'async def main():',
+      '    c = edge_tts.Communicate(sys.argv[1], "zh-CN-XiaoxiaoNeural")',
+      '    buf = io.BytesIO()',
+      '    async for ch in c.stream():',
+      '        if ch["type"] == "audio": buf.write(ch["data"])',
+      '    sys.stdout.buffer.write(buf.getvalue())',
+      'asyncio.run(main())',
+    ].join('\n');
+    const buf = execFileSync('python3', ['-c', script, text], { timeout: 30000 });
+    if (buf.length > 0) return { buffer: buf, engine: 'edge-tts-system-python' };
+  } catch (e) {
+    appendTtsLog(`降级 系统 python edge-tts 失败: ${e.message}`);
+  }
+  return null;
 }
 
 function logDisplayLayout() {
@@ -681,25 +794,15 @@ function setupIPC() {
 
   ipcMain.handle('load-settings', () => loadSettings());
 
-  // 配置导出：把 settings.json（含 API Key）另存为用户选择的 JSON 文件，
-  // 供重装/换机后一键导入恢复。
-  ipcMain.handle('export-config', async () => {
-    try {
-      const settings = loadSettings();
-      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-        title: '导出配置（含 API Key）',
-        defaultPath: `财神日历配置-${new Date().toISOString().slice(0, 10)}.json`,
-        filters: [{ name: 'JSON 配置文件', extensions: ['json'] }],
-      });
-      if (canceled || !filePath) return { canceled: true };
-      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
-      appendStartupLog(`config exported -> ${filePath}`);
-      return { ok: true, path: filePath };
-    } catch (e) {
-      console.error('[config] export failed:', e.message);
-      return { error: e.message };
-    }
+  // --- 开机启动（settings.autostart，默认关） ---
+  ipcMain.handle('autostart:set', (_event, enabled) => {
+    const s = loadSettings();
+    s.autostart = !!enabled;
+    saveSettings(s);
+    return applyAutoStart(!!enabled);
   });
+
+  ipcMain.handle('autostart:get', () => currentAutoStart());
 
   ipcMain.on('save-window-position', () => {
     if (mainWindow && !isCalendarMode) {
@@ -955,17 +1058,33 @@ function setupIPC() {
   });
 
   ipcMain.handle('tts:synthesize', async (_event, text) => {
+    const t = String(text || '').slice(0, 500);
+    // 主路径：sidecar edge-tts（在线）
     try {
-      const body = Buffer.from(JSON.stringify({ text: String(text || '').slice(0, 500) }), 'utf-8');
-      const r = await sidecar.requestSidecarBinary('POST', '/tts/synthesize', body, 'application/json');
-      if (r.status !== 200) {
-        return { error: r.buffer.toString('utf-8') };
+      const body = Buffer.from(JSON.stringify({ text: t }), 'utf-8');
+      const r = await sidecar.requestSidecarBinary('POST', '/tts/synthesize', body, 'application/json', 30000);
+      if (r.status === 200 && r.buffer.length > 0) {
+        return { audioBase64: r.buffer.toString('base64'), engine: 'edge-tts' };
       }
-      return { audioBase64: r.buffer.toString('base64') };
+      const errMsg = r.status === 200 ? '空音频(0 字节)' : (r.buffer.toString('utf-8') || `HTTP ${r.status}`);
+      appendTtsLog(`edge-tts sidecar 失败: ${errMsg}`);
+      appendStartupLog(`tts sidecar 失败: ${errMsg}`);
     } catch (e) {
-      console.error('[tts] failed:', e.message);
-      return { error: e.message };
+      appendTtsLog(`edge-tts sidecar 异常: ${e.message}`);
+      appendStartupLog(`tts sidecar 异常: ${e.message}`);
     }
+    // 降级合成（win 本地 System.Speech / 系统 python edge-tts）
+    try {
+      const fb = await synthesizeFallbackTTS(t);
+      if (fb) {
+        appendTtsLog(`降级成功 engine=${fb.engine} bytes=${fb.buffer.length}`);
+        return { audioBase64: fb.buffer.toString('base64'), engine: fb.engine };
+      }
+    } catch (e) {
+      appendTtsLog(`降级异常: ${e.message}`);
+    }
+    appendTtsLog(`TTS 最终失败 text_len=${t.length}`);
+    return { error: 'TTS 合成失败（详见 userData/debug/tts-error.log）' };
   });
 
   // --- Model status ---
@@ -1313,6 +1432,16 @@ app.whenReady().then(() => {
   );
   // 首次启动预填 DeepSeek 默认模型配置（Key 留空）；已存在配置则原样保留
   ensureDefaultSettings();
+  // 启动时应用保存的开机启动设置（默认关）：settings.autostart=true 时确保自启动项存在
+  try {
+    const s0 = loadSettings();
+    if (s0.autostart === true) {
+      const ar = applyAutoStart(true);
+      appendStartupLog(`autostart: 启动时应用保存设置 ${ar.ok ? 'ok' : '失败'}`);
+    } else {
+      appendStartupLog(`autostart: 默认关闭 (settings.autostart=${s0.autostart})`);
+    }
+  } catch (e) { /* ignore */ }
   setupIPC();
   createWindow();
   // 位置-阶段模型：阶段调度（10-20 分钟计时 + 状态动作）在渲染进程 pet.js，
@@ -1326,6 +1455,12 @@ app.whenReady().then(() => {
   sidecar.startSidecar().then((ok) => {
     console.log('[main] sidecar ready:', ok);
     appendStartupLog(`sidecar ready=${ok}`);
+    // 记录 TTS 引擎状态到 startup.log（诊断语音播报失效）
+    try {
+      sidecar.requestSidecar('GET', '/models/status').then((r) => {
+        appendStartupLog(`tts status: ${JSON.stringify((r.data && r.data.tts) || {})}`);
+      }).catch((e) => appendStartupLog(`tts status 获取失败: ${e.message}`));
+    } catch (e) { /* ignore */ }
     if (ok) {
       // Startup fortune reminder (5s delay, only if userInfo exists)
       fortuneEngine.maybeSendStartupFortune(mainWindow, (d, f) =>

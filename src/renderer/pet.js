@@ -18,7 +18,7 @@ const PetState = {
     this._phaseGen = 0;            // 阶段代数：异步 _beginPhase 期间被唤醒/新阶段打断则放弃
     this._lastMouseFollow = 0;     // 粘人「跟鼠标」上次跟随时间(冷却 15s)
     // 豆包式玩法状态
-    this._theme = 'cat';           // 当前主题（cat/fortune/bagua/custom/cat1/cat2/caishen）
+    this._theme = 'cat1';          // 当前主题（默认素材主题 cat1；内置 cat/fortune/bagua 仅作素材失败兜底）
     this._platform = (window.wealthCalendar && window.wealthCalendar.platform) || 'linux';
     this._roaming = false;         // 全屏漫游中（窗口移动 ↔ 宠物走路动画）
     this._idleBucket = undefined;  // 空闲感知上次区间：active/idle/rest/sleep
@@ -274,19 +274,21 @@ const PetState = {
     return 'idle';
   },
   _applyStateVisual(state) {
-    const theme = this._theme || 'cat';
+    const theme = this._theme || 'cat1';
     const isMaterial = theme === 'cat1' || theme === 'cat2' || theme === 'caishen';
     const svgEl = document.getElementById('pet-svg');
     const cls = this._stateClass(state);
+    // 素材主题：先备好内联 SVG 兜底内容（素材缺失/加载失败时显示对应 SVG），
+    // 再加载当前状态的动图素材（SwiftShader 后本机软渲染也能绘制位图）
     if (isMaterial) {
-      // 加载当前状态的动图素材（SwiftShader 后本机软渲染也能绘制位图；
-      // walk/sit 加动画类；素材缺失时 _loadActionImage 内兜底 SVG）
+      svgEl.innerHTML = this.svgPet(theme);
       this.petEl.classList.add(cls);
       this._loadActionImage(state);
       return;
     }
-    // 内置 SVG 主题（cat/fortune/bagua/custom 兜底）
+    // 内置 SVG 主题（cat/fortune/bagua/custom 兜底，素材主题失败时也复用）
     this._showPetElement(svgEl);
+    svgEl.innerHTML = this.svgPet(theme);
     this.petEl.classList.add(cls);
   },
 
@@ -810,8 +812,9 @@ const PetState = {
   },
 
   svgPet(theme, customEmoji) {
-    // 内置主题 → 对应 SVG；custom 在软渲染 Linux 下兜底为萌猫
-    if (theme === 'fortune') return this.svgFortune();
+    // 内置主题 → 对应 SVG；素材主题失败兜底时也按主题匹配（caishen→财神，cat1/cat2→萌猫）；
+    // custom 在软渲染 Linux 下兜底为萌猫
+    if (theme === 'fortune' || theme === 'caishen') return this.svgFortune();
     if (theme === 'bagua') return this.svgBagua();
     return this.svgCat();
   },
@@ -826,7 +829,8 @@ const PetState = {
   },
 
   setTheme(theme, customEmoji) {
-    // 'cat' | 'fortune' | 'bagua' | 'custom' | 'cat1'(素材) | 'caishen'(素材)
+    // 素材主题 cat1/cat2/caishen（设置面板可选）；内置 cat/fortune/bagua 保留渲染
+    // 逻辑仅作素材主题加载失败时的 SVG 兜底；custom 走自定义图/AI 视频
     const appEl = document.getElementById('app');
     appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua');
     this._theme = theme;

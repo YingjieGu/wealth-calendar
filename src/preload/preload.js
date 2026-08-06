@@ -10,8 +10,10 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   // Settings persistence
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   loadSettings: () => ipcRenderer.invoke('load-settings'),
-  // 配置导出（含 API Key，保存为 JSON 文件；导入由渲染进程读文件后经 saveSettings 合并保存）
-  exportConfig: () => ipcRenderer.invoke('export-config'),
+
+  // 开机启动（settings.autostart，默认关）
+  setAutoStart: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
+  getAutoStart: () => ipcRenderer.invoke('autostart:get'),
 
   // Window position
   saveWindowPosition: () => ipcRenderer.send('save-window-position'),

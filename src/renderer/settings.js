@@ -30,6 +30,15 @@ const SettingsManager = {
     this.updateThemeUI(theme);
     this.updateActivityUI(activity);
     this.applyUserInfo();
+    this.applyPrank();
+  },
+
+  // 捣蛋模式开关（settings.prankMode，默认关闭）
+  applyPrank() {
+    const on = this.settings.prankMode === true;
+    document.querySelectorAll('#prank-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.prank === '1') === on);
+    });
   },
 
   // 界面主题：深色(默认) / 浅色，body.theme-light 由 styles.css CSS 变量覆盖
@@ -233,6 +242,20 @@ const SettingsManager = {
         showToast(r && r.ok
           ? (on ? '🚀 已开启开机启动' : '🚫 已关闭开机启动')
           : `❌ 开机启动设置失败：${(r && r.error) || '未知错误'}`);
+      });
+    });
+
+    // 捣蛋模式开关（settings.prankMode，默认关；保存后主进程即时重排引擎）
+    this.applyPrank();
+    document.querySelectorAll('#prank-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const on = btn.dataset.prank === '1';
+        this.settings.prankMode = on;
+        document.querySelectorAll('#prank-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        showToast(on ? '😜 捣蛋模式已开启，小财会偶尔调皮一下~' : '🙂 捣蛋模式已关闭');
       });
     });
 

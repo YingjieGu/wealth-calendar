@@ -53,6 +53,12 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
     ipcRenderer.on('fortune-reminder', (_event, data) => callback(data));
   },
 
+  // 捣蛋模式：主进程触发吐槽事件 + 手动触发测试
+  onPetPrank: (callback) => {
+    ipcRenderer.on('pet-prank', (_event, data) => callback && callback(data));
+  },
+  prankTriggerTest: (mode) => ipcRenderer.invoke('prank:trigger-test', mode),
+
   // Quit app (from context menu)
   quitApp: () => ipcRenderer.send('app-quit'),
   hideWindow: () => ipcRenderer.send('hide-window'),

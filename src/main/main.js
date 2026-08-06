@@ -22,6 +22,7 @@ const fortuneEngine = require('./fortuneEngine');
 const chatEngine = require('./chatEngine');
 const wallpaper = require('./wallpaper');
 const multimodal = require('./multimodal');
+const prank = require('./prank');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -814,10 +815,17 @@ function setupIPC() {
   ipcMain.handle('save-settings', (_event, settings) => {
     const current = loadSettings();
     saveSettings({ ...current, ...settings });
+    // 捣蛋模式开关变化 → 主进程引擎即时重排/停表
+    try { prank.onSettingsChanged(); } catch (e) { /* ignore */ }
     return { success: true };
   });
 
   ipcMain.handle('load-settings', () => loadSettings());
+
+  // --- 捣蛋模式：手动触发一次（测试/诊断，force 跳过 30% 概率骰；mode 可强制玩法） ---
+  ipcMain.handle('prank:trigger-test', (_event, mode) => {
+    try { return prank.doTick({ force: true, mode: mode || null }); } catch (e) { return { ok: false, reason: e.message }; }
+  });
 
   // --- 开机启动（settings.autostart，默认关） ---
   ipcMain.handle('autostart:set', (_event, enabled) => {
@@ -1479,6 +1487,8 @@ app.whenReady().then(() => {
     app.quit();
   }, ensureTrayIcon()); // 托盘图标：icon.png 去白底多尺寸 PNG
   startReminder(mainWindow);
+  // 捣蛋模式引擎（娱乐互动）：settings.prankMode 默认关，开启后随机吐槽/打字
+  prank.startPrank(mainWindow, { getSettings: loadSettings, saveSettings });
   // Start fortune sidecar (non-blocking on failure)
   sidecar.startSidecar().then((ok) => {
     console.log('[main] sidecar ready:', ok);
@@ -1547,6 +1557,7 @@ app.on('before-quit', () => {
   } catch (e) { /* ignore */ }
   isQuitting = true;
   stopReminder();
+  prank.stopPrank();
   sidecar.stopSidecar();
 });
 

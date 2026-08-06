@@ -68,6 +68,13 @@ const PetState = {
     try {
       window.wealthCalendar.onPetMouseFast((evt) => this._handleMouseFast(evt));
     } catch (e) { /* ignore */ }
+    // 捣蛋模式（主进程触发）：吐槽进气泡 + 聊天对话框
+    try {
+      window.wealthCalendar.onPetPrank((data) => {
+        if (!data || !data.text) return;
+        this._broadcast(data.text);
+      });
+    } catch (e) { /* ignore */ }
     // 启动阶段循环：若 SettingsManager.init 已按保存模式调 setActivity 并启动阶段循环，
     // 则此处跳过（_phaseBooted）；默认 active 在此启动
     this._currentPhase = null;

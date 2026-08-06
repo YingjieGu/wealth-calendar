@@ -341,6 +341,8 @@ const CalendarView = {
     }
 
     const f = result.data;
+    // 查看运势互动：亲密度 +5 + 每日任务(查看运势)
+    try { if (window.PetState && PetState.onInteract) PetState.onInteract('fortune', 5); } catch (e) { /* ignore */ }
     const dims = f.dimensions || {};
     const dimLabels = {
       wealth: '💰 财运', career: '💼 事业', love: '💘 桃花',

@@ -219,6 +219,8 @@ function convertToPng(dataUrl) {
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.classList.remove('hidden');
+    // 右键菜单顶部显示亲密度（每次打开刷新）
+    if (window.PetState && PetState.refreshAffinityMenu) PetState.refreshAffinityMenu();
   });
 
   // Hide on click elsewhere
@@ -242,6 +244,10 @@ function convertToPng(dataUrl) {
       case 'stick':
         // 财神特色：随机抽一支签，用气泡显示签文
         PetState.drawStick();
+        break;
+      case 'tasks':
+        // 今日任务：气泡展示完成情况
+        PetState.showDailyTasks();
         break;
       case 'calendar':
         await window.wealthCalendar.openCalendar();

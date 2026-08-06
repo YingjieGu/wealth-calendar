@@ -21,6 +21,8 @@
           <img id="pet-action" style="display:none;" alt="theme action">
         </div>
         <div id="pet-zzz">💤</div>
+        <!-- 心情图标（宠物右下角小气泡） -->
+        <div id="pet-mood">😐</div>
       </div>
 
       <!-- Reminder speech bubble -->
@@ -37,8 +39,10 @@
 
       <!-- Context menu (right-click pet) -->
       <div id="context-menu" class="hidden">
+        <div id="context-menu-affinity">💗 亲密度: --/100</div>
         <button data-action="fortune">🔮 今日运势</button>
         <button data-action="stick">🎋 摇一支签</button>
+        <button data-action="tasks">📋 今日任务</button>
         <button data-action="calendar">📅 日历</button>
         <button data-action="settings">⚙️ 设置</button>
         <button data-action="hide">🙈 隐藏宠物（Ctrl+Alt+W）</button>
@@ -78,6 +82,12 @@
             </div>
             <input type="file" id="pet-upload" accept="image/*" style="display:none;">
             <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>
+          </div>
+
+          <div class="setting-group">
+            <label>宠物名字（气泡台词中“小财”会替换为这个名字）</label>
+            <input type="text" id="pet-name" class="setting-input" placeholder="默认：小财" maxlength="12">
+            <button id="btn-save-petname" class="action-btn">💾 保存宠物名字</button>
           </div>
 
           <div class="setting-group">

@@ -32,6 +32,8 @@ const ChatPanel = {
     if (!message) return;
     if (text === undefined) input.value = '';
     this.addMessage('user', message);
+    // 聊天互动：亲密度 +3 + 每日任务(聊天)
+    try { if (window.PetState && PetState.onInteract) PetState.onInteract('chat', 3); } catch (e) { /* ignore */ }
 
     const sendBtn = document.getElementById('btn-chat-send');
     sendBtn.disabled = true;

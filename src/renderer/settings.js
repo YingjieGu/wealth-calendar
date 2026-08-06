@@ -12,6 +12,12 @@ const SettingsManager = {
     const theme = this.settings.theme || 'cat1';
     PetState.setTheme(theme, this.settings.petEmoji);
 
+    // 宠物名字（默认小财；同步到 PetState 供气泡替换）
+    const petName = (this.settings.petName && this.settings.petName.trim()) || '小财';
+    const nameInput = document.getElementById('pet-name');
+    if (nameInput) nameInput.value = petName;
+    if (PetState) PetState._petName = petName;
+
     // Activity（默认粘人 clingy）
     const activity = this.settings.activity || 'clingy';
     PetState.setActivity(activity);
@@ -130,6 +136,15 @@ const SettingsManager = {
       this.updateThemeUI(theme);
       PetState.setTheme(theme, this.settings.petEmoji);
       this.save();
+    });
+
+    // 宠物名字保存：同步 PetState + settings.petName 持久化
+    document.getElementById('btn-save-petname').addEventListener('click', async () => {
+      const name = (document.getElementById('pet-name').value || '').trim() || '小财';
+      this.settings.petName = name;
+      if (PetState) PetState._petName = name;
+      await this.save();
+      showToast(`✅ 宠物名字已设为：${name}`);
     });
 
     // Custom pet image upload

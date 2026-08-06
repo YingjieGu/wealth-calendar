@@ -26,6 +26,20 @@ const PetState = {
     this._waterTimer = null;       // 喝水提醒定时器
     this._clicks = [];             // 连击计数（1 秒内的点击时间戳）
     this._clickTimer = null;       // 单击反应的延迟定时器（用于区分单击/双击）
+    // ---- 养成与情绪价值系统 ----
+    this._petAffinity = 0;         // 亲密度 0-100（settings.petAffinity）
+    this._petCoins = 0;            // 金币（settings.petCoins，远期解锁装扮）
+    this._petName = '小财';         // 宠物名字（settings.petName，气泡台词替换）
+    this._petDailyTask = null;     // 今日任务进度（settings.petDailyTask，按日期重置）
+    this._interactionLog = [];     // 互动时间戳（24h 内用于计算心情）
+    this._mood = 'normal';         // happy / normal / sad / excited
+  },
+
+  // 加载时恢复互动时间戳（settings.petInteractions，24h 窗口内）
+  _restoreInteractions(log) {
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    this._interactionLog = (Array.isArray(log) ? log : []).filter((t) => typeof t === 'number' && t > cutoff);
+    this._recomputeMood();
   },
 
   start() {
@@ -33,6 +47,7 @@ const PetState = {
     this.enterState('idle');
     this.setupInteraction();
     this.startProactive();
+    this._loadPetGrowth(); // 养成系统：亲密度/金币/每日任务/心情 初始化
     // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒 / 每日运势分段播报
     this.sayTimeGreeting();
     this.startIdleWatch();
@@ -105,10 +120,15 @@ const PetState = {
   },
 
   // 按当前位置类型从对应动作池随机切换动作（与当前不同），并切换动作图
+  // 心情影响动作池权重：happy/excited → 高兴动作占比提高；sad → 伤心动作占比提高
   _switchAction() {
     const pool = PetState.POSITION_STATES[this._currentPosType] || PetState.POSITION_STATES.homeBase;
     let next = pool[Math.floor(Math.random() * pool.length)];
-    if (pool.length > 1 && next === this.currentState) {
+    // 心情加权：30% 概率优先播与心情匹配的动作（happy/sad/excited→happy，sad→sad）
+    const moodPrefer = { happy: 'happy', excited: 'happy', sad: 'sad' }[this._mood];
+    if (moodPrefer && Math.random() < 0.3) {
+      next = moodPrefer;
+    } else if (pool.length > 1 && next === this.currentState) {
       // 与当前不同（单元素池保持原动作，让 play 池内的 GIF 随机）
       next = pool[(pool.indexOf(next) + 1) % pool.length];
     }
@@ -313,6 +333,228 @@ const PetState = {
     } catch (e) { /* ignore */ }
   },
 
+  // ==================== 养成系统：亲密度/等级/金币/每日任务/心情 ====================
+  // 称号：按等级映射（1学徒/3小管家/5招财猫/7财神童子/10财神爷）
+  AFFINITY_TITLES: { 1: '学徒', 2: '学徒', 3: '小管家', 4: '小管家', 5: '招财猫', 6: '招财猫', 7: '财神童子', 8: '财神童子', 9: '财神童子', 10: '财神爷' },
+  // 每日任务定义：key → {名称, 目标次数}
+  DAILY_TASKS: {
+    pet: { label: '摸摸', target: 3 },
+    fortune: { label: '查看运势', target: 1 },
+    stick: { label: '摇签', target: 1 },
+    chat: { label: '聊天', target: 1 },
+  },
+  // 心情 emoji：happy/normal/sad/excited
+  MOOD_EMOJI: { happy: '😊', normal: '😐', sad: '😢', excited: '🤩' },
+
+  // 从 settings 加载养成状态并初始化（petAffinity/petCoins/petName/petDailyTask）
+  async _loadPetGrowth() {
+    try {
+      const s = await window.wealthCalendar.loadSettings();
+      this._petAffinity = Math.min(100, Math.max(0, Number(s.petAffinity) || 0));
+      this._petCoins = Number(s.petCoins) || 0;
+      this._petName = (s.petName && s.petName.trim()) || '小财';
+      this._petDailyTask = this._normalizeDailyTask(s.petDailyTask);
+      this._restoreInteractions(s.petInteractions); // 恢复互动时间戳（心情）
+    } catch (e) {
+      this._petDailyTask = this._normalizeDailyTask(null);
+      this._recomputeMood();
+    }
+    this.refreshAffinityMenu();
+  },
+
+  // 今日任务进度结构（按日期重置）: { date:'YYYY-MM-DD', pet, fortune, stick, chat }
+  _normalizeDailyTask(raw) {
+    const today = this._todayStr();
+    if (raw && typeof raw === 'object' && raw.date === today) {
+      return { date: today, pet: raw.pet || 0, fortune: raw.fortune || 0, stick: raw.stick || 0, chat: raw.chat || 0 };
+    }
+    return { date: today, pet: 0, fortune: 0, stick: 0, chat: 0 };
+  },
+
+  _todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  // 持久化养成字段到 settings（只写本模块字段，避免覆盖其它配置）
+  async _savePetGrowth() {
+    try {
+      // 只保存 24h 窗口内的互动时间戳（心情来源，避免无限增长）
+      const cutoff = Date.now() - 24 * 3600 * 1000;
+      const recentLog = (this._interactionLog || []).filter((t) => t > cutoff);
+      await window.wealthCalendar.saveSettings({
+        petAffinity: this._petAffinity,
+        petCoins: this._petCoins,
+        petName: this._petName,
+        petDailyTask: this._petDailyTask,
+        petInteractions: recentLog,
+      });
+      // 同步 SettingsManager 内存副本，避免后续整份保存覆盖
+      if (typeof SettingsManager !== 'undefined' && SettingsManager.settings) {
+        SettingsManager.settings.petAffinity = this._petAffinity;
+        SettingsManager.settings.petCoins = this._petCoins;
+        SettingsManager.settings.petName = this._petName;
+        SettingsManager.settings.petDailyTask = this._petDailyTask;
+        SettingsManager.settings.petInteractions = recentLog;
+      }
+    } catch (e) { /* ignore */ }
+  },
+
+  // ---- 亲密度 ----
+  _affinityLevel(affinity) {
+    // 每 10 分一级：0→Lv1, 10→Lv2, ..., 90→Lv10；上限 100
+    return Math.min(10, Math.floor((affinity || 0) / 10) + 1);
+  },
+  _affinityTitle(level) {
+    return this.AFFINITY_TITLES[level] || '学徒';
+  },
+  affinityText() {
+    const lv = this._affinityLevel(this._petAffinity);
+    return `亲密度: ${this._petAffinity}/100 (Lv.${lv} ${this._affinityTitle(lv)})`;
+  },
+  // 右键菜单顶部刷新亲密度显示
+  refreshAffinityMenu() {
+    try {
+      const el = document.getElementById('context-menu-affinity');
+      if (el) el.textContent = `💗 ${this.affinityText()}`;
+    } catch (e) { /* ignore */ }
+  },
+
+  // 增加亲密度（0-100 封顶），升级时气泡庆祝
+  async addAffinity(points) {
+    const before = this._petAffinity;
+    const beforeLv = this._affinityLevel(before);
+    this._petAffinity = Math.min(100, before + (points || 0));
+    const afterLv = this._affinityLevel(this._petAffinity);
+    await this._savePetGrowth();
+    this.refreshAffinityMenu();
+    if (afterLv > beforeLv) {
+      this.say(`🎉 ${this._petName}升级啦! Lv.${afterLv} ${this._affinityTitle(afterLv)}！`);
+    }
+  },
+
+  // ---- 心情：由 24h 内互动次数计算 ----
+  _recomputeMood() {
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    this._interactionLog = (this._interactionLog || []).filter((t) => t > cutoff);
+    const n = this._interactionLog.length;
+    this._mood = n >= 8 ? 'excited' : (n >= 4 ? 'happy' : (n >= 1 ? 'normal' : 'sad'));
+    this._updateMoodIcon();
+    return this._mood;
+  },
+  _updateMoodIcon() {
+    try {
+      const el = document.getElementById('pet-mood');
+      if (el) el.textContent = this.MOOD_EMOJI[this._mood] || '😐';
+    } catch (e) { /* ignore */ }
+  },
+  // 记录一次互动（时间戳）并刷新心情
+  _recordInteraction() {
+    this._interactionLog.push(Date.now());
+    this._recomputeMood();
+  },
+
+  // ---- 每日任务：登记一次任务进度，达标时 +10 金币 +10 亲密度并气泡提示 ----
+  async _bumpTask(key) {
+    const def = this.DAILY_TASKS[key];
+    if (!def) return;
+    if (!this._petDailyTask || this._petDailyTask.date !== this._todayStr()) {
+      this._petDailyTask = this._normalizeDailyTask(this._petDailyTask);
+    }
+    const t = this._petDailyTask;
+    const before = t[key] || 0;
+    t[key] = before + 1;
+    const justDone = before < def.target && t[key] >= def.target;
+    if (justDone) {
+      // 任务完成：+10 金币 +10 亲密度
+      this._petCoins = Number(this._petCoins) || 0;
+      this._petCoins += 10;
+      await this.addAffinity(10);
+      await this._savePetGrowth();
+      this.say(`✅ 今日任务「${def.label}」完成! +10金币 +10亲密度`);
+    } else {
+      await this._savePetGrowth();
+    }
+  },
+
+  // ---- 今日任务状态气泡（右键菜单“今日任务”触发） ----
+  showDailyTasks() {
+    if (!this._petDailyTask || this._petDailyTask.date !== this._todayStr()) {
+      this._petDailyTask = this._normalizeDailyTask(this._petDailyTask);
+    }
+    const t = this._petDailyTask;
+    const lines = Object.entries(this.DAILY_TASKS).map(([k, def]) => {
+      const done = (t[k] || 0) >= def.target;
+      return `${done ? '✅' : '⬜'} ${def.label} ${Math.min(t[k] || 0, def.target)}/${def.target}`;
+    });
+    this.say(`📋 今日任务\n${lines.join('\n')}`);
+  },
+
+  // ---- 深夜安慰：22:00-05:00 首次互动 50% 触发 ----
+  _maybeLateNightComfort() {
+    try {
+      const h = new Date().getHours();
+      if (h >= 22 || h < 5) {
+        const key = `wc-late-${this._todayStr()}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, '1'); // 每天只触发一次
+          if (Math.random() < 0.5) {
+            this.say(`这么晚还在忙, ${this._petName}心疼你, 早点休息呀 🥺`);
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+  },
+
+  // ---- 节日彩蛋：元旦/春节/中秋/用户生日，当日首次互动触发 ----
+  async _maybeFestival() {
+    try {
+      const key = `wc-festival-${this._todayStr()}`;
+      if (localStorage.getItem(key)) return;
+      // 检测节日类型（农历需要走 IPC 黄历）
+      let festival = '';
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      // 用户生日（设置里的出生月日）
+      try {
+        const s = await window.wealthCalendar.loadSettings();
+        const birth = (s.userInfo && s.userInfo.birth) || '';
+        const b = birth.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (b && b[2] === mm && b[3] === dd) festival = 'birthday';
+      } catch (e) { /* ignore */ }
+      if (mm === '01' && dd === '01') festival = 'newyear';
+      if (!festival) {
+        try {
+          const lunar = await window.wealthCalendar.getDateLunarData(this._todayStr());
+          // 春节：农历正月初一；中秋：农历八月十五
+          const isSpring = lunar && lunar.lunarMonth === 1 && lunar.lunarDay === '初一';
+          const isMidAutumn = lunar && lunar.lunarMonth === 8 && lunar.lunarDay === '十五';
+          if (isSpring) festival = 'spring';
+          else if (isMidAutumn) festival = 'midautumn';
+        } catch (e) { /* ignore */ }
+      }
+      if (!festival) return;
+      localStorage.setItem(key, '1');
+      const msg = {
+        newyear: `🎉 元旦快乐! ${this._petName}祝主人新的一年财源滚滚~`,
+        spring: `🎉 春节快乐! ${this._petName}给主人拜年啦，恭喜发财~`,
+        midautumn: `🎉 中秋快乐! ${this._petName}祝主人月圆人团圆，好运连连~`,
+        birthday: `🎉 生日快乐! ${this._petName}祝主人愿望成真，财运亨通~`,
+      }[festival];
+      if (msg) this.say(msg);
+    } catch (e) { /* ignore */ }
+  },
+
+  // ---- 统一互动入口：单击/双击/聊天/运势/摇签 加分 + 每日任务 + 深夜安慰 + 节日彩蛋 ----
+  async onInteract(type, affinityPoints) {
+    this._recordInteraction();          // 心情
+    this._maybeLateNightComfort();      // 深夜安慰（仅深夜+概率）
+    if (this.DAILY_TASKS[type]) await this._bumpTask(type); // 每日任务进度
+    if (affinityPoints) await this.addAffinity(affinityPoints); // 亲密度
+    await this._maybeFestival();        // 节日彩蛋（每日首次互动）
+  },
+
   // ---- Click / double-click / combo interaction ----
   setupInteraction() {
     const lines = [
@@ -346,12 +588,13 @@ const PetState = {
       this._clickTimer = setTimeout(() => this.triggerClickReaction(), 300);
     });
 
-    // 双击：保留原有说话（取消待触发的单击反应）
+    // 双击：保留原有说话（取消待触发的单击反应），亲密度 +2
     this.petEl.addEventListener('dblclick', () => {
       if (this._clickTimer) { clearTimeout(this._clickTimer); this._clickTimer = null; }
       const line = lines[Math.floor(Math.random() * lines.length)];
       this.say(line);
       this._resumeIfIdle();
+      this.onInteract('pet', 2);
     });
   },
 
@@ -366,6 +609,8 @@ const PetState = {
   ],
 
   triggerClickReaction() {
+    // 单击：亲密度 +1（点按互动）
+    this.onInteract('pet', 1);
     // 睡梦中被戳醒：唤醒 + 模式位置联动
     if (this.currentState === 'sleep') {
       this._wakeUp();
@@ -413,7 +658,14 @@ const PetState = {
   say(text) {
     const bubble = document.getElementById('reminder-bubble');
     const el = document.getElementById('reminder-bubble-text');
-    el.textContent = `💬 ${text}`;
+    // 宠物命名：气泡台词中的“小财”替换为用户设置的名字（默认小财）
+    let finalText = text;
+    try {
+      if (this._petName && this._petName !== '小财') {
+        finalText = String(text || '').split('小财').join(this._petName);
+      }
+    } catch (e) { /* ignore */ }
+    el.textContent = `💬 ${finalText}`;
     bubble.classList.remove('hidden');
     clearTimeout(this._bubbleTimer);
     this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 8000);
@@ -560,6 +812,7 @@ const PetState = {
     const line = arr[Math.floor(Math.random() * arr.length)];
     this.say(line); // 签文已带财运提示，直接走气泡
     this._resumeIfIdle();
+    this.onInteract('stick', 2); // 摇签：亲密度 +2
   },
 
   // ---- 喝水提醒：每 2 小时提醒一次 ----

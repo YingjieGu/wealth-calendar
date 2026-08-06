@@ -1,6 +1,6 @@
 {
   "name": "wealth-calendar",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "description": "财神日历 (Wealth Calendar) - 桌面日历+AI命理+桌面宠物",
   "main": "src/main/main.js",
   "scripts": {

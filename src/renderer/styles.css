@@ -2011,6 +2011,87 @@ body.theme-light #zodiac-badge {
   text-align: center;
   padding: 12px 0;
 }
+/* v0.4.22 SVG 星盘 + 星盘分析 */
+.star-chart-svg {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto 4px;
+  display: block;
+}
+.star-chart-svg .star-chart-outer,
+.star-chart-svg .star-chart-inner {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+}
+.star-chart-svg .star-chart-cusp {
+  stroke: var(--border-soft);
+  stroke-width: 0.7;
+}
+.star-chart-svg .star-chart-sign {
+  font-size: 9px;
+  fill: var(--text-dim);
+}
+.star-chart-svg .star-chart-symbol {
+  font-size: 10px;
+  fill: var(--text-mid);
+}
+.star-chart-svg .star-chart-axis {
+  stroke: var(--accent, var(--text-mid));
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.star-chart-svg .star-chart-axis-label {
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--accent, var(--text-strong));
+}
+.star-chart-svg .star-chart-planet {
+  fill: var(--accent, var(--text-strong));
+}
+.star-chart-svg .star-chart-planet-label {
+  font-size: 9px;
+  fill: var(--text-strong);
+}
+.star-chart-svg .star-chart-title {
+  font-size: 12px;
+  fill: var(--text-mid);
+  letter-spacing: 2px;
+}
+.star-chart-analysis-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 9px 0;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.star-chart-analysis-btn:hover {
+  background: var(--btn-hover);
+}
+.star-chart-analysis-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.star-chart-analysis {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-soft);
+}
+.star-chart-analysis-p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.star-chart-analysis-p:last-child {
+  margin-bottom: 0;
+}
 
 /* ============================================================
    无障碍：尊重系统"减少动态效果"设置，关闭全部动画

@@ -1,6 +1,6 @@
 // Daily fortune pipeline: bazi + natal chart + almanac -> LLM (or template fallback) -> cache.
 // Design: data paths injectable for testability; no side effects on require.
-const { app, Notification } = require('electron');
+const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const userMemory = require('./userMemory');
@@ -494,35 +494,203 @@ function clampScore(n) {
 }
 
 // ---------------------------------------------------------------------------
-// Reminder
+// v0.4.22 启动运势播报统一由渲染层 sayDailyFortune（启动后 30s 一条通道）负责，
+// 不再主进程推送 fortune-reminder / 系统通知（避免启动时 2-3 条重复播报）。
 // ---------------------------------------------------------------------------
-function sendFortuneReminder(win, fortune) {
-  const line = fortune.reminderLines && fortune.reminderLines[0]
-    ? fortune.reminderLines[0]
-    : `今日运势 ${fortune.overall} 分，${fortune.dimensions.wealth.summary}`;
-  try {
-    if (Notification.isSupported()) {
-      new Notification({ title: '财神日历 · 今日运势', body: line }).show();
-    }
-  } catch (e) { /* ignore */ }
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('fortune-reminder', { line, overall: fortune.overall, date: fortune.date });
-  }
+
+// ---------------------------------------------------------------------------
+// 星盘分析（🔮 星盘分析按钮）：LLM 生成 4 段解读，无 key/失败 → 模板降级
+// ---------------------------------------------------------------------------
+// 12 星座顺序（与 sidecar lon_to_zodiac 的 ZODIAC_SIGNS 一致：白羊起 30° 一宫）
+const ZODIAC_SIGNS = ['白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座',
+  '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座'];
+// 12 星座 × 太阳性格 / 月亮情感 / 上升外在 各一句（顺序与 ZODIAC_SIGNS 一致：白羊起）
+const ZODIAC_SUN_PERSONALITY = [
+  '你骨子里有股冲劲，认定的事说干就干，天生敢闯敢试的开创者。',
+  '你踏实又倔强，认准的理八头牛拉不回，稳定是你的底气。',
+  '你脑子转得快、口才了得，好奇心和新鲜感是你的能量源。',
+  '你外冷内热、念旧护短，家与安全感是你最柔软的核心。',
+  '你自信有光芒，爱面子也讲义气，天然吸引别人追随。',
+  '你细致认真、追求完美，靠谱到把每件小事都做到极致。',
+  '你追求平衡与和谐，擅长沟通周旋，是人际场上的润滑剂。',
+  '你洞察力强、敢爱敢恨，认准的东西会执着地挖到底。',
+  '你乐观爱自由，说走就走，骨子里向往远方与冒险。',
+  '你务实自律、目标感强，能把苦活累活默默扛成成绩。',
+  '你思维跳脱、脑洞清奇，反传统是你的可爱与力量。',
+  '你敏感温柔、共情力满格，天生的浪漫治愈系。',
+];
+const ZODIAC_MOON_EMOTION = [
+  '情绪来得快也去得快，最需要的是被直接地回应和肯定。',
+  '情感慢热但极长情，被安稳陪伴时最有安全感。',
+  '心情像天气一样多变，聊聊天、换换环境就能被治愈。',
+  '心思细腻又容易内耗，家人的一句软话就能暖到心里。',
+  '表面大大咧咧，内心其实渴望被仰望和夸赞。',
+  '习惯用行动表达爱，默默做好小事就是你最大的在乎。',
+  '最怕冲突，情绪一上来就想要一个温和的台阶。',
+  '情感浓烈而深沉，好的坏的都会记得很久。',
+  '自由比黏腻更重要，恋爱里也渴望各自有空间。',
+  '情绪管理一流，但独处时也会有想被懂得的瞬间。',
+  '情感上需要新鲜感与精神共鸣，讨厌一成不变。',
+  '共情力太强，容易被别人的情绪牵着走，要记得照顾自己。',
+];
+const ZODIAC_RISING_IMAGE = [
+  '给人的第一印象是爽朗利落、精神头十足。',
+  '显得沉稳可靠、慢条斯理，自带一种踏实气场。',
+  '看起来机灵健谈，走到哪都像个话题中心。',
+  '外表温和带着距离感，熟了之后才发现其实很暖。',
+  '举手投足自带气场，走到哪都容易被注意到。',
+  '给人的感觉是干净利落、做事有条理的样子。',
+  '气质温和有礼貌，第一面就让人愿意亲近。',
+  '眼神有穿透力，外表有种神秘又不好惹的气场。',
+  '看起来阳光爱笑、自由洒脱，很好相处。',
+  '穿着谈吐都偏成熟稳重，给人靠谱的老干部感。',
+  '外形和谈吐都很有个性，一眼就觉得与众不同。',
+  '气质柔和不具攻击性，让人觉得很容易接近。',
+];
+// 相位通用解读：合相/三合/六合 → 顺畅；刑 → 挑战；冲 → 平衡；其余 → 一般
+function _aspectReadable(label, type) {
+  const t = String(type || '').toLowerCase();
+  if (t === 'conjunction' || t === 'trine') return '顺畅';
+  if (t === 'square') return '有挑战';
+  if (t === 'opposition') return '需要平衡';
+  if (t === 'sextile') return '有助力';
+  return '值得留意';
+}
+function zodiacIndexFromSign(sign) {
+  const s = String(sign || '').trim();
+  if (!s) return -1;
+  const zhIdx = ZODIAC_SUN_PERSONALITY.findIndex((_, i) => ZODIAC_SIGNS[i] === s);
+  if (zhIdx >= 0) return zhIdx;
+  // 兼容 "Aries"/"Taurus" 英文（首字母大写）
+  const en = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+  const lo = s.toLowerCase();
+  const enIdx = en.indexOf(lo);
+  if (enIdx >= 0) return enIdx;
+  return -1;
+}
+function _signOf(p) {
+  return (p && (p.sign || p.signEn)) || '';
 }
 
-function maybeSendStartupFortune(win, getDailyFortuneFn) {
+// 星盘分析 LLM prompt：compact JSON（行星落座/上升/天顶/相位），要求 4 段中文解读
+function buildNatalAnalysisPrompt(chartData) {
+  const d = (chartData && chartData.data && !chartData.error) ? chartData.data : (chartData || {});
+  const planets = d.planets || {};
+  const compact = {
+    planets: Object.fromEntries(
+      Object.entries(planets).map(([k, v]) => [k, {
+        sign: (v && v.sign) || '',
+        degree: (v && v.degree) != null ? v.degree : null,
+        label: (v && (v.label || v.planetLabel)) || k,
+        longitude: (v && typeof v.longitude === 'number') ? v.longitude : null,
+      }])
+    ),
+    ascendant: (d.ascendant && (d.ascendant.sign || d.ascendant.label)) ? { sign: d.ascendant.sign, label: d.ascendant.label } : null,
+    midheaven: (d.midheaven && (d.midheaven.sign || d.midheaven.label)) ? { sign: d.midheaven.sign, label: d.midheaven.label } : null,
+    aspects: (Array.isArray(d.aspects) ? d.aspects.slice(0, 8) : []).map((a) => ({
+      label: (a && a.label) || '', p1: (a && a.planet1Label) || '', p2: (a && a.planet2Label) || '', angle: (a && a.angle) != null ? a.angle : null,
+    })),
+  };
+  return `以下是本命星盘数据（JSON）：\n${JSON.stringify(compact, null, 2)}\n\n请按系统要求输出解读。`;
+}
+
+// 模板降级：太阳性格 + 月亮情感 + 上升外在 各一句 + 相位通用解读 + 免责
+// 返回段落数组（每段一段）；chartData 为空时仍给出通用解读
+function templateNatalAnalysis(chartData) {
+  const d = (chartData && chartData.data && !chartData.error) ? chartData.data : (chartData || {});
+  const planets = d.planets || {};
+  const sun = planets.Sun || planets.sun;
+  const moon = planets.Moon || planets.moon;
+  const asc = d.ascendant || null;
+  const sunIdx = zodiacIndexFromSign(_signOf(sun));
+  const moonIdx = zodiacIndexFromSign(_signOf(moon));
+  const ascIdx = zodiacIndexFromSign(asc && asc.sign);
+  const segments = [];
+  segments.push(`【核心性格】${sunIdx >= 0 ? ZODIAC_SUN_PERSONALITY[sunIdx] : '性格内外兼具，稳重中带点灵动，遇到大事能沉住气。'}`);
+  segments.push(`【月亮情感】${moonIdx >= 0 ? ZODIAC_MOON_EMOTION[moonIdx] : '情绪细腻有韧性，在意的人被你放在心上就格外长久。'}`);
+  segments.push(`【上升外在】${ascIdx >= 0 ? ZODIAC_RISING_IMAGE[ascIdx] : '外表随和好相处，越了解越觉得你丰富有内涵。'}`);
+  // 相位通用解读（取前 3 个相位）
+  const aspects = Array.isArray(d.aspects) ? d.aspects.filter((a) => a && (a.label || a.planet1Label)) : [];
+  if (aspects.length) {
+    const reads = aspects.slice(0, 3).map((a) => {
+      const p1 = a.planet1Label || '一星';
+      const p2 = a.planet2Label || '一星';
+      const kind = (a.label || a.type || '相位');
+      return `${p1}与${p2}${kind}，${_aspectReadable(kind, a.type)}`;
+    });
+    segments.push(`【相位提示】${reads.join('；')}。`);
+  } else {
+    segments.push('【相位提示】本命相位较为平稳，顺其自然便是最好的节奏。');
+  }
+  segments.push('以上内容仅供娱乐参考，人生的方向盘始终握在你自己手里~');
+  return segments;
+}
+
+// 星盘分析主入口：有 LLM key 走 LLM（OpenAI 兼容），失败/无 key → 模板降级。
+// deps.getSettings 可注入（测试用）；返回 { text, source }，text 为段落按空行拼接。
+async function analyzeNatalChart(chartData, deps = {}) {
+  let settings = {};
+  try { settings = deps.getSettings ? deps.getSettings() : loadJson(settingsPath(), {}); } catch (e) { /* ignore */ }
+  const modelConfig = settings.modelConfig || {};
+  if (modelConfig.llmApiKey) {
+    try {
+      const text = await callLLMText(
+        { apiKey: modelConfig.llmApiKey, baseUrl: modelConfig.llmBaseUrl, model: modelConfig.llmModel },
+        '你是资深占星师"财神小助手"，擅长本命盘解读。根据用户星盘数据输出 4 段中文解读，萌宠口吻（自称"小财"），每段 1-2 句，简短口语化：① 核心性格（太阳星座为主，含月亮/上升补充）② 感情/事业倾向（金星/火星/水星落座）③ 相位提示（如日月三合→内外一致）④ 一句整体建议。只输出解读正文，不要 JSON、不要编号标题、不要任何额外说明。',
+        buildNatalAnalysisPrompt(chartData)
+      );
+      const lines = String(text || '').split(/\n+/).map((s) => s.trim()).filter(Boolean);
+      return { text: lines.length ? lines.join('\n') : templateNatalAnalysis(chartData).join('\n'), source: 'llm' };
+    } catch (e) {
+      console.error('[star] LLM analyze failed, fallback to template:', e.message);
+      appendLLMDebug(`星盘分析 LLM 失败(模板降级): ${e.message}`);
+    }
+  }
+  return { text: templateNatalAnalysis(chartData).join('\n'), source: 'template' };
+}
+
+// OpenAI 兼容文本补全（星盘分析用）：与 callLLM 同模式，直接返回 content 纯文本
+async function callLLMText({ apiKey, baseUrl, model }, systemPrompt, userPrompt) {
+  const url = `${(baseUrl || 'https://api.deepseek.com').replace(/\/$/, '')}/chat/completions`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
   try {
-    const settings = loadJson(settingsPath(), {});
-    if (settings.fortuneReminderEnabled === false) return;
-    const today = new Date().toISOString().slice(0, 10);
-    getDailyFortuneFn(today, false)
-      .then((r) => {
-        if (r && r.data) {
-          setTimeout(() => sendFortuneReminder(win, r.data), 5000);
-        }
-      })
-      .catch((e) => console.error('[fortune] startup reminder failed:', e.message));
-  } catch (e) { /* ignore */ }
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: model || 'deepseek-v4-flash',
+          temperature: 0.8,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 1000,
+        }),
+      });
+    } catch (fetchErr) {
+      appendLLMDebug(`星盘分析 LLM fetch 失败: ${fetchErr && fetchErr.message}`);
+      throw new Error(`LLM fetch failed: ${fetchErr && fetchErr.message}`);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      appendLLMDebug(`星盘分析 LLM HTTP ${res.status} ${errText.slice(0, 200)}`);
+      throw new Error(`LLM HTTP ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices && json.choices[0] && json.choices[0].message
+      ? json.choices[0].message.content
+      : '';
+    if (!content) throw new Error('LLM empty response');
+    return String(content);
+  } catch (e) {
+    appendLLMDebug(`星盘分析 LLM 调用失败: ${e.message}`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // test hook
@@ -539,8 +707,14 @@ module.exports = {
   FORTUNE_STOPWORDS,
   isStaleFortuneEntry,
   FORTUNE_CACHE_SCHEMA_VERSION,
-  sendFortuneReminder,
-  maybeSendStartupFortune,
+  // v0.4.22 星盘分析
+  analyzeNatalChart,
+  templateNatalAnalysis,
+  buildNatalAnalysisPrompt,
+  ZODIAC_SUN_PERSONALITY,
+  ZODIAC_MOON_EMOTION,
+  ZODIAC_RISING_IMAGE,
+  zodiacIndexFromSign,
   __setDataDir,
   _internals: { WUXING, relationOf, parseLLMJson },
 };

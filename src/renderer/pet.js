@@ -855,6 +855,8 @@ const PetState = {
   // ---- Bubble 优先级消息队列 ----
   // 气泡串行显示（一条显示完再下一条）；高优先级可插队（打断当前气泡并放回队首）；
   // 语音走已有 TTS FIFO（enqueueMsg 的 speech 项调用 speakFortune，互不重叠）
+  // v0.4.22 同文本去重：opts.dedupe=true 时同文本已在队列/正在显示 → 不入队；
+  // fortune 类（category==='fortune'）默认 dedupe=true，user 交互不受影响（兜底防重复播报）
   enqueueMsg(text, opts = {}) {
     const str = String(text == null ? '' : text);
     if (!str) return null;
@@ -867,6 +869,10 @@ const PetState = {
       chat: opts.chat !== false,
       pop: !!opts.pop,
     };
+    const dedupe = opts.dedupe !== undefined ? !!opts.dedupe : (MsgCore.dedupeDefault ? MsgCore.dedupeDefault(item.category) : false);
+    if (dedupe && MsgCore.isTextPending(this._msgQueue, this._msgShowing && this._msgShowing.text, str)) {
+      return null; // 同文本已在队列或正在显示 → 丢弃（防重复）
+    }
     const cur = this._msgShowing;
     if (cur && MsgCore.shouldPreempt(cur, item)) {
       // 高优先级插队：当前气泡放回队首，立即展示新消息（不丢消息）

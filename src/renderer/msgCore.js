@@ -22,6 +22,19 @@
     return !!current && !!incoming && incoming.priority > current.priority;
   }
 
+  // ==================== v0.4.22 同文本去重 ====================
+  // 防重复播报兜底：fortune 类默认开启；同文本已在队列或正在显示 → 不入队。
+  // 用户交互 say()（category=user）默认 false，不受影响。
+  function dedupeDefault(category) {
+    return category === 'fortune';
+  }
+  function isTextPending(queue, showingText, text) {
+    const t = String(text == null ? '' : text);
+    if (!t) return false;
+    if (String(showingText == null ? '' : showingText) === t) return true;
+    return Array.isArray(queue) && queue.some((i) => i && String(i.text) === t);
+  }
+
   // ==================== 亲密度每日清零 ====================
   // 同一天保留原值；跨天归零重新计算（等级称号函数保留，元宝每日满100+1保留）
   function affinityForDay(savedAffinity, savedDate, todayStr) {
@@ -521,6 +534,9 @@
     PRIORITY,
     priorityInsert,
     shouldPreempt,
+    // v0.4.22 同文本去重
+    dedupeDefault,
+    isTextPending,
     affinityForDay,
     THEME_INTERACT,
     themePool,

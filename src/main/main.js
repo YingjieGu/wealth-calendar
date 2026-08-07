@@ -1067,6 +1067,24 @@ function setupIPC() {
     }
   });
 
+  // v0.4.22 星盘分析：渲染层传 natal 数据（chartData，避免二次请求 sidecar）；
+  // 若未传则用出生信息回退请求 /chart/natal 再分析。LLM 调用放主进程（渲染层无 key 环境）。
+  ipcMain.handle('star:analyze', async (_event, birth, chartData) => {
+    try {
+      let natal = chartData;
+      if (!natal || !natal.planets || !Object.keys(natal.planets || {}).length) {
+        if (!birth) return { error: 'noData', message: '缺少星盘数据' };
+        const r = await sidecar.requestSidecar('POST', '/chart/natal', { birth });
+        natal = r.data;
+      }
+      const r2 = await fortuneEngine.analyzeNatalChart(natal);
+      return { text: (r2 && r2.text) || '', source: (r2 && r2.source) || 'template' };
+    } catch (e) {
+      console.error('[star] analyze failed:', e.message);
+      return { error: e.message };
+    }
+  });
+
   ipcMain.handle('fortune:almanac', async (_event, dateStr) => {
     try {
       const q = dateStr ? `?date=${encodeURIComponent(dateStr)}` : '';
@@ -1650,10 +1668,8 @@ app.whenReady().then(() => {
       }).catch((e) => appendStartupLog(`tts status 获取失败: ${e.message}`));
     } catch (e) { /* ignore */ }
     if (ok) {
-      // Startup fortune reminder (5s delay, only if userInfo exists)
-      fortuneEngine.maybeSendStartupFortune(mainWindow, (d, f) =>
-        fortuneEngine.getDailyFortune(d, f, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) })
-      );
+      // v0.4.22 启动运势播报统一由渲染层 sayDailyFortune（启动后 30s）负责，
+      // 主进程不再推 fortune-reminder（避免启动时重复播报）
 
       // Apply wallpaper calendar mode if previously enabled
       const settings = loadSettings();

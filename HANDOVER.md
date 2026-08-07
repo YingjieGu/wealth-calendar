@@ -1,4 +1,38 @@
-# HANDOVER — v0.4.21 运势黄历宜忌彻底清除（缓存自愈 + sanitize 全覆盖）（已完成，归档）
+# HANDOVER — v0.4.22 星盘可视化+分析 + 启动重复播报修复（已完成，归档）
+
+## 本次任务（v0.4.22，用户原始需求 2 项，已完成）
+
+**① 星盘要"画出来" + 有分析（不只是数据列表）**
+- 现状：日历页「🔮 点击查看星盘」→ `_renderStarChart`（src/renderer/calendar.js）只渲染**行星落座文本列表**（太阳：金牛座 24°…）+ 上升/天顶行 + 相位摘要。用户要：**图形化星盘（画出来）** + **星座/行星/相位分析**。
+- 数据（sidecar `/chart/natal` 已返回，实测齐全）：`planets`（10 颗行星，每颗含 `sign/signEn/degree/minute/longitude` 黄经）、`ascendant`（含 longitude）、`midheaven`、`aspects`（19 个，含 planet1Label/planet2Label/label/angle/orb）。
+- **画图方案（SVG，软渲染安全——矢量 Skia CPU 渲染，勿用 canvas/位图）**：
+  - 圆形星盘：外圈 12 宫等分（每 30° 一格，标注星座名/符号，可用现有 ZODIAC_SIGNS 顺序），**以上升点 longitude 为第一宫起始**（传统星盘 asc 在左，宫位从 asc 逆时针排）；内圈画行星点（按 longitude 映射角度，标注行星中文名：太阳/月亮/水星/金星/火星/木星/土星/天王/海王/冥王）；画上升(ASC)/天顶(MC)轴线；中心可放"本命星盘"字样。
+  - 纯 SVG 字符串生成（函数如 `buildNatalChartSVG(chartData)`，纯函数便于单测），插入星盘区；`styles.css` 加 `.star-chart-svg` 基础样式（从简，深色/浅色主题适配用现有 CSS 变量）。
+  - 图在顶部，下方保留现有数据列表 + 相位摘要。
+- **分析（新增「🔮 星盘分析」按钮，图下方）**：
+  - 点击 → 调 LLM 生成解读（复用 fortuneEngine 的 LLM 调用模式：OpenAI 兼容 chat/completions、settings.modelConfig 的 llmApiKey/llmBaseUrl/llmModel、无 key/失败→模板降级）：
+    - LLM prompt：输入星盘紧凑 JSON（行星落座/上升/天顶/相位），输出 3-4 段中文解读——① 核心性格（太阳星座为主，含月亮/上升补充）② 感情/事业倾向（金星/火星/水星落座）③ 相位提示（如日月三合→内外一致）④ 一句整体建议。萌宠口吻"小财"，简短（每段 1-2 句）。
+    - **模板降级（无 key/LLM 失败）**：本地星座性格模板（12 星座 × 太阳星座核心性格一句 + 月亮情感 + 上升外在形象各一句，共 3 句）+ 相位通用解读（三合→顺利、刑→挑战、冲→平衡、六合→机会，取前 3 个相位）+ 免责"仅供娱乐参考"。
+  - 分析结果渲染在星盘区下方（`.star-chart-analysis` 卡片，样式从简）；加载中转圈/按钮文案变化；失败提示可重试。
+  - 新增 IPC：主进程 `star:analyze`（接收 birth 或 natal 数据，返回分析文本）——**注意 LLM 调用放主进程**（渲染层无 key 环境）；模板降级在主进程或渲染层都行（建议主进程统一，便于单测）。
+
+**② 启动后重复运势播报（"属马的你，运势整体63分…"出现 2-3 次）**
+- 根因（已定位，3 条通道同时播 reminderLines[0] 附近内容）：
+  1. 主进程 `maybeSendStartupFortune`（src/main/fortuneEngine.js:513，启动后 5s）→ `sendFortuneReminder`（:499）→ `webContents.send('fortune-reminder')` → 渲染层 renderer.js:212 `onFortuneReminder` → 气泡 + `speakFortune`（reminderLines[0]，带"属马的你"前缀即模板降级 zText）
+  2. 渲染层 `sayDailyFortune`（pet.js:1154，启动后 30s）→ `_broadcast(line, {speech:true})` → 气泡 + speakFortune（segments[0]）
+  3. 渲染层 `_doFortuneBroadcast`（时段播报，档期可能正好在启动附近）→ `_broadcast` 同源内容
+- 修复（两层）：
+  1. **统一启动通道**：主进程 `maybeSendStartupFortune` 的 IPC 推送去掉（不再 `webContents.send('fortune-reminder')`；`sendFortuneReminder` 里系统 Notification 可保留或一并去掉——用户抱怨的是"提醒播报队列"，气泡+语音统一由渲染层 `sayDailyFortune`（30s）负责即可；系统通知保留不影响气泡队列，但为观感一致建议把系统通知也去掉，启动运势播报完全交给渲染层一条通道）。`maybeSendStartupFortune` 若不再被调用，连同调用点一起删掉（检查 main.js 调用处）。
+  2. **队列同文本去重（兜底）**：`enqueueMsg`（pet.js）加 `opts.dedupe`——true 时若同文本已在消息队列中或正在显示（`_msgShowing.text`），**不再入队**；**fortune 类（category==='fortune'）默认 dedupe=true**；其他类默认 false（用户交互 say() 不受影响）。防止未来任何路径重复。
+- 验证：启动后 60s 内只播报一次总运势（TTS 队列只有一条 speakFortune 入队、气泡一条）；可注入两条相同文本 enqueueMsg 断言第二条被丢弃。
+
+**硬约束**：保留全部现有功能；勿动软渲染配置（SVG 可用，canvas/位图避免）；勿加 filter；测试前备份 settings.json 测后恢复；不跑 GUI 测试（node --check + 单元测试 + curl sidecar 验证星盘数据）；样式从简；中文 commit；bump 0.4.22；不打包 exe。
+
+**验证**：node --check 全过；单元测试——① buildNatalChartSVG：SVG 合法（含 12 宫/行星/ASC/MC 元素）、asc 起点映射正确、无 NaN ② 星盘分析模板降级（12 星座模板命中、无 key 时输出 3 段+免责）③ LLM prompt 结构 ④ enqueueMsg dedupe：fortune 同文本去重、user 交互不去重 ⑤ 主进程启动不再发 fortune-reminder（源码断言）；回归 v019/v020/v021 全过；bump 0.4.22 + 中文 commit；不打包 exe。
+
+---
+
+# HANDOVER — v0.4.21 运势黄历彻底清除（已完成，归档）（已完成，归档）
 
 ## 本次任务（v0.4.21，用户反馈：v0.4.19 修过但仍出现"今日宜祭祀、塞穴、入殓…"，已完成）
 

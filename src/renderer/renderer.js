@@ -209,16 +209,8 @@ function convertToPng(dataUrl) {
     if (!queue(text, { priority: 5, category: 'schedule', chat: false })) showBubble(text);
   });
 
-  window.wealthCalendar.onFortuneReminder((data) => {
-    const line = data.line || '';
-    const text = `🔮 ${line}`;
-    // ③ 运势提醒类：优先级(4)，气泡走队列串行显示（交互类台词不播报）
-    if (!queue(text, { priority: 4, category: 'fortune', chat: false })) showBubble(text);
-    // 运势语音播报走 TTS FIFO（先系统提示音再"小财帮你瞄了一眼：..."，不重叠）
-    if (typeof PetState !== 'undefined' && PetState.speakFortune && line) {
-      PetState.speakFortune(line);
-    }
-  });
+  // v0.4.22 启动运势播报统一由 sayDailyFortune（渲染层 30s 一条通道）负责，
+  // 主进程已不再推送 fortune-reminder，此处监听一并移除（避免重复播报残留路径）
 
   // ⑥ 即时通讯类（主进程推送，预留未来渠道）：优先级(4)
   try {

@@ -520,12 +520,21 @@ const CalendarView = {
     const body = document.getElementById('star-chart-body');
     if (!body) return;
     const d = (chart && chart.data) || chart || {};
+    this._natalChartData = d; // v0.4.22 保存星盘数据，供「星盘分析」按钮使用
     const planets = d.planets || {};
     // v0.4.19 修复 [object Object]：后端 ascendant/midheaven 是对象，label 里已含"上升 /天顶 "前缀，
     // 此处取 label 并去前缀，输出一行"上升 天蝎座 15°03′22″"，避免"上升 上升 X"重复
     const ascLabel = this._zodiacLabel(d.ascendant);
     const mcLabel = this._zodiacLabel(d.midheaven);
     let html = '';
+    // v0.4.22 顶部 SVG 圆形星盘（纯 SVG 字符串生成，软渲染安全勿用 canvas）；
+    // 生成失败不影响下方数据列表
+    try {
+      if (typeof StarChart !== 'undefined' && StarChart.buildNatalChartSVG) {
+        const svg = StarChart.buildNatalChartSVG(d);
+        if (svg) html += svg;
+      }
+    } catch (e) { /* ignore */ }
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(birth || ''));
     if (m) html += `<div class="star-chart-sub">${m[1]}年${Number(m[2])}月${Number(m[3])}日 本命星盘</div>`;
     if (ascLabel) html += `<div class="star-chart-line"><span class="star-chart-name">上升</span><span class="star-chart-val">${this.escapeHtml(ascLabel)}</span></div>`;
@@ -547,8 +556,42 @@ const CalendarView = {
         const labels = aspects.slice(0, 5).map((a) => (typeof a === 'string' ? a : (a && (a.label || a.type)) || '')).filter(Boolean);
         if (labels.length) html += `<div class="star-chart-phases">相位：${this.escapeHtml(labels.join('、'))}</div>`;
       }
+      // v0.4.22 「🔮 星盘分析」按钮（图下方）+ 分析结果卡片（懒加载，点击后显示）
+      html += '<button id="btn-star-analysis" class="star-chart-analysis-btn" type="button">🔮 星盘分析</button>';
+      html += '<div id="star-chart-analysis" class="star-chart-analysis hidden"></div>';
     }
     body.innerHTML = html;
+    // v0.4.22 绑定分析按钮（body 每次重建，须每次渲染后重新绑定）
+    const btn = document.getElementById('btn-star-analysis');
+    if (btn) btn.addEventListener('click', () => this._analyzeStarChart());
+  },
+
+  // v0.4.22 星盘分析：调主进程 star:analyze（LLM 生成 4 段解读，无 key/失败模板降级），
+  // 结果渲染在星盘区下方卡片；加载中转圈（按钮文案变化）；失败提示可重试
+  async _analyzeStarChart() {
+    const btn = document.getElementById('btn-star-analysis');
+    const out = document.getElementById('star-chart-analysis');
+    if (!btn || !out) return;
+    btn.disabled = true;
+    btn.textContent = '🔮 分析中…';
+    try {
+      const r = await window.wealthCalendar.starAnalyze(null, this._natalChartData || null);
+      const text = (r && r.text) || '';
+      if (text) {
+        const segs = String(text).split(/\n+/).map((s) => s.trim()).filter(Boolean);
+        out.innerHTML = segs.map((s) => `<p class="star-chart-analysis-p">${this.escapeHtml(s)}</p>`).join('') ||
+          '<div class="star-chart-empty">暂无分析结果</div>';
+      } else {
+        out.innerHTML = '<div class="star-chart-empty">暂无分析结果</div>';
+      }
+      out.classList.remove('hidden');
+    } catch (e) {
+      out.innerHTML = '<div class="star-chart-empty">分析失败，请重试</div>';
+      out.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔮 星盘分析';
+    }
   }
 };
 

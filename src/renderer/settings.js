@@ -40,6 +40,8 @@ const SettingsManager = {
     // 元宝卡片 + 财神金主兑换解锁状态
     this.applyCoins();
     this.applyGoldUnlock();
+    // v0.4.18 生肖收集宫格 + 解锁按钮 + 进度
+    this.applyZodiac();
   },
 
   // ---- 元宝系统：卡片展示 + 兑换解锁「财神金主」限定主题 ----
@@ -81,6 +83,57 @@ const SettingsManager = {
     if (!btn) return;
     const unlocked = (this.settings.unlockedThemes || []).includes('gold');
     btn.style.display = unlocked ? '' : 'none';
+  },
+
+  // v0.4.18 生肖收集：渲染 4x3 十二宫格（固定鼠牛虎兔龙蛇马羊猴鸡狗猪）+ 元宝余额 + 解锁按钮 + 进度
+  applyZodiac() {
+    if (typeof MsgCore === 'undefined') return;
+    const unlocked = Array.isArray(this.settings.zodiacUnlocked) ? this.settings.zodiacUnlocked : [];
+    const grid = document.getElementById('zodiac-grid');
+    if (!grid) return;
+    const cur = this.settings.theme;
+    grid.innerHTML = MsgCore.zodiacEntries().map((t) => {
+      const s = MsgCore.zodiacCellState(t, unlocked);
+      return `<div class="zodiac-cell ${s.cls}${s.isUnlocked && cur === t.id ? ' active' : ''}" data-theme="${t.id}" title="${t.name}">` +
+        `<span class="zodiac-emoji">${s.emoji}</span><span>${s.label}</span></div>`;
+    }).join('');
+    const coins = (typeof PetState !== 'undefined' && PetState._petCoins != null)
+      ? Number(PetState._petCoins) || 0
+      : (Number(this.settings.petCoins) || 0);
+    const bal = document.getElementById('zodiac-coin-balance');
+    if (bal) bal.textContent = `🪙 ${coins} 元宝`;
+    const pool = MsgCore.zodiacPool(unlocked);
+    const complete = MsgCore.isCollectionComplete(unlocked);
+    const btn = document.getElementById('btn-unlock-zodiac');
+    if (btn) {
+      if (complete) {
+        btn.textContent = '🏆 已集齐 12 生肖！';
+        btn.disabled = true;
+      } else if (MsgCore.canUnlockZodiac(coins, pool)) {
+        btn.textContent = `🎲 随机解锁生肖（3 元宝 · 剩 ${pool.length} 个）`;
+        btn.disabled = false;
+      } else if (coins < MsgCore.ZODIAC_COST) {
+        btn.textContent = `🎲 随机解锁生肖（还差 ${MsgCore.ZODIAC_COST - coins} 元宝）`;
+        btn.disabled = true;
+      } else {
+        btn.textContent = '🎲 随机解锁生肖（素材筹备中）';
+        btn.disabled = true;
+      }
+    }
+    const prog = document.getElementById('zodiac-progress');
+    if (prog) {
+      const p = MsgCore.zodiacProgress(unlocked);
+      prog.textContent = complete
+        ? `已收集 ${p.collected}/${p.total} 🎉 集齐彩蛋：十二生肖收藏家！`
+        : `已收集 ${p.collected}/${p.total}`;
+    }
+    // 同步「收藏家」称号状态：集齐 + 当前生肖主题时 pet.js 显示徽标
+    if (typeof PetState !== 'undefined') {
+      PetState._zodiacComplete = complete;
+      if (PetState._updateZodiacBadge) {
+        PetState._updateZodiacBadge(MsgCore.isZodiac(this.settings.theme) && complete);
+      }
+    }
   },
 
   // 亲密度/心情展示（财宠名字板块；由 PetState.refreshAffinityMenu 实时刷新）
@@ -268,6 +321,59 @@ const SettingsManager = {
       this.applyGoldUnlock();
       this.updateThemeUI(this.settings.theme);
       showToast('👑 已解锁「财神金主」限定主题！可到主题板块选用');
+    });
+
+    // v0.4.18 生肖随机解锁：扣 3 元宝 → 从 assetsReady 且未解锁池随机抽 1 个 → 写 zodiacUnlocked
+    document.getElementById('btn-unlock-zodiac').addEventListener('click', async () => {
+      if (typeof MsgCore === 'undefined') return;
+      const unlocked = Array.isArray(this.settings.zodiacUnlocked) ? this.settings.zodiacUnlocked : [];
+      const pool = MsgCore.zodiacPool(unlocked);
+      const coins = (typeof PetState !== 'undefined' && PetState._petCoins != null)
+        ? Number(PetState._petCoins) || 0
+        : (Number(this.settings.petCoins) || 0);
+      if (!MsgCore.canUnlockZodiac(coins, pool)) {
+        showToast(MsgCore.isCollectionComplete(unlocked)
+          ? '🏆 十二生肖已全部集齐！'
+          : `元宝不足（随机解锁需 ${MsgCore.ZODIAC_COST} 元宝），或素材筹备中`);
+        return;
+      }
+      const picked = MsgCore.randomZodiacFromPool(pool);
+      if (!picked) return;
+      this.settings.petCoins = coins - MsgCore.ZODIAC_COST;
+      if (typeof PetState !== 'undefined') PetState._petCoins = this.settings.petCoins;
+      this.settings.zodiacUnlocked = [...unlocked, picked.id];
+      await this.save();
+      const emoji = MsgCore.zodiacEmoji(picked.zodiacIndex);
+      const msg = `${emoji} 解锁了${picked.name}！`;
+      showToast(`${msg}（消耗 3 元宝）`);
+      if (typeof PetState !== 'undefined' && PetState.say) PetState.say(`${msg} 去主题板块选它当宠物吧～`);
+      this.applyCoins();
+      this.applyZodiac();
+      // 集齐彩蛋：气泡庆祝 + 「🐲 十二生肖收藏家」称号徽标 + 自动切到刚解锁生肖
+      if (MsgCore.isCollectionComplete(this.settings.zodiacUnlocked)) {
+        setTimeout(() => {
+          showToast('🎉 集齐 12 生肖！获得称号「🐲 十二生肖收藏家」');
+          if (typeof PetState !== 'undefined' && PetState.say) PetState.say('🐲 我集齐了十二生肖！主人太棒啦，收藏家称号到手～');
+          if (typeof PetState !== 'undefined') {
+            this.settings.theme = picked.id;
+            this.updateThemeUI(picked.id);
+            PetState.setTheme(picked.id, this.settings.petEmoji);
+            this.applyZodiac();
+          }
+        }, 1500);
+      }
+    });
+
+    // v0.4.18 生肖宫格：点已解锁格 = 切换主题
+    document.getElementById('zodiac-grid').addEventListener('click', (e) => {
+      const cell = e.target.closest('.zodiac-cell');
+      if (!cell || !cell.classList.contains('unlocked')) return;
+      const theme = cell.dataset.theme;
+      this.settings.theme = theme;
+      this.updateThemeUI(theme);
+      PetState.setTheme(theme, this.settings.petEmoji);
+      this.save();
+      this.applyZodiac();
     });
 
     // 宠物名字保存：同步 PetState + settings.petName 持久化

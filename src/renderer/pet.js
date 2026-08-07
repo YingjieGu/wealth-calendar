@@ -388,6 +388,39 @@ const PetState = {
       play: ['财神到.webp'],
       sit: ['财神到.webp'],
     },
+    // v0.4.18 生肖收集主题（素材已在 assets/themes/{rat,ox,tiger,rabbit}/，文件名精确匹配）
+    rat: {
+      walk: ['吃麦乐鸡.gif'],                                     // 无专门走路图，复用
+      happy: ['喝酒开心.gif', '吃麦乐鸡.gif'],                     // 吃麦乐鸡/喝酒开心
+      sad: ['哭唧唧.gif', '晴天霹雳.gif'],                         // 哭唧唧/晴天霹雳
+      play: ['转呼啦圈.gif', '摘玫瑰花瓣-“它喜欢我，它不喜欢我”.gif'],
+      sit: ['吃麦乐鸡.gif', '刷牙.gif'],
+      sleep: ['吃麦乐鸡.gif'],                                     // 素材少复用
+    },
+    ox: {
+      walk: ['加油加油.gif'],                                     // 复用
+      sleep: ['摆烂.gif'],
+      happy: ['恭喜发财.webp', '福到.webp', '新年快乐.gif'],
+      sad: ['害羞.webp'],
+      play: ['加油加油.gif'],
+      sit: ['福到.webp'],
+    },
+    tiger: {
+      walk: ['送你花花.gif'],
+      sleep: ['睡大觉.webp'],
+      happy: ['发大财.webp', '傻乐.webp'],
+      sad: ['傻乐.webp'],
+      play: ['送你花花.gif'],
+      sit: ['送你花花.gif'],
+    },
+    rabbit: {
+      walk: ['蹭蹭.gif'],
+      sleep: ['想你了.webp'],
+      happy: ['比心.gif', '啵一个.gif', '哇哦.gif', '抛个媚眼.gif'],
+      sad: ['伤心.gif', '哭唧唧.gif', '生气.gif', '哼.gif'],
+      play: ['蹭蹭.gif', '黏住你.gif', '丘比特之箭.gif', '大声唱歌.gif'],
+      sit: ['吃吃吃.gif', '带你去溜达.webp'],
+    },
   },
 
   // 按状态展示宠物视觉：素材主题 → 动作动图；其余 → SVG/emoji
@@ -399,7 +432,8 @@ const PetState = {
   },
   _applyStateVisual(state) {
     const theme = this._theme || 'cat1';
-    const isMaterial = theme === 'cat1' || theme === 'cat2' || theme === 'caishen';
+    // v0.4.18 素材主题判断改走 THEME_CATALOG 的 kind（含 12 生肖，扩展主题零改动）
+    const isMaterial = typeof MsgCore !== 'undefined' && MsgCore.catalogKind(theme) === 'material';
     const svgEl = document.getElementById('pet-svg');
     const cls = this._stateClass(state);
     // 素材主题：先备好内联 SVG 兜底内容（素材缺失/加载失败时显示对应 SVG），
@@ -1513,9 +1547,11 @@ const PetState = {
 
   svgPet(theme, customEmoji) {
     // 内置主题 → 对应 SVG；素材主题失败兜底时也按主题匹配（caishen→财神，cat1/cat2→萌猫）；
-    // custom 在软渲染 Linux 下兜底为萌猫；gold 财神金主复用财神 SVG（金色样式走 CSS）
+    // custom 在软渲染 Linux 下兜底为萌猫；gold 财神金主复用财神 SVG（金色样式走 CSS）；
+    // v0.4.18 生肖主题兜底复用萌猫 SVG（软渲染下 emoji 灰色剪影，不用生肖 emoji 直渲）
     if (theme === 'fortune' || theme === 'caishen' || theme === 'gold') return this.svgFortune();
     if (theme === 'bagua') return this.svgBagua();
+    if (typeof MsgCore !== 'undefined' && MsgCore.isZodiac(theme)) return this.svgCat();
     return this.svgCat();
   },
 
@@ -1523,6 +1559,14 @@ const PetState = {
   _updateGoldBadge(show) {
     try {
       const badge = document.getElementById('gold-badge');
+      if (badge) badge.style.display = show ? 'block' : 'none';
+    } catch (e) { /* ignore */ }
+  },
+
+  // v0.4.18 生肖收藏家称号（集齐 12 生肖 + 当前为生肖主题）：显示/隐藏 🐲 徽标
+  _updateZodiacBadge(show) {
+    try {
+      const badge = document.getElementById('zodiac-badge');
       if (badge) badge.style.display = show ? 'block' : 'none';
     } catch (e) { /* ignore */ }
   },
@@ -1544,6 +1588,8 @@ const PetState = {
     appEl.classList.remove('theme-cat', 'theme-fortune', 'theme-bagua', 'theme-gold');
     this._theme = theme;
     this._updateGoldBadge(theme === 'gold');
+    // v0.4.18 生肖收藏家称号：集齐 + 当前为生肖主题才亮
+    this._updateZodiacBadge(typeof MsgCore !== 'undefined' && MsgCore.isZodiac(theme) && !!this._zodiacComplete);
 
     const svgEl = document.getElementById('pet-svg');
     const img = document.getElementById('pet-img');
@@ -1553,7 +1599,8 @@ const PetState = {
     // 素材主题：显示动作动图（webp/gif）。SwiftShader (use-angle=swiftshader)
     // 已让位图在本机 KVM 软渲染环境也能绘制，统一走素材图；
     // themeAsset 加载失败时 _applyStateVisual 内部自动兜底为 SVG。
-    if (theme === 'cat1' || theme === 'cat2' || theme === 'caishen') {
+    // v0.4.18 判断改走 THEME_CATALOG kind==='material'（含 12 生肖），CSS class 兜底 theme-cat
+    if (typeof MsgCore !== 'undefined' && MsgCore.catalogKind(theme) === 'material') {
       appEl.classList.add(theme === 'caishen' ? 'theme-fortune' : 'theme-cat');
       this._applyStateVisual(this.currentState || 'idle');
       return;

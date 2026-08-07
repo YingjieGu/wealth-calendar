@@ -59,14 +59,103 @@
       comfort: ['别难过啦，小财陪着你~', '摸摸头，好运会来的~'],
       roast: ['主人又调皮啦！', '喵，别闹啦~'],
     },
+    // v0.4.18 生肖收集主题共用互动文案（12 生肖共用一组，文案里带各生肖 emoji 风格）
+    zodiac: {
+      interact: ['吱吱~ 主人摸我啦，好开心！', '嘿嘿，主人来陪我玩啦~', '主人戳我，蹭蹭你手心~', '昂昂，陪主人打会儿盹~'],
+      comfort: ['别难过啦，主人，我陪着你呢~', '摸摸头，好运马上就来找你~', '主人累了吧？靠着我休息会儿~'],
+      roast: ['主人又在偷懒啦，我都看不下去了~', '哼，主人是不是忘了给我加鸡腿~', '主人，你这运气还得再攒攒哦~'],
+    },
   };
   function themePool(theme) {
-    return THEME_INTERACT[theme] || THEME_INTERACT.default;
+    if (THEME_INTERACT[theme]) return THEME_INTERACT[theme];
+    if (zodiacIndexOf(theme) >= 0) return THEME_INTERACT.zodiac; // 12 生肖共用通用互动组
+    return THEME_INTERACT.default;
   }
   function pickThemeLine(theme, category) {
     const pool = themePool(theme);
     const arr = pool[category] || THEME_INTERACT.default.interact;
     return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  // ==================== 主题目录（THEME_CATALOG：集中元数据，可扩展） ====================
+  // 每项 { id, name, kind: 'material'|'svg'|'custom', unlock: 'free'|'coins'|'zodiac', cost?, zodiacIndex?, assetsReady? }
+  // free：默认可用；coins：元宝兑换（gold 10 元宝，保留现有逻辑）；zodiac：元宝随机解锁收集
+  // 12 生肖全量预注册，后 8 个（龙蛇马羊猴鸡狗猪）素材未到 → assetsReady:false，不参与随机池，
+  // 素材到位只需补目录 + 改 assetsReady，其余代码零改动；未来其他主题加一个条目即可。
+  const ZODIAC_EMOJI = ['🐭', '🐮', '🐯', '🐰', '🐲', '🐍', '🐴', '🐑', '🐵', '🐔', '🐶', '🐷'];
+  const ZODIAC_COST = 3; // 随机解锁一个生肖的花费（元宝）
+  const THEME_CATALOG = [
+    { id: 'cat1', name: 'Q版猫咪', kind: 'material', unlock: 'free' },
+    { id: 'cat2', name: '萌宠2', kind: 'material', unlock: 'free' },
+    { id: 'caishen', name: '财神', kind: 'material', unlock: 'free' },
+    { id: 'custom', name: '自定义', kind: 'custom', unlock: 'free' },
+    { id: 'gold', name: '财神金主', kind: 'svg', unlock: 'coins', cost: 10 },
+    // ---- 12 生肖收集主题（全量预注册）----
+    { id: 'rat', name: '生肖鼠', kind: 'material', unlock: 'zodiac', zodiacIndex: 0, assetsReady: true },
+    { id: 'ox', name: '生肖牛', kind: 'material', unlock: 'zodiac', zodiacIndex: 1, assetsReady: true },
+    { id: 'tiger', name: '生肖虎', kind: 'material', unlock: 'zodiac', zodiacIndex: 2, assetsReady: true },
+    { id: 'rabbit', name: '生肖兔', kind: 'material', unlock: 'zodiac', zodiacIndex: 3, assetsReady: true },
+    { id: 'dragon', name: '生肖龙', kind: 'material', unlock: 'zodiac', zodiacIndex: 4, assetsReady: false },
+    { id: 'snake', name: '生肖蛇', kind: 'material', unlock: 'zodiac', zodiacIndex: 5, assetsReady: false },
+    { id: 'horse', name: '生肖马', kind: 'material', unlock: 'zodiac', zodiacIndex: 6, assetsReady: false },
+    { id: 'goat', name: '生肖羊', kind: 'material', unlock: 'zodiac', zodiacIndex: 7, assetsReady: false },
+    { id: 'monkey', name: '生肖猴', kind: 'material', unlock: 'zodiac', zodiacIndex: 8, assetsReady: false },
+    { id: 'rooster', name: '生肖鸡', kind: 'material', unlock: 'zodiac', zodiacIndex: 9, assetsReady: false },
+    { id: 'dog', name: '生肖狗', kind: 'material', unlock: 'zodiac', zodiacIndex: 10, assetsReady: false },
+    { id: 'pig', name: '生肖猪', kind: 'material', unlock: 'zodiac', zodiacIndex: 11, assetsReady: false },
+  ];
+  // 查目录条目 / 类型（未知主题返回 null / undefined，内置 svg 主题 cat/fortune/bagua 不在目录）
+  function catalogEntry(id) {
+    return THEME_CATALOG.find((t) => t.id === id) || null;
+  }
+  function catalogKind(id) {
+    const e = catalogEntry(id);
+    return e ? e.kind : null;
+  }
+  // 生肖 id → 在 12 生肖中的下标（非生肖返回 -1）
+  function zodiacIndexOf(id) {
+    const e = catalogEntry(id);
+    return (e && e.unlock === 'zodiac' && typeof e.zodiacIndex === 'number') ? e.zodiacIndex : -1;
+  }
+  function isZodiac(id) {
+    return zodiacIndexOf(id) >= 0;
+  }
+  // 12 生肖条目（固定鼠牛虎兔龙蛇马羊猴鸡狗猪顺序）
+  function zodiacEntries() {
+    return THEME_CATALOG.filter((t) => t.unlock === 'zodiac').sort((a, b) => a.zodiacIndex - b.zodiacIndex);
+  }
+  function zodiacEmoji(zodiacIndex) {
+    return ZODIAC_EMOJI[zodiacIndex] || '❓';
+  }
+  // 随机解锁池：已解锁排除 + 素材未到排除（后 8 个不参与随机抽）
+  function zodiacPool(unlockedIds) {
+    const unlocked = new Set(Array.isArray(unlockedIds) ? unlockedIds : []);
+    return zodiacEntries().filter((t) => t.assetsReady === true && !unlocked.has(t.id));
+  }
+  function randomZodiacFromPool(pool) {
+    if (!pool || !pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function zodiacProgress(unlockedIds) {
+    const unlocked = new Set(Array.isArray(unlockedIds) ? unlockedIds : []);
+    const collected = zodiacEntries().filter((t) => unlocked.has(t.id)).length;
+    return { collected, total: zodiacEntries().length };
+  }
+  function isCollectionComplete(unlockedIds) {
+    return zodiacProgress(unlockedIds).collected >= zodiacEntries().length;
+  }
+  // 随机解锁校验（纯函数）：元宝足够 + 池非空 → 可解锁
+  function canUnlockZodiac(coins, pool) {
+    return (Number(coins) || 0) >= ZODIAC_COST && Array.isArray(pool) && pool.length > 0;
+  }
+  // 宫格单格渲染状态（v0.4.18）：已解锁亮色可点 / 未解锁 assetsReady 灰锁 / 素材未到「敬请期待」
+  function zodiacCellState(t, unlockedIds) {
+    const unlocked = new Set(Array.isArray(unlockedIds) ? unlockedIds : []);
+    const isUnlocked = unlocked.has(t.id);
+    const cls = isUnlocked ? 'unlocked' : (t.assetsReady ? 'locked' : 'coming');
+    const emoji = isUnlocked ? ZODIAC_EMOJI[t.zodiacIndex] : '🔒';
+    const label = t.assetsReady ? (t.name || '').replace('生肖', '') : '敬请期待';
+    return { cls, emoji, label, isUnlocked };
   }
 
   // ==================== ② 日常互动类（通用）====================
@@ -444,5 +533,21 @@
     holidayLine,
     mailLine,
     SYSTEM_CHIME_B64,
+    // v0.4.18 主题目录 + 生肖收集
+    THEME_CATALOG,
+    ZODIAC_EMOJI,
+    ZODIAC_COST,
+    catalogEntry,
+    catalogKind,
+    zodiacIndexOf,
+    isZodiac,
+    zodiacEntries,
+    zodiacEmoji,
+    zodiacPool,
+    randomZodiacFromPool,
+    zodiacProgress,
+    isCollectionComplete,
+    canUnlockZodiac,
+    zodiacCellState,
   };
 });

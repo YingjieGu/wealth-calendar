@@ -25,6 +25,8 @@
         <div id="pet-heart">♥0</div>
         <!-- 财神金主限定主题称号（金色边框主题下显示） -->
         <div id="gold-badge" style="display:none;">👑 财神金主</div>
+        <!-- v0.4.18 生肖收藏家称号（集齐 12 生肖 + 生肖主题下显示） -->
+        <div id="zodiac-badge" style="display:none;">🐲 十二生肖收藏家</div>
       </div>
 
       <!-- Reminder speech bubble -->
@@ -169,6 +171,15 @@
             </div>
             <input type="file" id="pet-upload" accept="image/*" style="display:none;">
             <button id="btn-upload-pet" class="action-btn">📤 上传宠物图片（自定义主题）</button>
+
+            <!-- v0.4.18 生肖收集：4x3 十二宫格 + 元宝余额 + 随机解锁 + 进度 -->
+            <div class="setting-sublabel">🐲 生肖收集</div>
+            <div class="zodiac-grid" id="zodiac-grid"></div>
+            <div class="coin-unlock-row">
+              <span class="zodiac-coin-balance" id="zodiac-coin-balance">🪙 0 元宝</span>
+              <button id="btn-unlock-zodiac" class="action-btn setting-inline-btn" disabled>🎲 随机解锁生肖（3 元宝）</button>
+            </div>
+            <p class="placeholder-text" id="zodiac-progress">已收集 0/12</p>
           </div>
 
           <!-- 5. 模式（宠物模式 + 捣蛋 + 伙伴 + 位置阶段切换 + 恢复位置） -->

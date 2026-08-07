@@ -603,6 +603,30 @@ body.theme-light #gold-badge {
   color: #6b4a00;
 }
 
+/* v0.4.18 生肖收藏家称号（集齐 12 生肖 + 当前为生肖主题时显示，宠物下方） */
+#zodiac-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #3a2500;
+  background: linear-gradient(135deg, #ffe9a8, #ffb84d 60%, #ff9d3f);
+  border: 1px solid #e07b2f;
+  border-radius: 12px;
+  padding: 3px 12px;
+  box-shadow: 0 2px 10px rgba(224, 123, 47, 0.5);
+  z-index: 7;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+body.theme-light #zodiac-badge {
+  color: #4a2c00;
+}
+
 /* 财神金主限定主题：特殊气泡样式（金色描边 + 淡金底） */
 #app.theme-gold #reminder-bubble {
   background: linear-gradient(160deg, #fffdf2 0%, #fff7dd 100%);
@@ -1214,6 +1238,55 @@ body.theme-light #gold-badge {
 .theme-option:active,
 .activity-option:active {
   transform: scale(0.95);
+}
+/* v0.4.18 生肖收集十二宫格：4x3 固定顺序（鼠牛虎兔龙蛇马羊猴鸡狗猪） */
+.zodiac-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+.zodiac-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--card);
+  color: var(--text-mid);
+  font-size: 11px;
+  cursor: default;
+  transition: none; /* 软渲染禁 filter；不缩放动画，样式从简 */
+}
+.zodiac-cell .zodiac-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+.zodiac-cell.unlocked {
+  cursor: pointer;
+  border-color: rgba(255, 215, 0, 0.6);
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.22), rgba(240, 168, 48, 0.16));
+  color: var(--accent);
+  font-weight: 600;
+}
+.zodiac-cell.unlocked:hover,
+.zodiac-cell.unlocked.active {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.zodiac-cell.locked,
+.zodiac-cell.coming {
+  opacity: 0.6;
+}
+.zodiac-cell.coming {
+  opacity: 0.45;
+}
+.zodiac-coin-balance {
+  font-size: 12px;
+  color: var(--text-strong);
+  white-space: nowrap;
 }
 .action-btn {
   width: 100%;

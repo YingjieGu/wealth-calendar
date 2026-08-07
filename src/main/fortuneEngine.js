@@ -254,7 +254,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
             {
               role: 'system',
               content:
-                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须先做简短推理再给分数：把推理要点（日主五行强弱、当日干支与日主生克关系、喜用神倾向）用 1-2 句通俗话写入 briefReason 字段。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"briefReason":"1-2句简短推理：日主五行强弱/当日干支与日主生克/喜用神倾向","dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，只围绕7维度（财运/事业/桃花/学业/出行/签约/健康）写"好的或避忌"内容，禁止出现黄历宜忌词汇（祭祀/塞穴/入殓/安葬/移柩/破土/祈福/开光/斋醮/立券/栽种/牧养/纳畜/安床/作灶/伐木/开渠/穿井/扫舍等），如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
+                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须先做简短推理再给分数：把推理要点（日主五行强弱、当日干支与日主生克关系、喜用神倾向）用 1-2 句通俗话写入 briefReason 字段。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。全部文本字段（含 dimensions 各维度的 summary/advice）都只写 7 维度（财运/事业/桃花/学业/出行/签约/健康）相关的"好的或避忌"内容，一律禁止出现黄历宜忌词汇（祭祀/塞穴/入殓/安葬/移柩/破土/祈福/开光/斋醮/立券/栽种/牧养/纳畜/安床/作灶/伐木/开渠/穿井/扫舍等）。JSON 结构: {"overall":0-100,"briefReason":"1-2句简短推理：日主五行强弱/当日干支与日主生克/喜用神倾向","dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，只围绕7维度（财运/事业/桃花/学业/出行/签约/健康）写"好的或避忌"内容，禁止出现黄历宜忌词汇（祭祀/塞穴/入殓/安葬/移柩/破土/祈福/开光/斋醮/立券/栽种/牧养/纳畜/安床/作灶/伐木/开渠/穿井/扫舍等），如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
             },
             { role: 'user', content: userPrompt },
           ],
@@ -318,7 +318,8 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   const cache = loadJson(fortunePath(), { fortuneByDate: {} });
   const todayKey = dateStr || new Date().toISOString().slice(0, 10);
 
-  if (!forceRefresh && cache.fortuneByDate[todayKey]) {
+  // v0.4.21 缓存自愈：命中但过期（无 schemaVersion/版本过低/含黄历宜忌词）→ 跳过重建
+  if (!forceRefresh && cache.fortuneByDate[todayKey] && !isStaleFortuneEntry(cache.fortuneByDate[todayKey])) {
     return { data: cache.fortuneByDate[todayKey].data, source: cache.fortuneByDate[todayKey].source || 'cache', cached: true };
   }
 
@@ -400,8 +401,8 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
     source = 'template';
   }
 
-  // Cache
-  cache.fortuneByDate[todayKey] = { data: fortune, source, createdAt: Date.now() };
+  // Cache（v0.4.21 写入 schemaVersion，供下次读取自愈判定）
+  cache.fortuneByDate[todayKey] = { data: fortune, source, createdAt: Date.now(), schemaVersion: FORTUNE_CACHE_SCHEMA_VERSION };
   saveJson(fortunePath(), cache);
 
   return { data: fortune, source };
@@ -430,14 +431,41 @@ function sanitizeFortuneText(text) {
   return kept.join('').trim();
 }
 
+// v0.4.21 缓存 schema 版本：文案规则变化时 bump，旧缓存自动失效重建，无需删文件
+const FORTUNE_CACHE_SCHEMA_VERSION = 2;
+
+// 缓存自愈判定：条目无 schemaVersion / 版本过低，或任意被播报/提醒的文本字段
+// （reminderLines/lotteryTip/briefReason + 各维度 summary/advice）含黄历宜忌词 → 视为过期。
+// 命中则 getDailyFortune 跳过缓存重新生成（v0.4.19 修复前生成的旧缓存自动失效）。
+function isStaleFortuneEntry(entry) {
+  if (!entry || !entry.data) return true;
+  if (entry.schemaVersion !== FORTUNE_CACHE_SCHEMA_VERSION) return true;
+  const d = entry.data || {};
+  const parts = [
+    ...(Array.isArray(d.reminderLines) ? d.reminderLines : []),
+    d.lotteryTip,
+    d.briefReason,
+  ];
+  for (const dim of Object.values(d.dimensions || {})) {
+    if (dim && typeof dim === 'object') {
+      parts.push(dim.summary, dim.advice);
+    }
+  }
+  const joined = parts.filter(Boolean).join(' ');
+  return FORTUNE_STOPWORDS.some((w) => joined.includes(w));
+}
+
 function normalizeFortune(f, dateStr) {
   const dims = {};
   for (const key of ['wealth', 'career', 'love', 'health', 'study', 'travel', 'signing']) {
     const d = (f.dimensions && f.dimensions[key]) || {};
+    // v0.4.21 全覆盖：summary/advice 也过黄历宜忌清洗；清洗后为空给通用兜底，避免空字段
+    const summary = sanitizeFortuneText(d.summary || '') || '运势平稳';
+    const advice = sanitizeFortuneText(d.advice || '') || '稳扎稳打';
     dims[key] = {
       score: clampScore(d.score),
-      summary: d.summary || '',
-      advice: d.advice || '',
+      summary,
+      advice,
     };
   }
   const overall = clampScore(f.overall ?? Math.round(Object.values(dims).reduce((a, b) => a + b.score, 0) / 7));
@@ -509,6 +537,8 @@ module.exports = {
   normalizeFortune,
   sanitizeFortuneText,
   FORTUNE_STOPWORDS,
+  isStaleFortuneEntry,
+  FORTUNE_CACHE_SCHEMA_VERSION,
   sendFortuneReminder,
   maybeSendStartupFortune,
   __setDataDir,

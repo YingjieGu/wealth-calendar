@@ -1,4 +1,32 @@
-# HANDOVER — v0.4.20 用户记忆体（MEMORY.md 经验积累）（已完成，归档）
+# HANDOVER — v0.4.21 运势黄历宜忌彻底清除（缓存自愈 + sanitize 全覆盖）（已完成，归档）
+
+## 本次任务（v0.4.21，用户反馈：v0.4.19 修过但仍出现"今日宜祭祀、塞穴、入殓…"，已完成）
+
+**根因（已定位，两层）**：
+1. **旧缓存未失效（主因）**：`fortune.json` 按日期缓存（`fortuneByDate[todayKey] = {data, source, createdAt}`），用户机器上 **v0.4.19 修复前生成的当天数据**仍含"今日宜祭祀、塞穴、入殓…"（旧模板 reminderLines），`getDailyFortune`（src/main/fortuneEngine.js:321）命中缓存直接返回——**同一天内不会重建**，要等第二天新代码生成才消失。用户当天看到的就是这份旧缓存。
+2. **sanitize 覆盖面不全（次因）**：`normalizeFortune`（src/main/fortuneEngine.js:429+）只清洗 `reminderLines/lotteryTip/briefReason`，**未清洗 `dimensions[].summary/advice`**——LLM 或模板可能在 summary/advice 里写黄历宜忌词。
+
+**修复（三管齐下）**：
+1. **缓存版本化 + 自愈**：
+   - 缓存条目写 `schemaVersion: 2`（写入处 src/main/fortuneEngine.js:404 `cache.fortuneByDate[todayKey] = { data, source, createdAt }` 补字段）
+   - `getDailyFortune` 读取缓存处（:321）加过期判断：**条目无 schemaVersion 或 < 当前版本，或条目文本含 FORTUNE_STOPWORDS 黄历词 → 视为过期，跳过缓存重新生成**（新函数如 `isStaleFortuneEntry(entry)`，用 sanitizeFortuneText 的 STOPWORDS 列表做检查——可对 reminderLines/lotteryTip/briefReason + 各 dimension 的 summary/advice 拼接文本查词）
+   - 效果：用户机器旧缓存自动失效重建，**无需手动删文件**；以后文案规则再变也能自愈
+2. **sanitize 全覆盖**：`normalizeFortune` 对 `dimensions[].summary` 和 `dimensions[].advice` 也过 `sanitizeFortuneText`；清洗后为空时给通用兜底（如 summary 空→`运势平稳`、advice 空→`稳扎稳打`），避免出现空字段
+3. **LLM prompt 补强**（src/main/fortuneEngine.js:257 prompt）：明确 `dimensions[].summary/advice` 同样**禁止黄历宜忌词汇**，只写 7 维度相关建议
+
+**注意**：
+- `FORTUNE_STOPWORDS`/`sanitizeFortuneText` 已有（v0.4.19），直接复用，勿重复定义
+- 日历页黄历区（calendar.js 独立展示）不动
+- 用户本机 `~/.config/wealth-calendar/fortune.json` 含 2026-08-04/05/07 旧缓存——修复后跑一次 getDailyFortune 验证 2026-08-07 自动重建且无黄历词（可用 v021-test.js 模拟旧缓存条目 → 断言 isStaleFortuneEntry 判定过期 → 重建路径）
+- 注意 v0.4.20 修复过 pet.js `delayMin` 作用域 bug——**不要在 pet.js 动这段主动台词逻辑**
+
+**硬约束**：保留全部现有功能；勿动软渲染配置；勿加 filter；测试前备份 settings.json 测后恢复；不跑 GUI 测试（node --check + 单元测试 + 可 node 直接调 fortuneEngine 验证缓存自愈）；样式从简；中文 commit；bump 0.4.21；不打包 exe。
+
+**验证**：node --check 全过；单元测试——① isStaleFortuneEntry：无 schemaVersion 的旧条目→过期、含"祭祀/塞穴/入殓"→过期、新版本干净条目→有效 ② normalizeFortune 清洗 dimensions.summary/advice（含黄历词→过滤/兜底）③ 模拟旧缓存 → getDailyFortune 重建路径（可注入 fake requestSidecar 断言重新调用）④ 回归 v019/v020 测试仍过；bump 0.4.21 + 中文 commit；不打包 exe。
+
+---
+
+# HANDOVER — v0.4.20 用户记忆体（已完成，归档）（已完成，归档）
 
 ## 本次任务（v0.4.20，用户原始需求，已完成）
 

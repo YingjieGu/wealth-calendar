@@ -4,6 +4,7 @@
 const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const userMemory = require('./userMemory');
 
 const HISTORY_PATH = () => path.join(app.getPath('userData'), 'chat_history.json');
 const MAX_HISTORY = 20;
@@ -401,6 +402,10 @@ async function chatSend(userMessage, deps) {
   const settings = loadSettings();
   const mc = settings.modelConfig || {};
   const deps0 = deps || {};
+
+  // v0.4.20 用户记忆体：入口统一采集聊天消息（话题分类 + 情绪分析）。
+  // 放在技能路由之前，保证命中技能（runSkill）的请求也被记录。
+  try { userMemory.trackChat(String(userMessage || '')); } catch (e) { /* ignore */ }
 
   // 技能路由 L3-L4：命中计算器/天气/翻译/数字吉凶/邮件时优先执行。
   // 在 LLM 调用前检测意图；不需 LLM 的技能在无 API Key 下也可用。

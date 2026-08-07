@@ -137,4 +137,12 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   multimodalClear: () => ipcRenderer.invoke('multimodal:clear'),
   multimodalHasVideo: () => ipcRenderer.invoke('multimodal:has-video'),
   multimodalVideo: () => ipcRenderer.invoke('multimodal:video-path').then((r) => (r ? r.dataUrl : null)),
+
+  // v0.4.20 用户记忆体：互动上报 / 查看记忆 / 活跃时段感知 / 低落安慰气泡
+  memoryTrack: (payload) => ipcRenderer.invoke('memory:track', payload),
+  memoryView: () => ipcRenderer.invoke('memory:view'),
+  memoryState: () => ipcRenderer.invoke('memory:state'),
+  onMemoryComfort: (callback) => {
+    ipcRenderer.on('memory-comfort', (_event, data) => callback && callback(data));
+  },
 });

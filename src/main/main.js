@@ -24,6 +24,7 @@ const wallpaper = require('./wallpaper');
 const multimodal = require('./multimodal');
 const prank = require('./prank');
 const windowInfo = require('./windowInfo');
+const userMemory = require('./userMemory');
 
 // lunar-javascript (runs in main process)
 const { Solar } = require('lunar-javascript');
@@ -853,10 +854,60 @@ function setupIPC() {
     saveSettings({ ...current, ...settings });
     // 捣蛋模式开关变化 → 主进程引擎即时重排/停表
     try { prank.onSettingsChanged(); } catch (e) { /* ignore */ }
+    // v0.4.20 用户记忆体：同步开关（默认开）+ 记录主求方向变化
+    try {
+      const memEnabled = (settings && settings.userMemoryEnabled !== undefined)
+        ? settings.userMemoryEnabled
+        : current.userMemoryEnabled;
+      userMemory.setEnabled(memEnabled !== false);
+      const nextWish = (settings && settings.mainWish) || current.mainWish || '';
+      if (nextWish && nextWish !== 'recommend') userMemory.trackWish(nextWish);
+    } catch (e) { /* ignore */ }
     return { success: true };
   });
 
   ipcMain.handle('load-settings', () => loadSettings());
+
+  // --- v0.4.20 用户记忆体 IPC ---
+  // 渲染层互动上报：onInteract 各类型（pet/chat/fortune/stick）→ 主进程采集
+  ipcMain.handle('memory:track', (_event, payload) => {
+    try {
+      const p = (payload && typeof payload === 'object') ? payload : {};
+      const type = String(p.type || '');
+      if (!userMemory.isEnabled() || !type) return { ok: false, reason: 'disabled-or-empty' };
+      const item = userMemory.trackInteraction({
+        type,
+        text: p.text || '',
+        topic: p.topic || '',
+        sentiment: p.sentiment || '',
+      });
+      return { ok: true, recorded: !!item };
+    } catch (e) {
+      return { ok: false, reason: e.message };
+    }
+  });
+  // 「📖 查看记忆」：读取 MEMORY.md 内容显示在设置页预览框
+  ipcMain.handle('memory:view', () => {
+    try {
+      const s = loadSettings();
+      return { ok: true, md: userMemory.readMemoryMd(s.mainWish || '') || '' };
+    } catch (e) {
+      return { ok: false, md: '', reason: e.message };
+    }
+  });
+  // 渲染层活跃时段感知（日常台词降频）：返回是否低谷时段（23-5 点）
+  ipcMain.handle('memory:state', () => {
+    try {
+      return {
+        ok: true,
+        enabled: userMemory.isEnabled(),
+        quiet: userMemory.isLowActivityHour(),
+        active: userMemory.isHighActivityHour(),
+      };
+    } catch (e) {
+      return { ok: false, enabled: true, quiet: false, active: false };
+    }
+  });
 
   // --- 捣蛋模式：手动触发一次（测试/诊断，force 跳过 30% 概率骰；mode 可强制玩法） ---
   ipcMain.handle('prank:trigger-test', (_event, mode) => {
@@ -1153,11 +1204,19 @@ function setupIPC() {
     }
   };
 
-  ipcMain.handle('chat:send', (_event, message) => {
-    return chatEngine.chatSend(String(message || '').slice(0, 500), {
+  ipcMain.handle('chat:send', async (_event, message) => {
+    const result = await chatEngine.chatSend(String(message || '').slice(0, 500), {
       executeTool,
       requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b),
     });
+    // v0.4.20 用户记忆体：近 3 条消息含 2+ 消极词 → 主动弹安慰气泡（渲染层走 enqueueMsg）
+    try {
+      const comfort = userMemory.comfortPayload();
+      if (comfort && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('memory-comfort', comfort);
+      }
+    } catch (e) { /* ignore */ }
+    return result;
   });
 
   ipcMain.handle('chat:clear', () => {
@@ -1552,6 +1611,13 @@ app.whenReady().then(() => {
   );
   // 首次启动预填 DeepSeek 默认模型配置（Key 留空）；已存在配置则原样保留
   ensureDefaultSettings();
+  // v0.4.20 用户记忆体：启动采集 + 记录主求方向（开关默认开，数据仅存本机）
+  try {
+    const sMem = loadSettings();
+    userMemory.setEnabled(sMem.userMemoryEnabled !== false);
+    userMemory.trackStartup();
+    if (sMem.mainWish && sMem.mainWish !== 'recommend') userMemory.trackWish(sMem.mainWish);
+  } catch (e) { /* ignore */ }
   // 启动时应用保存的开机启动设置（默认关）：settings.autostart=true 时确保自启动项存在
   try {
     const s0 = loadSettings();
@@ -1643,6 +1709,12 @@ app.on('before-quit', () => {
   stopReminder();
   prank.stopPrank();
   sidecar.stopSidecar();
+  // v0.4.20 用户记忆体：退出采集 + 刷新 MEMORY.md（agent 记忆体风格人类可读总结）
+  try {
+    userMemory.trackShutdown();
+    const qs = loadSettings();
+    userMemory.refreshMemoryMd({ mainWish: qs.mainWish || '' });
+  } catch (e) { /* ignore */ }
 });
 
 app.on('activate', () => {

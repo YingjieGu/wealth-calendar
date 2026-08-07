@@ -113,6 +113,13 @@ const PetState = {
         this._broadcast(data.text, { priority: MsgCore.PRIORITY.work, category: 'work' });
       });
     } catch (e) { /* ignore */ }
+    // v0.4.20 用户记忆体：聊天情绪低落 → 主进程主动安慰气泡（用户优先级 10，可打断）
+    try {
+      window.wealthCalendar.onMemoryComfort((data) => {
+        if (!data || !data.text) return;
+        this.enqueueMsg(data.text, { priority: MsgCore.PRIORITY.user, category: 'user', chat: false });
+      });
+    } catch (e) { /* ignore */ }
     // 伙伴模式：窗口感知（60s 轮询活跃窗口标题，切换时概率主动提供帮助）
     this.startPartnerWatch();
     // 启动阶段循环：若 SettingsManager.init 已按保存模式调 setActivity 并启动阶段循环，
@@ -727,6 +734,12 @@ const PetState = {
 
   // ---- 统一互动入口：单击/双击/聊天/运势/摇签 加分 + 每日任务 + 深夜安慰 + 节日彩蛋 ----
   async onInteract(type, affinityPoints) {
+    // v0.4.20 用户记忆体：互动上报（pet/chat/fortune/stick）→ 主进程采集活跃时段
+    try {
+      if (window.wealthCalendar && window.wealthCalendar.memoryTrack) {
+        window.wealthCalendar.memoryTrack({ type });
+      }
+    } catch (e) { /* ignore */ }
     this._recordInteraction();          // 心情
     this._maybeLateNightComfort();      // 深夜安慰（仅深夜+概率）
     if (this.DAILY_TASKS[type]) await this._bumpTask(type); // 每日任务进度
@@ -1094,12 +1107,29 @@ const PetState = {
     '金币金币，滚滚来～💰',
   ],
 
+  // v0.4.20 用户记忆体：刷新活跃时段感知（低谷 23-5 → 降频）
+  _refreshMemoryState() {
+    try {
+      if (window.wealthCalendar && window.wealthCalendar.memoryState) {
+        window.wealthCalendar.memoryState().then((r) => {
+          if (r && r.ok) this._memoryState = r;
+        }).catch(() => { /* ignore */ });
+      }
+    } catch (e) { /* ignore */ }
+  },
+
   startProactive() {
     // 随机 20-40 分钟主动说一句话：② 日常互动(通用) 与 ① 主题互动(随主题) 混合，
     // ② 日常/① 主题 都按日常优先级(2)入队（主题互动为最低档 1，这里并入主动轮换不抢高优）
+    this._memoryState = this._memoryState || { quiet: false, enabled: true };
+    this._refreshMemoryState();
     const scheduleNext = () => {
       this._proactiveTimer = setTimeout(() => {
-        if (Math.random() < 0.8) {
+        this._refreshMemoryState(); // 每轮刷新低谷状态（深夜自动降频，白天恢复）
+        const quiet = !!(this._memoryState && this._memoryState.quiet);
+        const chance = quiet ? 0.3 : 0.8;          // 低谷降频：80% → 30%
+        const delayMin = quiet ? 30 : 20;          // 低谷间隔拉长
+        if (Math.random() < chance) {
           let line;
           const roll = Math.random();
           try {
@@ -1116,7 +1146,7 @@ const PetState = {
           this.enqueueMsg(line, { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
         }
         scheduleNext();
-      }, (20 + Math.random() * 20) * 60 * 1000);
+      }, (delayMin + Math.random() * 20) * 60 * 1000);
     };
     scheduleNext();
 

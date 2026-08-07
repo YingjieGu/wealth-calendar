@@ -32,6 +32,7 @@ const SettingsManager = {
     this.applyUserInfo();
     this.applyPrank();
     this.applyPartner();
+    this.applyMemory();
     this.applySkills();
     this.applyMail();
     // 亲密度/心情展示（财宠名字板块）+ 技能配置卡片初始收起
@@ -194,6 +195,14 @@ const SettingsManager = {
     const on = this.settings.partnerMode === true;
     document.querySelectorAll('#partner-options .activity-option').forEach((b) => {
       b.classList.toggle('active', (b.dataset.partner === '1') === on);
+    });
+  },
+
+  // v0.4.20 用户记忆体开关（settings.userMemoryEnabled，默认开启；关掉停止采集）
+  applyMemory() {
+    const on = this.settings.userMemoryEnabled !== false;
+    document.querySelectorAll('#memory-options .activity-option').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.memory === '1') === on);
     });
   },
 
@@ -508,6 +517,34 @@ const SettingsManager = {
         }
         showToast(on ? '🤝 伙伴模式已开启，🔓 已打开技能权限' : '🙈 伙伴模式已关闭');
       });
+    });
+
+    // v0.4.20 用户记忆体开关（settings.userMemoryEnabled，默认开；关掉停止采集）
+    this.applyMemory();
+    document.querySelectorAll('#memory-options .activity-option').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const on = btn.dataset.memory === '1';
+        this.settings.userMemoryEnabled = on;
+        document.querySelectorAll('#memory-options .activity-option').forEach((b) =>
+          b.classList.toggle('active', b === btn)
+        );
+        await this.save();
+        showToast(on ? '🧠 用户记忆体已开启（仅存本机，让提醒更贴心）' : '🧠 用户记忆体已关闭（停止采集习惯与情绪）');
+      });
+    });
+
+    // 「📖 查看记忆」：主进程读取 userData/MEMORY.md 显示在预览框（样式从简）
+    document.getElementById('btn-view-memory').addEventListener('click', async () => {
+      const pre = document.getElementById('memory-preview');
+      try {
+        const r = await window.wealthCalendar.memoryView();
+        if (pre) {
+          pre.textContent = (r && r.ok && r.md) ? r.md : '（暂无记忆，先和小财多互动一会儿吧～）';
+          pre.hidden = false;
+        }
+      } catch (e) {
+        if (pre) { pre.textContent = '（读取记忆失败）'; pre.hidden = false; }
+      }
     });
 
     // User info: birth datetime change -> update zodiac preview + auto 生肖

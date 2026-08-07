@@ -1350,6 +1350,22 @@ body.theme-light #zodiac-badge {
   color: var(--accent);
   font-weight: 500;
 }
+/* v0.4.20 用户记忆体预览框（查看记忆按钮展开，样式从简） */
+.memory-preview {
+  margin-top: 8px;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 #user-zodiac {
   margin-bottom: 8px;
   color: var(--accent);

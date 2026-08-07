@@ -10,6 +10,7 @@
 //   进气泡 + 聊天对话框（吐槽时气泡带表情动效）
 const { execFileSync } = require('child_process');
 const { getActiveWindowTitle } = require('./windowInfo');
+const userMemory = require('./userMemory');
 
 let prankTimer = null;
 let mainWindow = null;
@@ -249,7 +250,11 @@ function schedulePrank() {
   if (prankTimer) { clearTimeout(prankTimer); prankTimer = null; }
   const s = getSettings() || {};
   if (s.prankMode !== true) return;
-  const delayMs = (PRANK_INTERVAL_MIN + Math.floor(Math.random() * (PRANK_INTERVAL_MAX - PRANK_INTERVAL_MIN + 1))) * 60000;
+  // v0.4.20 用户记忆体：低谷时段（深夜 23-5 点）捣蛋不触发，避免打扰休息
+  try { if (userMemory.isLowActivityHour()) return; } catch (e) { /* ignore */ }
+  let delayMs = (PRANK_INTERVAL_MIN + Math.floor(Math.random() * (PRANK_INTERVAL_MAX - PRANK_INTERVAL_MIN + 1))) * 60000;
+  // 高频活跃时段（记忆推断）→ 间隔略短（约 80%），活跃时多陪主人
+  try { if (userMemory.isHighActivityHour()) delayMs = Math.round(delayMs * 0.8); } catch (e) { /* ignore */ }
   prankTimer = setTimeout(() => {
     prankTimer = null;
     try {

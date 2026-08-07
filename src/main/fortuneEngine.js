@@ -3,6 +3,7 @@
 const { app, Notification } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const userMemory = require('./userMemory');
 
 let _dataDir = null; // injectable for tests
 function dataDir() {
@@ -343,7 +344,10 @@ async function getDailyFortune(dateStr, forceRefresh, deps = {}) {
   const almanacOk = almanac.data && !almanac.data.error;
 
   // LLM prompt: 主求方向侧重提醒
-  const wish = settings.mainWish || '';
+  // v0.4.20 用户记忆体：mainWish 为空时用记忆推断主求方向（聊天话题频率兜底）
+  const mainWish = (settings.mainWish && settings.mainWish !== 'recommend') ? settings.mainWish : '';
+  let wish = mainWish || '';
+  try { if (!wish) wish = userMemory.inferredWish('') || ''; } catch (e) { /* ignore */ }
   const wishPrompt = wish && WISH_LABELS[wish]
     ? `\n用户主求方向：${WISH_LABELS[wish]}。提醒语(reminderLines)和吉时应侧重此方向，其他维度仍全量输出。`
     : '\n用户未设主求方向，提醒语全面覆盖各维度。';

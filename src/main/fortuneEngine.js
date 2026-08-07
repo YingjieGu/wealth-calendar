@@ -111,33 +111,31 @@ function buildTemplateFortune(paipan, almanac, dateStr, wish, zodiac) {
   const scores = Object.values(dims).map((d) => d.score);
   const overall = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 
-  const yiText = almanacYi.length ? almanacYi.slice(0, 3).join('、') : '诸事顺遂';
-  const jiText = almanacJi.length ? almanacJi.slice(0, 3).join('、') : '无';
-
-  // 主求方向侧重提醒语
+  // v0.4.19 提醒语不再拼黄历宜忌原文（祭祀/塞穴/入殓等面向上班族/学生毫不相关），
+  // 改为基于 7 维度（财运/事业/桃花/学业/出行/签约/健康）的差异化文案
   const wishLines = {
     wealth: [
       `小财发现，今日你财运${dims.wealth.score >= 75 ? '很不错' : '平稳'}（${dims.wealth.score}分），${dims.wealth.advice}~`,
-      `今日宜${yiText}，财神在${caiShen || '吉位'}，重要求财之事可安排在这个方位~`,
+      `偏财机会${dims.wealth.score >= 70 ? '在线' : '平平'}，${dims.wealth.advice}，重要求财之事安排在好时段~`,
     ],
     love: [
       `小财发现，今日你桃花运${dims.love.score >= 75 ? '旺盛' : '温温的'}（${dims.love.score}分），${dims.love.advice}~`,
-      `今日宜${yiText}，${dims.love.summary}，主动一点会有意外惊喜哦~`,
+      `${dims.love.summary}，主动一点会有意外惊喜哦~`,
     ],
     career: [
       `小财发现，今日你事业运${dims.career.score >= 75 ? '稳中有升' : '平稳'}（${dims.career.score}分），${dims.career.advice}~`,
-      `今日宜${yiText}，重要工作安排在这个时段效率更高~`,
+      `${dims.career.summary}，重要工作安排在高效率时段~`,
     ],
     health: [
       `小财发现，今日你健康运势${dims.health.score}分，${dims.health.advice}，小财会提醒你按时休息的~`,
-      `今日宜${yiText}，忌${jiText}，注意劳逸结合~`,
+      `${dims.health.summary}，${dims.health.advice}，注意劳逸结合~`,
     ],
     study: [
       `小财发现，今日你学业运势${dims.study.score}分，${dims.study.advice}~`,
-      `今日宜${yiText}，专注力不错的时段要抓住哦~`,
+      `${dims.study.summary}，专注力不错的时段要抓住哦~`,
     ],
     peace: [
-      `小财发现，今日宜${yiText}，忌${jiText}，出行留意安全，小财保佑你平平安安~`,
+      `${dims.travel.summary}，出行留意安全，小财保佑你平平安安~`,
       `今日诸事${dims.travel.score >= 70 ? '顺遂' : '多留心'}，遇事不急，稳字当头~`,
     ],
   };
@@ -145,8 +143,8 @@ function buildTemplateFortune(paipan, almanac, dateStr, wish, zodiac) {
   const lines = wish && wishLines[wish]
     ? wishLines[wish]
     : [
-        `${zText}小财发现，今日宜${yiText}，整体运势 ${overall} 分，${dims.wealth.advice}~`,
-        `今日忌${jiText}，${dims.career.advice}，小财会一直陪着你哦～`,
+        `${zText}小财发现，今日整体运势 ${overall} 分，${dims.wealth.advice}，${dims.health.advice}~`,
+        `${dims.career.summary}，${dims.study.summary}，小财会一直陪着你哦～`,
       ];
   const reminderLines = lines;
 
@@ -255,7 +253,7 @@ async function callLLM({ apiKey, baseUrl, model }, userPrompt) {
             {
               role: 'system',
               content:
-                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须先做简短推理再给分数：把推理要点（日主五行强弱、当日干支与日主生克关系、喜用神倾向）用 1-2 句通俗话写入 briefReason 字段。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"briefReason":"1-2句简短推理：日主五行强弱/当日干支与日主生克/喜用神倾向","dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
+                '你是资深命理师"财神小助手"，精通八字、星盘、黄历。根据用户命理数据输出当日运势，语气生动有趣（可爱萌宠口吻，称呼自己"小财"）。必须先做简短推理再给分数：把推理要点（日主五行强弱、当日干支与日主生克关系、喜用神倾向）用 1-2 句通俗话写入 briefReason 字段。必须只输出合法 JSON，不要 markdown 代码块，不要任何额外文字。JSON 结构: {"overall":0-100,"briefReason":"1-2句简短推理：日主五行强弱/当日干支与日主生克/喜用神倾向","dimensions":{"wealth":{"score":0-100,"summary":"一句话","advice":"一句建议"},"career":{...},"love":{...},"health":{...},"study":{...},"travel":{...},"signing":{...}},"luckyTime":["HH:mm-HH:mm","HH:mm-HH:mm"],"directions":{"wealth":"方位","love":"方位"},"luckyNumber":[3个1-9的幸运数字],"luckyColor":"幸运色，如金色","luckyItem":"开运物/幸运饰品，如貔貅挂件","lotteryTip":"一句彩票/意外之财建议，娱乐向，鼓励量力而行","reminderLines":["2到3条生动提醒语，萌宠口吻，只围绕7维度（财运/事业/桃花/学业/出行/签约/健康）写"好的或避忌"内容，禁止出现黄历宜忌词汇（祭祀/塞穴/入殓/安葬/移柩/破土/祈福/开光/斋醮/立券/栽种/牧养/纳畜/安床/作灶/伐木/开渠/穿井/扫舍等），如小财发现你今天财运爆棚，可以去刮一张彩票~"],"disclaimer":"仅供参考娱乐"}。运势分数要合理分布，不要全是高分。',
             },
             { role: 'user', content: userPrompt },
           ],
@@ -413,6 +411,21 @@ async function getFortuneByDate(dateStr, forceRefresh, deps = {}) {
   return getDailyFortune(date, !!forceRefresh, deps);
 }
 
+// v0.4.19 黄历宜忌 STOPWORDS：提醒/播报文案过滤（面向上班族/学生，祭祀/塞穴/入殓等毫不相关）。
+// 日历页完整黄历展示保留，此清洗只作用于提醒/播报输出文本；命中 STOPWORDS 的整句直接去掉。
+const FORTUNE_STOPWORDS = [
+  '祭祀', '塞穴', '入殓', '安葬', '移柩', '破土', '祈福', '开光', '斋醮',
+  '立券', '栽种', '牧养', '纳畜', '安床', '作灶', '伐木', '开渠', '穿井',
+  '扫舍', '上梁', '安门', '畋猎', '取渔', '断蚁', '结网',
+];
+function sanitizeFortuneText(text) {
+  if (!text) return '';
+  // 按标点切句（保留分隔符），命中 STOPWORDS 的整句去掉，避免残留"宜，忌"空洞
+  const segs = String(text).split(/(?<=[，。；！？])/);
+  const kept = segs.filter((s) => !FORTUNE_STOPWORDS.some((w) => s.includes(w)));
+  return kept.join('').trim();
+}
+
 function normalizeFortune(f, dateStr) {
   const dims = {};
   for (const key of ['wealth', 'career', 'love', 'health', 'study', 'travel', 'signing']) {
@@ -433,9 +446,12 @@ function normalizeFortune(f, dateStr) {
     luckyNumber: Array.isArray(f.luckyNumber) ? f.luckyNumber.slice(0, 3) : [],
     luckyColor: f.luckyColor || '',
     luckyItem: f.luckyItem || '',
-    lotteryTip: f.lotteryTip || '',
-    reminderLines: Array.isArray(f.reminderLines) ? f.reminderLines.slice(0, 3) : [],
-    briefReason: f.briefReason || '',
+    // v0.4.19 提醒/播报文本统一过黄历宜忌清洗（LLM 与模板输出都走 normalizeFortune）
+    lotteryTip: sanitizeFortuneText(f.lotteryTip || ''),
+    reminderLines: (Array.isArray(f.reminderLines) ? f.reminderLines.slice(0, 3) : [])
+      .map(sanitizeFortuneText)
+      .filter((l) => l),
+    briefReason: sanitizeFortuneText(f.briefReason || ''),
     disclaimer: f.disclaimer || '仅供参考娱乐',
   };
 }
@@ -487,6 +503,8 @@ module.exports = {
   getFortuneByDate,
   buildTemplateFortune,
   normalizeFortune,
+  sanitizeFortuneText,
+  FORTUNE_STOPWORDS,
   sendFortuneReminder,
   maybeSendStartupFortune,
   __setDataDir,

@@ -507,16 +507,29 @@ const CalendarView = {
     }
   },
 
+  // 从后端落座对象提取干净落座文案：取 label（可能带"上升 /天顶 "前缀），去前缀返回"星座 X°X′X″"；
+  // 兼容字符串兜底（旧结构直接返回，去前缀）
+  _zodiacLabel(obj) {
+    if (!obj) return '';
+    const raw = typeof obj === 'string' ? obj : ((obj && (obj.label || obj.sign)) || '');
+    if (!raw) return '';
+    return String(raw).replace(/^(上升|天顶)\s*/, '').trim();
+  },
+
   _renderStarChart(chart, birth) {
     const body = document.getElementById('star-chart-body');
     if (!body) return;
     const d = (chart && chart.data) || chart || {};
     const planets = d.planets || {};
-    const ascendant = d.ascendant || '';
+    // v0.4.19 修复 [object Object]：后端 ascendant/midheaven 是对象，label 里已含"上升 /天顶 "前缀，
+    // 此处取 label 并去前缀，输出一行"上升 天蝎座 15°03′22″"，避免"上升 上升 X"重复
+    const ascLabel = this._zodiacLabel(d.ascendant);
+    const mcLabel = this._zodiacLabel(d.midheaven);
     let html = '';
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(birth || ''));
     if (m) html += `<div class="star-chart-sub">${m[1]}年${Number(m[2])}月${Number(m[3])}日 本命星盘</div>`;
-    if (ascendant) html += `<div class="star-chart-line"><span class="star-chart-name">上升</span><span class="star-chart-val">${this.escapeHtml(String(ascendant))}</span></div>`;
+    if (ascLabel) html += `<div class="star-chart-line"><span class="star-chart-name">上升</span><span class="star-chart-val">${this.escapeHtml(ascLabel)}</span></div>`;
+    if (mcLabel) html += `<div class="star-chart-line"><span class="star-chart-name">天顶</span><span class="star-chart-val">${this.escapeHtml(mcLabel)}</span></div>`;
     const nameMap = { sun: '太阳', moon: '月亮', mercury: '水星', venus: '金星', mars: '火星', jupiter: '木星', saturn: '土星', uranus: '天王星', neptune: '海王星', pluto: '冥王星' };
     const entries = Object.entries(planets);
     for (const [key, p] of entries) {
@@ -525,7 +538,7 @@ const CalendarView = {
       const degree = (p && p.degree) != null ? String(p.degree) : '';
       html += `<div class="star-chart-line"><span class="star-chart-name">${this.escapeHtml(String(label))}</span><span class="star-chart-val">${this.escapeHtml(sign)}${degree ? ` ${degree}°` : ''}</span></div>`;
     }
-    if (!entries.length && !ascendant) {
+    if (!entries.length && !ascLabel && !mcLabel) {
       html = '<div class="star-chart-empty">暂无星盘数据</div>';
     } else {
       // 相位摘要（简表，纯文字安全）

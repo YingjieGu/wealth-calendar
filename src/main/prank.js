@@ -1,10 +1,8 @@
 // 捣蛋模式引擎（娱乐互动，主进程）
 // - getActiveWindowTitle()：平台适配获取活跃窗口标题（获取失败/工具缺失返回 null）
-// - 双通道定时触发：吐槽（标题甜话）每 5-8 分钟一次；捣蛋操作（打字/窗口抖动）
-//   每 10-15 分钟一次；触发概率 100%（定时到点即触发）；每天上限 20 次
-//   （settings.prankCount 按日期重置，settings.prankMode 开关）
+// - v0.4.19 单通道定时触发：每 5-10 分钟到点随机触发「吐槽（标题甜话）或捣蛋操作
+//   （打字/窗口抖动）」二选一；触发概率 100%（定时到点即触发）；无每日上限
 // - 抢键盘打字：Windows SendKeys / Linux xdotool type；平台工具不可用时跳过该玩法
-//   （⚠ 抢键盘打字需 Windows 实机验证 —— 本机 xdotool 不可用）
 // - 窗口抖动：小幅位移 2-3 次后回原位（互动小动作）
 // - 窗口标题吐槽：按活跃窗口标题关键词匹配甜系吐槽池，通用兜底「主人辛苦啦~」
 // - 分寸控制：吐槽池全部卖萌甜系，禁止攻击性
@@ -13,21 +11,15 @@
 const { execFileSync } = require('child_process');
 const { getActiveWindowTitle } = require('./windowInfo');
 
-let roastTimer = null;
-let actionTimer = null;
+let prankTimer = null;
 let mainWindow = null;
 let getSettings = () => ({});
-let saveSettingsFn = () => {};
 // typeText 可注入（测试用假实现；生产默认走真实平台实现）
 let typeTextImpl = null;
 
-// 每日次数上限（吐槽 + 捣蛋操作共享名额）
-const DAILY_LIMIT = 20;
-// 吐槽间隔 5-8 分钟；捣蛋操作（打字/窗口抖动）间隔 10-15 分钟；定时触发概率 100%
-const ROAST_INTERVAL_MIN = 5;
-const ROAST_INTERVAL_MAX = 8;
-const ACTION_INTERVAL_MIN = 10;
-const ACTION_INTERVAL_MAX = 15;
+// v0.4.19 单通道：每 5-10 分钟到点随机触发（吐槽或捣蛋二选一）；触发概率 100%；无每日上限
+const PRANK_INTERVAL_MIN = 5;
+const PRANK_INTERVAL_MAX = 10;
 const TRIGGER_CHANCE = 1;
 
 // --- 甜系吐槽池（按窗口标题关键词匹配，全卖萌甜系） ---
@@ -89,28 +81,6 @@ const FALLBACK_LINES = [
 const TYPING_LINES = ['meow', 'owo', 'nya', 'purr', 'cute', 'zZz', 'hello', 'hi']; // 不含 SendKeys 特殊字符
 // 打字吐槽随机插入的表情符号（约 70% 概率追加一个，互动性增强）
 const PRANK_EMOJI = ['🐾', '✨', '🌸', '💗', '🐱', '🫶', '😝', '⭐', '🍀', '🎀'];
-
-// --- 每日次数（settings.prankCount 按日期重置） ---
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function remainingSlots() {
-  const s = getSettings() || {};
-  const pc = s.prankCount || {};
-  if (pc.date !== todayStr()) return DAILY_LIMIT;
-  return Math.max(0, DAILY_LIMIT - (pc.count || 0));
-}
-
-// 占一个触发名额，返回是否成功（达到上限返回 false）
-function takeSlot() {
-  const s = getSettings() || {};
-  if (!remainingSlots()) return false;
-  const pc = { date: todayStr(), count: (s.prankCount && s.prankCount.date === todayStr() ? s.prankCount.count : 0) + 1 };
-  saveSettingsFn({ ...s, prankCount: pc });
-  return true;
-}
 
 // --- 玩法实现 ---
 
@@ -200,14 +170,12 @@ function wiggleWindow() {
   }
 }
 
-// 纯吐槽（标题甜话/兜底）：走 5-8 分钟通道，占名额
+// 纯吐槽（标题甜话/兜底）：v0.4.19 无每日上限
 function doRoast() {
   if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, reason: 'no-window' };
-  if (!remainingSlots()) return { ok: false, reason: 'daily-limit' };
   const s = getSettings() || {};
   if (s.prankMode !== true) return { ok: false, reason: 'disabled' };
   const result = titleRoast();
-  takeSlot();
   broadcast(result);
   return result;
 }
@@ -217,7 +185,6 @@ function doRoast() {
 // null 随机（打字/窗口抖动二选一，工具不可用自动降级标题吐槽）
 function doPrank(opts = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, reason: 'no-window' };
-  if (!remainingSlots()) return { ok: false, reason: 'daily-limit' };
   const s = getSettings() || {};
   if (s.prankMode !== true) return { ok: false, reason: 'disabled' };
 
@@ -238,7 +205,6 @@ function doPrank(opts = {}) {
     let text = TYPING_LINES[Math.floor(Math.random() * TYPING_LINES.length)];
     if (Math.random() < 0.7) text += ' ' + PRANK_EMOJI[Math.floor(Math.random() * PRANK_EMOJI.length)];
     if (typeText(text)) {
-      takeSlot();
       const result = { type: 'typed', text: `喵（敲了一行 "${text}" 然后溜走~）`, typedText: text };
       broadcast(result);
       return result;
@@ -248,7 +214,6 @@ function doPrank(opts = {}) {
   // 窗口抖动玩法（小幅位移 2-3 次后回原位）
   if (mode === 'wiggle' && canType) {
     if (wiggleWindow()) {
-      takeSlot();
       const result = { type: 'wiggle', text: '咦？小财把窗口晃了两下就跑啦~ 😝' };
       broadcast(result);
       return result;
@@ -256,7 +221,6 @@ function doPrank(opts = {}) {
   }
 
   const result = titleRoast();
-  takeSlot();
   broadcast(result);
   return result;
 }
@@ -273,61 +237,40 @@ function broadcast(result) {
   } catch (e) { /* ignore */ }
 }
 
-// --- 调度：双通道（吐槽 5-8 分钟 / 捣蛋操作 10-15 分钟），到点 100% 触发 ---
+// --- 调度：v0.4.19 单通道（5-10 分钟），到点随机吐槽或捣蛋二选一，无每日上限 ---
 function scheduleNext() {
   stopTimers();
   const s = getSettings() || {};
   if (s.prankMode !== true) return; // 未开启 → 不排程
-  if (!remainingSlots()) return; // 当日已达上限 → 本日不再排程
-  scheduleRoast();
-  scheduleAction();
+  schedulePrank();
 }
 
-function scheduleRoast() {
-  if (roastTimer) { clearTimeout(roastTimer); roastTimer = null; }
+function schedulePrank() {
+  if (prankTimer) { clearTimeout(prankTimer); prankTimer = null; }
   const s = getSettings() || {};
   if (s.prankMode !== true) return;
-  if (!remainingSlots()) return;
-  const delayMs = (ROAST_INTERVAL_MIN + Math.floor(Math.random() * (ROAST_INTERVAL_MAX - ROAST_INTERVAL_MIN + 1))) * 60000;
-  roastTimer = setTimeout(() => {
-    roastTimer = null;
+  const delayMs = (PRANK_INTERVAL_MIN + Math.floor(Math.random() * (PRANK_INTERVAL_MAX - PRANK_INTERVAL_MIN + 1))) * 60000;
+  prankTimer = setTimeout(() => {
+    prankTimer = null;
     try {
       const cur = getSettings() || {};
-      if (cur.prankMode === true && remainingSlots()) {
-        if (Math.random() < TRIGGER_CHANCE) doRoast();
+      if (cur.prankMode === true && Math.random() < TRIGGER_CHANCE) {
+        // 到点随机二选一：吐槽（标题甜话）或捣蛋操作（打字/窗口抖动）
+        if (Math.random() < 0.5) doRoast();
+        else doPrank();
       }
     } catch (e) { /* ignore */ }
-    scheduleRoast(); // 到点触发后续排
-  }, delayMs);
-}
-
-function scheduleAction() {
-  if (actionTimer) { clearTimeout(actionTimer); actionTimer = null; }
-  const s = getSettings() || {};
-  if (s.prankMode !== true) return;
-  if (!remainingSlots()) return;
-  const delayMs = (ACTION_INTERVAL_MIN + Math.floor(Math.random() * (ACTION_INTERVAL_MAX - ACTION_INTERVAL_MIN + 1))) * 60000;
-  actionTimer = setTimeout(() => {
-    actionTimer = null;
-    try {
-      const cur = getSettings() || {};
-      if (cur.prankMode === true && remainingSlots()) {
-        if (Math.random() < TRIGGER_CHANCE) doPrank();
-      }
-    } catch (e) { /* ignore */ }
-    scheduleAction(); // 到点触发后续排
+    schedulePrank(); // 到点触发后续排
   }, delayMs);
 }
 
 function stopTimers() {
-  if (roastTimer) { clearTimeout(roastTimer); roastTimer = null; }
-  if (actionTimer) { clearTimeout(actionTimer); actionTimer = null; }
+  if (prankTimer) { clearTimeout(prankTimer); prankTimer = null; }
 }
 
 function startPrank(window, deps = {}) {
   mainWindow = window;
   if (typeof deps.getSettings === 'function') getSettings = deps.getSettings;
-  if (typeof deps.saveSettings === 'function') saveSettingsFn = deps.saveSettings;
   if (typeof deps.typeText === 'function') typeTextImpl = deps.typeText;
   scheduleNext();
 }

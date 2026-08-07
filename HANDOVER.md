@@ -1,4 +1,38 @@
-# HANDOVER — v0.4.18 生肖主题收集系统（元宝随机解锁 + 主题目录化可扩展，已完成，归档）
+# HANDOVER — v0.4.19 星盘修复 + 运势播报过滤 + 捣蛋频率调整 + 设置页文案（已完成，归档）
+
+## 本次任务（v0.4.19，用户原始需求，5 项，已完成）
+
+**① 星盘 bug：上升星座显示 "[object Object]" + 星盘没显示**
+- 根因（已定位）：`python/server.py` `lon_to_zodiac()` 返回**对象** `{sign, signEn, degree, minute, second, longitude, label}`；ascendant 对象里 `label` 已拼好"上升 X X°…"。但 `src/renderer/calendar.js` `_renderStarChart` 里 `const ascendant = d.ascendant || ''` 拿到的是对象，`String(ascendant)` → `[object Object]`。
+- 修法：前端改为取 `ascendant.label`（如 `const asc = d.ascendant; const ascLabel = (asc && asc.label) || ''`），渲染 `上升 ${ascLabel}`；**注意 label 里已含"上升 "前缀，避免"上升 上升 X"重复**（选一种：后端 label 去前缀或前端只拼一次，输出最终为 `上升 白羊 12°34′56″` 一行）。同时排查"星盘没显示"：检查 `_renderStarChart` 整段（planets 循环正常、空数据分支、`star-chart-body` 显隐），确保有出生信息时点"查看星盘"能渲染出行星落座列表 + 上升/天顶（midheaven 前端可选渲染，样式从简）。可先 `curl -X POST 127.0.0.1:47821/chart/natal -d '{"birth":"1990-05-15 10:30"}'` 验证后端返回结构。
+
+**② 运势提醒/播报过滤黄历宜忌（重点）**
+- 问题：气泡消息和对话消息里的运势提醒，会出现"今日宜祭祀、塞穴、入殓…"等黄历宜忌内容（来自 `src/main/fortuneEngine.js` `buildTemplateFortune` 的 `almanacYi/almanacJi` 拼进 reminderLines/播报文案）。用户明确：**面向上班族/学生，提醒和播报不要说这些毫不相关的内容**；黄历宜忌可以在日历页面正常展示（calendar.js 日历页不动）。
+- 修法（三管齐下）：
+  1. `buildTemplateFortune`：reminderLines 与播报文案**不再直接拼 almanac.yi/ji 原文**，改为基于 7 维度（财运/事业/桃花/学业/出行/签约/健康）的差异化文案（如财运好→"偏财在线"、桃花好→"主动一点有惊喜"、健康维度低→"注意劳逸结合"等，现有 dims 文案可复用改造）；黄历数据仍可用于计算分数/吉时/财神方位，只是不把"祭祀塞穴入殓"这类词进提醒文本。
+  2. LLM prompt：明确要求 reminderLines 只围绕 7 维度（财运/事业/桃花/学业/出行/签约/健康）写"好的或避忌"内容，**禁止出现黄历宜忌词汇（祭祀/塞穴/入殓/安葬/祈福/开光/破土/作灶等）**。
+  3. 加后置清洗函数（如 `sanitizeFortuneText(text)`，在 fortuneEngine.js 或 msgCore.js）：过滤已知祭祀/丧葬/农耕类黄历词（维护一个 STOPWORDS 列表：祭祀/塞穴/入殓/安葬/移柩/破土/祈福/开光/斋醮/立券/栽种/牧养/纳畜/安床/作灶/伐木/开渠/穿井/扫舍 等），命中则用通用维度文案替换或去掉该句；应用到 reminderLines/lotteryTip/运势播报所有输出文本。
+- 日历页（calendar.js 黄历区）保留完整宜忌展示，不动。
+
+**③ 捣蛋模式频率：5~10 分钟随机吐槽或捣蛋，每日上限不设限**
+- 现状（`src/main/prank.js`）：双通道——吐槽 5-8 分钟（ROAST_INTERVAL_MIN/MAX=5/8）+ 捣蛋操作 10-15 分钟（ACTION_INTERVAL_MIN/MAX=10/15），各自独立排程；DAILY_LIMIT=20 每日上限（remainingSlots/takeSlot 限流）。
+- 改法：合并为**单通道**——每 5-10 分钟（一个间隔常量组，如 PRANK_INTERVAL_MIN/MAX=5/10）到点随机触发 **吐槽或捣蛋操作二选一**（50/50 或按权重，可复用现有 doRoast/doAction）；**移除每日上限**（DAILY_LIMIT/remainingSlots/takeSlot 逻辑去掉或恒放行，prankCount 记录可保留但不阻塞）；TRIGGER_CHANCE=1 保持（到点即触发）。开关 prankMode、自家窗口禁止打字、PRANK_POOL 等其余逻辑不动。
+
+**④ 设置页文案（`src/renderer/index.html`）**
+- `AI 命理（DeepSeek 兼容 API）` → `AI 命理（兼容 OpenAI 模式 API、本地模式 API）`
+- 多模态模型部分去掉个性化提示：
+  - `即梦 Seedance（火山引擎，有免费额度）` → `即梦 Seedance`
+  - `AK/SK 签名（火山引擎 AccessKey）` → `AK/SK 签名`
+  - placeholder `AccessKeyId（即梦/火山引擎控制台）` → `AccessKeyId`
+- **AccessKeyId/SecretAccessKey 默认空**：`src/main/main.js` DEFAULT_MODEL_CONFIG 已不含 multimodal 凭证字段（首次启动预填只有 llmBaseUrl/llmModel/llmApiKey），确认 settings.js `applyMultimodal` 的 `mc.accessKeyId || ''` 兜底正确即可；顺带检查是否有其他预填路径（如旧 settings 迁移/默认值对象）会写入非空凭证，有则清掉。用户当前 settings 的 modelConfig 无这两字段，符合预期。
+
+**硬约束**：保留全部现有功能；勿动软渲染配置；勿加 filter；测试前备份 settings.json 测后恢复；不跑 GUI 测试（node --check + 单元测试；星盘可 curl sidecar 验证后端）；样式从简；中文 commit；bump 0.4.19。
+
+**验证**：node --check 全过；单元测试——① 星盘渲染函数对 ascendant 对象/空值正确处理（不再 [object Object]）② sanitizeFortuneText 过滤 STOPWORDS（祭祀/塞穴/入殓等不出现）且保留 7 维度文案 ③ buildTemplateFortune 的 reminderLines 不含黄历宜忌原文 ④ 捣蛋排程单通道间隔在 5-10 分钟区间、无每日上限 ⑤ 文案字符串断言；bump 0.4.19 + 中文 commit；不打包 exe。
+
+---
+
+# HANDOVER — v0.4.18 生肖主题收集系统（已完成，归档）
 
 ## 本次任务（v0.4.18，用户原始需求，已完成）
 

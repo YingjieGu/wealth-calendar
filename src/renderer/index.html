@@ -233,7 +233,7 @@
           <!-- 7. 模型配置（AI 命理 + 多模态 + 本地模型状态 合并） -->
           <div class="setting-group">
             <label>模型配置</label>
-            <div class="setting-sublabel">AI 命理（DeepSeek 兼容 API）</div>
+            <div class="setting-sublabel">AI 命理（兼容 OpenAI 模式 API、本地模式 API）</div>
             <input type="password" id="llm-api-key" class="setting-input" placeholder="API Key（留空则用本地模板推算）">
             <input type="text" id="llm-base-url" class="setting-input" placeholder="Base URL（默认 https://api.deepseek.com）">
             <input type="text" id="llm-model" class="setting-input" placeholder="Model（默认 deepseek-v4-flash）">
@@ -243,14 +243,14 @@
             <button id="btn-save-modelconfig" class="action-btn">💾 保存模型配置</button>
             <div class="setting-sublabel">多模态动图生成（图片 → 动画宠物）</div>
             <select id="mm-provider" class="setting-input">
-              <option value="jimeng">即梦 Seedance（火山引擎，有免费额度）</option>
+              <option value="jimeng">即梦 Seedance</option>
               <option value="kling">可灵 Kling</option>
             </select>
             <select id="mm-auth-type" class="setting-input">
-              <option value="aksk">AK/SK 签名（火山引擎 AccessKey）</option>
+              <option value="aksk">AK/SK 签名</option>
               <option value="apikey">API Key（Bearer）</option>
             </select>
-            <input type="text" id="mm-access-key" class="setting-input" placeholder="AccessKeyId（即梦/火山引擎控制台）">
+            <input type="text" id="mm-access-key" class="setting-input" placeholder="AccessKeyId">
             <input type="password" id="mm-secret-key" class="setting-input" placeholder="SecretAccessKey">
             <input type="password" id="mm-api-key" class="setting-input" placeholder="API Key（Bearer 方式，可留空）" style="display:none;">
             <input type="file" id="mm-upload" accept="image/*" style="display:none;">

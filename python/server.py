@@ -360,6 +360,35 @@ class RequestHandler(BaseHTTPRequestHandler):
     # --- Mail handlers (stdlib imaplib/smtplib, zero extra deps) ---
     # 收件箱前 5 封；配置来自请求体（由 Electron 从 settings.mail 读出）
 
+    def _handle_mail_unread_count(self):
+        # 未读邮件数（UNSEEN），供 v0.4.17 邮件未读提醒；有配置才启用
+        try:
+            body = self._read_body() or {}
+            server = (body.get("imapServer") or "").strip()
+            port = int(body.get("imapPort") or 993)
+            email = (body.get("email") or "").strip()
+            password = (body.get("password") or "").strip()
+            if not (server and email and password):
+                self._error(400, "邮箱配置不完整")
+                return
+            import imaplib
+            M = imaplib.IMAP4_SSL(server, port)
+            try:
+                M.login(email, password)
+                M.select("INBOX")
+                typ, data = M.search(None, "UNSEEN")
+                count = 0
+                if typ == "OK" and data and data[0]:
+                    count = len(data[0].split())
+                self._send_json(200, {"count": count})
+            finally:
+                try:
+                    M.logout()
+                except Exception:
+                    pass
+        except Exception as e:
+            self._error(500, f"查询未读失败: {e}", traceback.format_exc())
+
     def _handle_mail_list(self):
         try:
             body = self._read_body() or {}
@@ -522,6 +551,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._handle_tts()
         elif path == "/mail/list":
             self._handle_mail_list()
+        elif path == "/mail/unread-count":
+            self._handle_mail_unread_count()
         elif path == "/mail/send":
             self._handle_mail_send()
         else:

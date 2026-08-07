@@ -53,6 +53,11 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   onFortuneReminder: (callback) => {
     ipcRenderer.on('fortune-reminder', (_event, data) => callback(data));
   },
+  // ⑥ 即时通讯类：邮件未读提醒（有配置才启用）+ 未来渠道推送事件
+  mailUnreadCount: () => ipcRenderer.invoke('mail:unread-count'),
+  onImReminder: (callback) => {
+    ipcRenderer.on('im-reminder', (_event, data) => callback && callback(data));
+  },
 
   // 捣蛋模式：主进程触发吐槽事件 + 手动触发测试
   onPetPrank: (callback) => {

@@ -38,6 +38,20 @@ const PetState = {
     this._ttsQueue = [];           // 待播队列 [{ text, chime }]
     this._ttsPlaying = false;      // 是否正在播放
     this._ttsCurrent = null;       // 当前正在播放的文本（去重用）
+    // ---- 消息优先级队列（气泡串行显示不重叠；高优先级可插队）----
+    // 优先级：日程5 > 运势/即时通讯4 > 工作3 > 日常2 > 主题互动1；用户交互 say() 最高
+    this._msgQueue = [];           // 待显示消息队列 [{id,text,priority,category,speech,chat,pop}]
+    this._msgShowing = null;       // 当前正在展示的消息（打断时放回队首）
+    this._msgTimer = null;         // 气泡自动隐藏定时器
+    this._msgSeq = 0;              // 消息自增 id
+    // ③ 运势提醒消息池（按天生成一批，次日替换）
+    this._fortuneMsgPool = null;   // { date:'YYYY-MM-DD', lines:[], idx }
+    this._fortuneSegmentsQueue = []; // 兼容 v0.4.16 分段队列
+    // ④ 工作协助每日一次去重
+    this._workLineDate = '';
+    // ⑥ 即时通讯邮件未读（每天提醒一次去重）
+    this._mailWatchTimer = null;
+    this._mailNotifiedDate = '';
   },
 
   // 加载时恢复互动时间戳（settings.petInteractions，24h 窗口内）
@@ -58,6 +72,10 @@ const PetState = {
     this.startIdleWatch();
     this.startWaterReminder();
     this.startFortuneSlots();
+    // ④ 工作协助：每天给一次时间感知的工作提示（周一/周五/月末）
+    setTimeout(() => this._maybeWorkLine(), 25000);
+    // ⑥ 即时通讯：邮件未读提醒（仅当设置里配了邮箱才生效）
+    this.startMailWatch();
     // 面板打开：暂停阶段调度与动作切换（避免面板期间瞬移挪动面板窗口）。
     // 计数器：对话/日历/设置三个面板各自发一次 pet-panel / pet-resume，
     // 全部关闭（计数归零）后才恢复位置变动 —— 避免开着多个面板时关一个就提前恢复。
@@ -81,19 +99,18 @@ const PetState = {
     try {
       window.wealthCalendar.onPetMouseFast((evt) => this._handleMouseFast(evt));
     } catch (e) { /* ignore */ }
-    // 捣蛋模式（主进程触发）：吐槽进气泡 + 聊天对话框（吐槽时气泡带表情动效）
+    // 捣蛋模式（主进程触发）：吐槽进气泡 + 聊天对话框（① 主题互动·吐槽：最低优先级 1，不抢高优）
     try {
       window.wealthCalendar.onPetPrank((data) => {
         if (!data || !data.text) return;
-        this._broadcast(data.text);
-        this._prankBubblePop();
+        this._broadcast(data.text, { priority: MsgCore.PRIORITY.theme, category: 'theme', pop: true });
       });
     } catch (e) { /* ignore */ }
-    // 伙伴模式：主进程剪贴板总结结果 → 气泡 + 聊天对话框
+    // 伙伴模式：主进程剪贴板总结结果 → 气泡 + 聊天对话框（④ 工作协助类：优先级 3）
     try {
       window.wealthCalendar.onPartnerSummary((data) => {
         if (!data || !data.text) return;
-        this._broadcast(data.text);
+        this._broadcast(data.text, { priority: MsgCore.PRIORITY.work, category: 'work' });
       });
     } catch (e) { /* ignore */ }
     // 伙伴模式：窗口感知（60s 轮询活跃窗口标题，切换时概率主动提供帮助）
@@ -149,7 +166,8 @@ const PetState = {
       if (now - this._lastPartnerOfferAt < this.PARTNER_COOLDOWN_MS) return; // 10 分钟冷却
       if (Math.random() >= this.PARTNER_TRIGGER_CHANCE) return; // 20% 概率
       this._lastPartnerOfferAt = now;
-      this.say(this._partnerLine(title));
+      // ④ 工作协助类：工作优先级(3)
+      this.enqueueMsg(this._partnerLine(title), { priority: MsgCore.PRIORITY.work, category: 'work' });
     } catch (e) { /* ignore */ }
   },
 
@@ -436,7 +454,17 @@ const PetState = {
   async _loadPetGrowth() {
     try {
       const s = await window.wealthCalendar.loadSettings();
-      this._petAffinity = Math.min(100, Math.max(0, Number(s.petAffinity) || 0));
+      const today = this._todayStr();
+      // 亲密度每日清零：同一天保留原值，跨天从 0 重新计算（等级称号函数保留，
+      // 元宝每日满100+1逻辑保留——清零后每天重新涨，涨满再得元宝）
+      this._petAffinityDate = s.petAffinityDate || null;
+      this._petAffinity = MsgCore.affinityForDay(s.petAffinity, this._petAffinityDate, today);
+      if (this._petAffinityDate !== today) {
+        this._petAffinityDate = today;
+        try {
+          await window.wealthCalendar.saveSettings({ petAffinityDate: today, petAffinity: 0 });
+        } catch (e) { /* ignore */ }
+      }
       this._petCoins = Number(s.petCoins) || 0;
       this._lastCoinDate = s.lastCoinDate || null;   // 亲密度每日结算：上次领元宝的日期
       this._petName = (s.petName && s.petName.trim()) || '小财';
@@ -471,6 +499,7 @@ const PetState = {
       const recentLog = (this._interactionLog || []).filter((t) => t > cutoff);
       await window.wealthCalendar.saveSettings({
         petAffinity: this._petAffinity,
+        petAffinityDate: this._petAffinityDate || this._todayStr(),
         petCoins: this._petCoins,
         petName: this._petName,
         petDailyTask: this._petDailyTask,
@@ -479,6 +508,7 @@ const PetState = {
       // 同步 SettingsManager 内存副本，避免后续整份保存覆盖
       if (typeof SettingsManager !== 'undefined' && SettingsManager.settings) {
         SettingsManager.settings.petAffinity = this._petAffinity;
+        SettingsManager.settings.petAffinityDate = this._petAffinityDate || this._todayStr();
         SettingsManager.settings.petCoins = this._petCoins;
         SettingsManager.settings.petName = this._petName;
         SettingsManager.settings.petDailyTask = this._petDailyTask;
@@ -621,50 +651,43 @@ const PetState = {
         if (!localStorage.getItem(key)) {
           localStorage.setItem(key, '1'); // 每天只触发一次
           if (Math.random() < 0.5) {
-            this.say(`这么晚还在忙, ${this._petName}心疼你, 早点休息呀 🥺`);
+            // ① 主题互动·安抚：深夜安慰用当前主题的 comfort 文案（有主题则主题互动，否则通用日常）
+            const line = `这么晚还在忙, ${this._petName}心疼你, 早点休息呀 🥺`;
+            this.enqueueMsg(line, { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
           }
         }
       }
     } catch (e) { /* ignore */ }
   },
 
-  // ---- 节日彩蛋：元旦/春节/中秋/用户生日，当日首次互动触发 ----
+  // ---- ⑤ 日程提醒类·节日彩蛋：用户生日 + 情人节 + 法定节假日（元旦/春节/清明/劳动/端午/中秋/国庆），当日首次互动触发 ----
   async _maybeFestival() {
     try {
       const key = `wc-festival-${this._todayStr()}`;
       if (localStorage.getItem(key)) return;
-      // 检测节日类型（农历需要走 IPC 黄历）
-      let festival = '';
       const d = new Date();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
-      // 用户生日（设置里的出生月日）
+      const mmdd = `${mm}-${dd}`;
+      // 1) 用户生日（设置里的出生月日）
+      let msg = '';
       try {
         const s = await window.wealthCalendar.loadSettings();
         const birth = (s.userInfo && s.userInfo.birth) || '';
         const b = birth.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (b && b[2] === mm && b[3] === dd) festival = 'birthday';
+        if (b && b[2] === mm && b[3] === dd) msg = `🎉 生日快乐! ${this._petName}祝主人愿望成真，财运亨通~`;
       } catch (e) { /* ignore */ }
-      if (mm === '01' && dd === '01') festival = 'newyear';
-      if (!festival) {
+      // 2) 情人节 + 法定节假日（黄历 festivals，含农历春节/端午/中秋等）
+      if (!msg) {
         try {
           const lunar = await window.wealthCalendar.getDateLunarData(this._todayStr());
-          // 春节：农历正月初一；中秋：农历八月十五
-          const isSpring = lunar && lunar.lunarMonth === 1 && lunar.lunarDay === '初一';
-          const isMidAutumn = lunar && lunar.lunarMonth === 8 && lunar.lunarDay === '十五';
-          if (isSpring) festival = 'spring';
-          else if (isMidAutumn) festival = 'midautumn';
+          msg = MsgCore.holidayLine(mmdd, lunar);
         } catch (e) { /* ignore */ }
       }
-      if (!festival) return;
+      if (!msg) return;
       localStorage.setItem(key, '1');
-      const msg = {
-        newyear: `🎉 元旦快乐! ${this._petName}祝主人新的一年财源滚滚~`,
-        spring: `🎉 春节快乐! ${this._petName}给主人拜年啦，恭喜发财~`,
-        midautumn: `🎉 中秋快乐! ${this._petName}祝主人月圆人团圆，好运连连~`,
-        birthday: `🎉 生日快乐! ${this._petName}祝主人愿望成真，财运亨通~`,
-      }[festival];
-      if (msg) this.say(msg);
+      // 日程提醒类：最高类别优先级(5)，不被日常/运势消息淹没
+      this.enqueueMsg(msg, { priority: MsgCore.PRIORITY.schedule, category: 'schedule', chat: false });
     } catch (e) { /* ignore */ }
   },
 
@@ -741,8 +764,14 @@ const PetState = {
     // 非 sleep：立即随机切换到另一个动作（play/happy/idle，与当前不同），素材图随之切换
     const candidates = ['play', 'happy', 'idle'].filter((s) => s !== this.currentState);
     this.enterState(candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : 'idle');
-    // 保留现有随机小反应（台词+表情）
-    const r = this.clickReactions[Math.floor(Math.random() * this.clickReactions.length)];
+    // ① 主题互动·交互：单击小反应随主题不同（萌宠 vs 财神 vs 财神金主文案各异），
+    // 走用户交互 say()（最高优先级，可打断当前气泡）；无主题池时兜底通用 clickReactions
+    let r = this.clickReactions[Math.floor(Math.random() * this.clickReactions.length)];
+    try {
+      if (typeof MsgCore !== 'undefined') {
+        r = { emoji: '🥰', line: MsgCore.pickThemeLine(this._theme, 'interact') };
+      }
+    } catch (e) { /* ignore */ }
     this.say(`${r.emoji} ${r.line}`);
     // 重置动作计时器（点击立即切动作后重新计时）
     this._armActionTimer();
@@ -776,21 +805,91 @@ const PetState = {
     // quiet：原地不动，状态已切 idle/play 玩耍动作
   },
 
-  // ---- Bubble ----
-  say(text) {
+  // ---- Bubble 优先级消息队列 ----
+  // 气泡串行显示（一条显示完再下一条）；高优先级可插队（打断当前气泡并放回队首）；
+  // 语音走已有 TTS FIFO（enqueueMsg 的 speech 项调用 speakFortune，互不重叠）
+  enqueueMsg(text, opts = {}) {
+    const str = String(text == null ? '' : text);
+    if (!str) return null;
+    const item = {
+      id: ++this._msgSeq,
+      text: str,
+      priority: Number(opts.priority) || (MsgCore.PRIORITY ? MsgCore.PRIORITY.daily : 2),
+      category: opts.category || 'daily',
+      speech: !!opts.speech,
+      chat: opts.chat !== false,
+      pop: !!opts.pop,
+    };
+    const cur = this._msgShowing;
+    if (cur && MsgCore.shouldPreempt(cur, item)) {
+      // 高优先级插队：当前气泡放回队首，立即展示新消息（不丢消息）
+      this._clearMsgTimer();
+      this._msgShowing = null;
+      this._hideBubbleNow();
+      this._msgQueue.unshift(cur);
+    }
+    MsgCore.priorityInsert(this._msgQueue, item);
+    this._drainMsgQueue();
+    return item;
+  },
+
+  // 串行排水：一条展示完后自动隐藏，再取下一条；展示期间不叠加
+  _drainMsgQueue() {
+    if (this._msgShowing || !this._msgQueue.length) return;
+    const item = this._msgQueue.shift();
+    this._msgShowing = item;
+    this._showBubbleItem(item);
+    if (item.pop) { try { this._prankBubblePop(); } catch (e) { /* ignore */ } }
+    if (item.speech) { try { this.speakFortune(item.text); } catch (e) { /* ignore */ } }
+    if (item.chat) {
+      try {
+        if (typeof ChatPanel !== 'undefined' && ChatPanel && ChatPanel.addMessage) {
+          ChatPanel.addMessage('assistant', item.text);
+        }
+      } catch (e) { /* ignore */ }
+    }
+    const dur = this._msgDuration(item);
+    this._msgTimer = setTimeout(() => {
+      this._msgTimer = null;
+      this._msgShowing = null;
+      this._hideBubbleNow();
+      this._drainMsgQueue();
+    }, dur);
+  },
+
+  // 气泡展示时长：高优先级（日程/用户交互）稍久；文本越长越久（上限 10s）
+  _msgDuration(item) {
+    const base = item.priority >= MsgCore.PRIORITY.schedule ? 8000 : 6000;
+    const extra = Math.min(4000, (item.text || '').length * 25);
+    return base + extra;
+  },
+
+  _showBubbleItem(item) {
     const bubble = document.getElementById('reminder-bubble');
     const el = document.getElementById('reminder-bubble-text');
     // 宠物命名：气泡台词中的“小财”替换为用户设置的名字（默认小财）
-    let finalText = text;
+    let finalText = item.text;
     try {
       if (this._petName && this._petName !== '小财') {
-        finalText = String(text || '').split('小财').join(this._petName);
+        finalText = String(item.text || '').split('小财').join(this._petName);
       }
     } catch (e) { /* ignore */ }
     el.textContent = `💬 ${finalText}`;
-    bubble.classList.remove('hidden');
-    clearTimeout(this._bubbleTimer);
-    this._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 8000);
+    if (bubble) bubble.classList.remove('hidden');
+  },
+
+  _hideBubbleNow() {
+    const bubble = document.getElementById('reminder-bubble');
+    if (bubble) bubble.classList.add('hidden');
+  },
+
+  _clearMsgTimer() {
+    if (this._msgTimer) { clearTimeout(this._msgTimer); this._msgTimer = null; }
+  },
+
+  // 用户交互即时反馈：最高优先级（可打断/覆盖当前气泡）
+  say(text) {
+    this.enqueueMsg(text, { priority: MsgCore.PRIORITY.user, category: 'user', chat: false });
   },
 
   // ---- 时间感知问候：早安/午安/晚安/深夜，每天每时段只一次 ----
@@ -834,8 +933,10 @@ const PetState = {
       } catch (e) { /* localStorage 不可用时也照常问候 */ }
       const arr = this.greetingLines[segment];
       if (arr && arr.length) {
-        // 稍微延迟再开口，避免和启动播报/动画重叠
-        setTimeout(() => this.say(arr[Math.floor(Math.random() * arr.length)]), 1500 + Math.random() * 3000);
+        // 稍微延迟再开口，避免和启动播报/动画重叠；② 日常互动类：日常优先级(2)
+        setTimeout(() => {
+          this.enqueueMsg(arr[Math.floor(Math.random() * arr.length)], { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
+        }, 1500 + Math.random() * 3000);
       }
     } catch (e) { /* ignore */ }
   },
@@ -873,14 +974,15 @@ const PetState = {
       // 深度空闲：让宠物睡一会儿（复用现有 enterState，暂停随机状态机）
       this._pauseStateMachine();
       this.enterState('sleep');
-      this.say('😴 主人好久没动静，小财先眯一会儿…');
+      // ② 日常互动类：日常优先级(2)
+      this.enqueueMsg('😴 主人好久没动静，小财先眯一会儿…', { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
     } else if (bucket === 'rest' && (prev === 'idle' || prev === 'active' || prev === undefined)) {
       // 首次进入休息区间时提醒一次（prev 判断保证不重复刷屏）
-      this.say('主人是不是累了，起来活动一下，顺便喝口水~ 💧');
+      this.enqueueMsg('主人是不是累了，起来活动一下，顺便喝口水~ 💧', { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
     } else if (bucket === 'active' && (prev === 'sleep' || prev === 'rest')) {
       // 用户回来了：恢复状态机并打招呼
       this._resumeStateMachine();
-      this.say('主人回来啦！小财好想你~ 🥰');
+      this.enqueueMsg('主人回来啦！小财好想你~ 🥰', { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
     }
   },
 
@@ -941,7 +1043,8 @@ const PetState = {
   startWaterReminder() {
     if (this._waterTimer) clearInterval(this._waterTimer);
     this._waterTimer = setInterval(() => {
-      this.say('💧 小财提醒主人喝水啦！规律补水身体好~');
+      // ② 日常互动类：日常优先级(2)
+      this.enqueueMsg('💧 小财提醒主人喝水啦！规律补水身体好~', { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
     }, 2 * 60 * 60 * 1000);
   },
 
@@ -958,12 +1061,25 @@ const PetState = {
   ],
 
   startProactive() {
-    // 随机 20-40 分钟主动说一句话
+    // 随机 20-40 分钟主动说一句话：② 日常互动(通用) 与 ① 主题互动(随主题) 混合，
+    // ② 日常/① 主题 都按日常优先级(2)入队（主题互动为最低档 1，这里并入主动轮换不抢高优）
     const scheduleNext = () => {
       this._proactiveTimer = setTimeout(() => {
         if (Math.random() < 0.8) {
-          const line = this.proactiveLines[Math.floor(Math.random() * this.proactiveLines.length)];
-          this.say(line);
+          let line;
+          const roll = Math.random();
+          try {
+            if (roll < 0.35 && typeof MsgCore !== 'undefined') {
+              line = MsgCore.pickThemeLine(this._theme, 'interact');   // ① 主题互动
+            } else if (roll < 0.7) {
+              line = this.proactiveLines[Math.floor(Math.random() * this.proactiveLines.length)]; // 原主动台词
+            } else if (typeof MsgCore !== 'undefined') {
+              line = MsgCore.DAILY_LINES[Math.floor(Math.random() * MsgCore.DAILY_LINES.length)]; // ② 日常互动
+            } else {
+              line = this.proactiveLines[Math.floor(Math.random() * this.proactiveLines.length)];
+            }
+          } catch (e) { line = this.proactiveLines[Math.floor(Math.random() * this.proactiveLines.length)]; }
+          this.enqueueMsg(line, { priority: MsgCore.PRIORITY.daily, category: 'daily', chat: false });
         }
         scheduleNext();
       }, (20 + Math.random() * 20) * 60 * 1000);
@@ -989,14 +1105,32 @@ const PetState = {
         const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
         wishHint = wishMap[wish] ? `，今天重点：${wishMap[wish]}` : '';
       } catch (e) { /* ignore */ }
-      // 运势拆成多条（总运势/财运/避忌/幸运元素）：启动只播总运势 1 条，
-      // 其余分段存入队列，由 startFortuneSlots 分散到一天多个时段播报（不集中轰炸）
-      const segs = this._fortuneSegments(fortune);
-      this._fortuneSegmentsQueue = segs.slice(1);
-      const line = segs[0] + wishHint;
-      // 运势类播报：先"叮~"提示音再语音播报
-      this._broadcast(line, { speech: true });
+      // ③ 运势提醒类：当天运势出来后生成一批消息保存，直到第二天新运势替换；
+      // 启动只播总运势 1 条，其余存入消息池，由 startFortuneSlots 分散到一天多个时段播报
+      const pool = this._ensureFortunePool(fortune);
+      const line = pool.lines[0] + wishHint;
+      pool.idx = 1; // 下一条从池内第 2 条开始
+      // 运势类播报：优先级(4)，先系统提示音再语音播报
+      this._broadcast(line, { speech: true, priority: MsgCore.PRIORITY.fortune, category: 'fortune' });
     } catch (e) { /* ignore */ }
+  },
+
+  // ③ 运势提醒消息池：按日期生成一批保存，跨天自动替换为新运势的批次
+  _ensureFortunePool(fortune) {
+    const today = this._todayStr();
+    if (!this._fortuneMsgPool || this._fortuneMsgPool.date !== today) {
+      this._fortuneMsgPool = { date: today, lines: MsgCore.buildFortuneMsgPool(fortune, today), idx: 0 };
+      // 兼容 v0.4.16 分段队列（_fortuneSegments 仍保留，供诊断/测试）
+      this._fortuneSegmentsQueue = this._fortuneSegments(fortune).slice(1);
+    }
+    return this._fortuneMsgPool;
+  },
+  _nextFortuneLine() {
+    const p = this._fortuneMsgPool;
+    if (!p || !p.lines || !p.lines.length) return null;
+    const line = p.lines[p.idx % p.lines.length];
+    p.idx += 1;
+    return line;
   },
 
   // ---- 每日运势分段播报（上午/中午/下午/晚上 四时段, 每时段 4-6 条, 每天 16-24 条）----
@@ -1043,26 +1177,25 @@ const PetState = {
     try {
       const result = await window.wealthCalendar.getDailyFortune();
       if (!result || !result.data) return;
-      // 分段队列轮换：每次只播 1 条（总/财/避忌/幸运元素），分散各时段，不集中轰炸
-      if (!this._fortuneSegmentsQueue || !this._fortuneSegmentsQueue.length) {
-        this._fortuneSegmentsQueue = this._fortuneSegments(result.data);
-      }
-      const line = this._fortuneSegmentsQueue.shift();
-      // 运势类播报：先"叮~"提示音再语音播报
-      if (line) this._broadcast(line, { speech: true });
+      // ③ 运势提醒消息池轮换：每次只播 1 条，分散各时段，不集中轰炸；
+      // 池跨天自动替换（_ensureFortunePool 按日期重建）
+      const pool = this._ensureFortunePool(result.data);
+      const line = this._nextFortuneLine();
+      // 运势类播报：优先级(4)，先系统提示音再语音播报
+      if (line) this._broadcast(line, { speech: true, priority: MsgCore.PRIORITY.fortune, category: 'fortune' });
     } catch (e) { /* ignore */ }
   },
 
-  // 播报：宠物气泡说话 + 同步追加到聊天对话框（只追加，不打断用户对话）
-  // opts.speech=true 时额外语音播报（运势类：先"叮~"提示音再播报）；普通交互台词不播报
+  // 播报：入优先级队列串行显示（气泡）+ 同步追加到聊天对话框（只追加，不打断用户对话）
+  // opts.priority/opts.category 标注消息类别；opts.speech=true 额外语音播报（走 TTS FIFO）
   _broadcast(line, opts) {
-    this.say(line);
-    if (opts && opts.speech) this.speakFortune(line);
-    try {
-      if (typeof ChatPanel !== 'undefined' && ChatPanel && ChatPanel.addMessage) {
-        ChatPanel.addMessage('assistant', line);
-      }
-    } catch (e) { /* ignore */ }
+    this.enqueueMsg(line, {
+      priority: (opts && opts.priority) || MsgCore.PRIORITY.daily,
+      category: (opts && opts.category) || 'daily',
+      speech: !!(opts && opts.speech),
+      chat: (opts && opts.chat) !== false,
+      pop: !!(opts && opts.pop),
+    });
   },
   // 捣蛋吐槽时气泡带表情动效（弹跳/抖动一次后恢复）
   _prankBubblePop() {
@@ -1094,10 +1227,9 @@ const PetState = {
     try {
       const s = await window.wealthCalendar.loadSettings();
       if (s.ttsEnabled !== false) {
-        // 运势类：先"叮~"提示音再播报；普通对话回复不带提示音
+        // 运势类：先播内置系统"叮"提示音（不走 TTS 合成，清脆一声）；普通对话回复不带提示音
         if (item.chime) {
-          const chime = await window.wealthCalendar.ttsSynthesize('叮～');
-          if (chime && chime.audioBase64) await this._playAudio(chime.audioBase64);
+          await this._playChime();
         }
         const r = await window.wealthCalendar.ttsSynthesize(item.text);
         if (r && r.audioBase64) await this._playAudio(r.audioBase64);
@@ -1126,6 +1258,51 @@ const PetState = {
         setTimeout(resolve, 15000);
       } catch (e) { resolve(); }
     });
+  },
+  // 系统消息提示音：内置短"叮" WAV（base64，HTML5 Audio 播放，零外部依赖）。
+  // 替换 v0.4.16 用 TTS 合成"叮～"的方式，避免软渲染下念"叮"的别扭体验。
+  _playChime() {
+    return new Promise((resolve) => {
+      try {
+        if (typeof MsgCore === 'undefined' || !MsgCore.SYSTEM_CHIME_B64) { resolve(); return; }
+        const audio = new Audio(`data:audio/wav;base64,${MsgCore.SYSTEM_CHIME_B64}`);
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+        setTimeout(resolve, 3000); // 提示音很短，3s 兜底
+      } catch (e) { resolve(); }
+    });
+  },
+
+  // ---- ④ 工作协助类：每天给一次时间感知的工作提示（周一/周五/月末优先）----
+  _maybeWorkLine() {
+    const today = this._todayStr();
+    if (this._workLineDate === today) return;
+    const lines = MsgCore.workLinesForDate(today);
+    if (!lines || !lines.length) return;
+    this._workLineDate = today;
+    // 取第一条（时间感知线优先，如周一/周五/月末），工作优先级(3)
+    this.enqueueMsg(lines[0], { priority: MsgCore.PRIORITY.work, category: 'work', chat: false });
+  },
+
+  // ---- ⑥ 即时通讯类：邮件未读提醒（复用现有 IMAP 配置，有配置才启用；每天提醒一次）----
+  startMailWatch() {
+    if (!window.wealthCalendar || !window.wealthCalendar.mailUnreadCount) return;
+    if (this._mailWatchTimer) clearInterval(this._mailWatchTimer);
+    this._mailWatchTimer = setInterval(() => this._checkMailUnread(), 45 * 60 * 1000);
+    // 启动 2.5 分钟后首次检查，避免与启动问候/运势抢气泡
+    setTimeout(() => this._checkMailUnread(), 150 * 1000);
+  },
+  async _checkMailUnread() {
+    try {
+      const r = await window.wealthCalendar.mailUnreadCount();
+      if (!r || !r.enabled || !r.count) return; // 未配置邮箱 / 无未读 → 静默
+      const today = this._todayStr();
+      if (this._mailNotifiedDate === today) return; // 每天只提醒一次
+      this._mailNotifiedDate = today;
+      // 即时通讯类：优先级(4)
+      this.enqueueMsg(MsgCore.mailLine(r.count), { priority: MsgCore.PRIORITY.im, category: 'im' });
+    } catch (e) { /* ignore */ }
   },
 
   _buildFortuneLine(fortune) {
@@ -1239,8 +1416,8 @@ const PetState = {
           return hm >= g.start && hm <= g.end;
         });
         if (inGood) {
-          // 吉时属运势类播报：先"叮~"提示音再语音播报
-          this._broadcast(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`, { speech: true });
+          // 吉时属运势类播报：优先级(4)，先系统提示音再语音播报
+          this._broadcast(`⏰ 现在正是今日吉时（${hm}），适合做重要决定！`, { speech: true, priority: MsgCore.PRIORITY.fortune, category: 'fortune' });
         }
       });
     } catch (e) { /* ignore */ }

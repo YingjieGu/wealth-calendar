@@ -178,6 +178,8 @@ function convertToPng(dataUrl) {
 })();
 
 // --- Reminder listener ---
+// 提醒类消息统一走 PetState 优先级队列（气泡串行显示、高优先级插队、语音走 TTS FIFO），
+// 队列不可用时兜底为本地纯气泡显示
 (function setupReminderListener() {
   let bubbleTimer = null;
   const bubble = document.getElementById('reminder-bubble');
@@ -192,18 +194,40 @@ function convertToPng(dataUrl) {
     }, ms || 5000);
   }
 
+  function queue(text, opts) {
+    if (typeof PetState !== 'undefined' && PetState.enqueueMsg) {
+      PetState.enqueueMsg(text, opts);
+      return true;
+    }
+    return false;
+  }
+
   window.wealthCalendar.onScheduleReminder((schedule) => {
     const timeStr = schedule.time ? ` ${schedule.time}` : '';
-    showBubble(`🔔 ${schedule.title}${timeStr}`);
+    const text = `🔔 ${schedule.title}${timeStr}`;
+    // ⑤ 日程提醒类：最高类别优先级(5)，不被日常/运势消息淹没
+    if (!queue(text, { priority: 5, category: 'schedule', chat: false })) showBubble(text);
   });
 
   window.wealthCalendar.onFortuneReminder((data) => {
-    showBubble(`🔮 ${data.line || ''}`);
-    // 运势类播报：先"叮~"提示音再语音播报（交互类台词不播报）
-    if (typeof PetState !== 'undefined' && PetState.speakFortune && data.line) {
-      PetState.speakFortune(data.line);
+    const line = data.line || '';
+    const text = `🔮 ${line}`;
+    // ③ 运势提醒类：优先级(4)，气泡走队列串行显示（交互类台词不播报）
+    if (!queue(text, { priority: 4, category: 'fortune', chat: false })) showBubble(text);
+    // 运势语音播报走 TTS FIFO（先系统提示音再"小财帮你瞄了一眼：..."，不重叠）
+    if (typeof PetState !== 'undefined' && PetState.speakFortune && line) {
+      PetState.speakFortune(line);
     }
   });
+
+  // ⑥ 即时通讯类（主进程推送，预留未来渠道）：优先级(4)
+  try {
+    window.wealthCalendar.onImReminder((data) => {
+      const text = (data && data.text) || (data && data.type === 'mail' && data.count ? `📮 主人有 ${data.count} 封未读邮件，记得查收哦~` : '');
+      if (!text) return;
+      if (!queue(text, { priority: 4, category: 'im' })) showBubble(text);
+    });
+  } catch (e) { /* ignore */ }
 })();
 
 // --- Context menu (right-click pet) ---

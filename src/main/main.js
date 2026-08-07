@@ -1037,6 +1037,27 @@ function setupIPC() {
     return fortuneEngine.getFortuneByDate(dateStr, !!force, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
   });
 
+  // ⑥ 即时通讯类：邮件未读数（仅当设置面板配置了邮箱才启用；密码只在本机 settings.json，
+  // 经本机 Python 标准库 imaplib 查询，不上传）
+  ipcMain.handle('mail:unread-count', async () => {
+    try {
+      const m = (loadSettings().mail || {});
+      if (!m.imapServer || !m.email || !m.password) return { enabled: false, count: 0 };
+      const r = await sidecar.requestSidecar('POST', '/mail/unread-count', {
+        imapServer: String(m.imapServer || '').trim(),
+        imapPort: parseInt(m.imapPort || 993, 10) || 993,
+        email: String(m.email || '').trim(),
+        password: String(m.password || ''),
+      });
+      if (r.status >= 400 || (r.data && r.data.error)) {
+        return { enabled: true, count: 0, error: (r.data && r.data.error) || `HTTP ${r.status}` };
+      }
+      return { enabled: true, count: (r.data && r.data.count) || 0 };
+    } catch (e) {
+      return { enabled: true, count: 0, error: String((e && e.message) || e) };
+    }
+  });
+
   // Quit from renderer context menu
   const handleQuit = () => {
     isQuitting = true;

@@ -1124,11 +1124,11 @@ const PetState = {
     this._memoryState = this._memoryState || { quiet: false, enabled: true };
     this._refreshMemoryState();
     const scheduleNext = () => {
+      this._refreshMemoryState(); // 每轮刷新低谷状态（深夜自动降频，白天恢复）
+      const quiet = !!(this._memoryState && this._memoryState.quiet);
+      const chance = quiet ? 0.3 : 0.8;          // 低谷降频：80% → 30%
+      const delayMin = quiet ? 30 : 20;          // 低谷间隔拉长
       this._proactiveTimer = setTimeout(() => {
-        this._refreshMemoryState(); // 每轮刷新低谷状态（深夜自动降频，白天恢复）
-        const quiet = !!(this._memoryState && this._memoryState.quiet);
-        const chance = quiet ? 0.3 : 0.8;          // 低谷降频：80% → 30%
-        const delayMin = quiet ? 30 : 20;          // 低谷间隔拉长
         if (Math.random() < chance) {
           let line;
           const roll = Math.random();

@@ -1,4 +1,25 @@
-# HANDOVER — v0.4.22 星盘可视化+分析 + 启动重复播报修复（已完成，归档）
+# HANDOVER — v0.4.23 手绘涂鸦风格界面模式（doodle theme）（已完成，归档）
+
+## 本次任务（v0.4.23，用户需求：新增手绘涂鸦风格界面模式，要有设计感，改完运行截图验证，已完成）
+
+**目标**：设置页「界面模式」新增第 4 种：**🎨 手绘涂鸦（doodle）**——目前已有 深色 dark（默认）/ 浅色 light / 青涩 teal（body.theme-light / body.theme-teal，CSS 变量覆盖体系在 styles.css）。doodle 同样走 `body.theme-doodle` CSS 变量覆盖 + 组件级手绘细节。用户明确要"有设计感"，本轮可放开做 UI 质感（但遵守软渲染硬约束）。
+
+**手绘涂鸦设计要点（全部 CSS/SVG 实现，软渲染安全）**：
+1. **手绘边框**：经典不对称 border-radius 技法，如 `border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`（卡片/按钮/输入框/气泡/面板随机微调数值，避免全部相同），配合 2px 实线描边（铅笔感）
+2. **蜡笔色板 + 纸纹**：米黄纸底 `#fdf6e3` 系；强调色用柔和蜡笔（如蜡笔蓝 #7aa5d9 / 蜡笔红 #e98a8a / 蜡笔绿 #9cc79c / 铅笔灰 #4a4a4a）；纸纹用纯 CSS 渐变模拟（如细横线笔记本纸 `linear-gradient` 或点状），**勿用 filter（feTurbulence/noise）**（软渲染风险）
+3. **贴纸感**：硬阴影无模糊 `box-shadow: 2px 3px 0 rgba(0,0,0,.25)`；卡片/标签微旋转 `transform: rotate(-1deg / 0.8deg)` 交错（贴纸/便签感，transform 安全）；hover 时旋转归零或加大
+4. **手写字体**：尝试下载开源手写体 **站酷快乐体（ZCOOL KuaiLe）** woff2（约 1-3MB）放入 `assets/fonts/`，`@font-face` 加载，正文/标题用；**下载源先试**：npm 包 `zcool-kuaile`（npmmirror 有镜像）或 gitee/GitHub raw（如 `https://gitee.com/...` / `https://cdn.jsdelivr.net/npm/zcool-kuaile`）；下载失败则纯 CSS 手绘手法（微旋转+手绘边框已足够有设计感），字体降级系统 sans。**字体文件必须能离线打包**（进 build 资源，勿引用外部 CDN 运行时加载——国内网络不稳）；如引入字体，package.json 打包配置要带上 assets/fonts
+5. **组件覆盖范围**：面板（#panel）、设置页卡片/按钮/输入框/开关、聊天面板、日历面板、宠物气泡（#reminder-bubble）、右键菜单、运势卡片、星盘卡片、toast——全部手绘化（边框/阴影/字体/微旋转）；标题下划线可用 SVG 波浪线或 border-bottom 双线
+6. **与其他主题隔离**：`body.theme-doodle` 显式重写全部派生变量（参照 0.4.13 浅色"文字看不清"坑：**勿依赖 var() 派生级联，显式覆盖**）；切换逻辑复用现有 applyUiTheme（settings.js），加 'doodle' 分支；设置页「界面模式」按钮组加 `🎨 手绘涂鸦`（data-ui-theme="doodle"）
+7. **保留全部现有功能**：dark/light/teal 三个主题不可回归（CSS 变量体系别破坏，doodle 用独立 body class 隔离）
+
+**硬约束**：勿加 filter（软渲染）；动画只用 transform/opacity；勿动软渲染配置（swiftshader 等）；测试前备份 settings.json 测后恢复；不跑 GUI 启动测试（node --check + 单元测试即可，**截图验证由 Hermes 负责**——本机会 npm start + KWin 截图发用户）；样式可以放开做（本轮用户明确要设计感）；中文 commit；bump 0.4.23；不打包 exe。
+
+**验证**：node --check 全过；单元测试——① styles.css 含 `body.theme-doodle` 且无 filter 关键字 ② 设置页 index.html 含 doodle 按钮、settings.js applyUiTheme 有 doodle 分支 ③ 派生变量显式覆盖（doodle 块不引用 var() 派生关键变量）④ 字体文件存在（若下载成功，断言 assets/fonts/*.woff2 存在且 >100KB）⑤ 回归 v019-v022 测试仍过（若受影响）；bump 0.4.23 + 中文 commit；不打包 exe。
+
+---
+
+# HANDOVER — v0.4.22 星盘可视化+分析 + 启动重复播报修复（已完成，归档）（已完成，归档）
 
 ## 本次任务（v0.4.22，用户原始需求 2 项，已完成）
 

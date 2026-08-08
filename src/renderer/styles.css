@@ -24,6 +24,14 @@ html, body {
    深色默认；body.theme-light 覆盖为暖米色浅色主题。
    所有组件只引用 token 层，深浅主题切换自动级联。
    ============================================================ */
+/* ---- 站酷快乐体（ZCOOL KuaiLe）— 手绘涂鸦主题手写字体 ---- */
+@font-face {
+  font-family: 'ZCOOL KuaiLe';
+  src: url('../../assets/fonts/ZCOOLKuaiLe-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   /* ---- 色板 tokens ---- */
   --color-primary: #d4a017;        /* 财神金（主品牌色） */
@@ -161,6 +169,598 @@ body.theme-teal #app.theme-gold {
   background: linear-gradient(160deg, #f0e7c8 0%, #e6e9dc 60%, #dce8e6 100%);
   border: 2px solid #b8952f;
   box-shadow: inset 0 0 24px rgba(184, 149, 47, 0.18);
+}
+
+/* ============================================================
+   手绘涂鸦主题（doodle）— 第 4 种界面模式
+   蜡笔色板 + 米黄纸纹 + 不对称手绘边框 + 贴纸感硬阴影 + 微旋转
+   设计原则：纯 CSS/SVG 实现，零 filter，动画仅 transform/opacity
+   ============================================================ */
+body.theme-doodle {
+  /* ---- 蜡笔色板 ---- */
+  --color-primary: #6a9fd8;        /* 蜡笔蓝（主色） */
+  --color-accent: #e98a8a;         /* 蜡笔红（点缀） */
+  --color-accent-soft: rgba(122, 165, 217, 0.16);
+  --bg: #fdf6e3;                   /* 米黄纸底 */
+  --surface: #fffef9;              /* 卡片：微暖白 */
+  --surface-2: #fff8ed;            /* 浮层：淡奶油 */
+  --surface-3: #fef0dc;            /* hover：淡杏 */
+  --text: #3a3028;                 /* 铅笔灰主文字 */
+  --text-dim: #7a6e62;             /* 弱文字 */
+  /* ---- 手绘阴影：硬阴影无模糊（贴纸感）---- */
+  --shadow-1: 2px 3px 0 rgba(0, 0, 0, 0.18);
+  --shadow-2: 3px 4px 0 rgba(0, 0, 0, 0.22);
+  --shadow-3: 4px 5px 0 rgba(0, 0, 0, 0.26);
+  /* ---- 手绘圆角 tokens（不对称，模拟手绘）---- */
+  --radius-sm: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --radius-md: 185px 25px 215px 20px / 20px 200px 18px 210px;
+  --radius-lg: 200px 30px 190px 25px / 22px 180px 28px 195px;
+  /* ---- 手写字体（优先站酷快乐体，降级系统字体）---- */
+  --font-doodle: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  --font-sans: var(--font-doodle);
+  --font-num: var(--font-doodle);
+  /* ---- 派生变量：全部显式覆盖，不依赖 var() 级联 ---- */
+  --accent: #e98a8a;
+  --accent-dim: #d07070;
+  --panel-bg: linear-gradient(170deg, #fdf6e3 0%, #f8efd8 50%, #fdf3e0 100%);
+  --panel-bg2: linear-gradient(170deg, #fef9ee 0%, #fdf4e2 50%, #fcf0da 100%);
+  --menu-bg: rgba(255, 252, 245, 0.98);
+  --toast-bg: rgba(58, 48, 40, 0.94);
+  --text-strong: #2a2218;
+  --text-mid: #5a4e42;
+  --card: #fffef9;
+  --card-border: #c8b89a;
+  --input-bg: #fffdf5;
+  --input-border: #c8b89a;
+  --border-soft: #e0d4bc;
+  --btn-bg: #faf3e4;
+  --btn-hover: #f5e8d0;
+  --scrollbar: rgba(58, 48, 40, 0.22);
+  --scrollbar-hover: rgba(58, 48, 40, 0.4);
+  --schedule-item: rgba(122, 165, 217, 0.12);
+}
+
+/* ---- 纸纹背景（纯 CSS 渐变模拟笔记本横线，不用 filter）---- */
+body.theme-doodle #app,
+body.theme-doodle #settings-panel,
+body.theme-doodle #chat-panel,
+body.theme-doodle #calendar-view {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 27px,
+      rgba(180, 160, 140, 0.18) 27px,
+      rgba(180, 160, 140, 0.18) 28px
+    );
+}
+/* 面板叠加暖纸色渐变在横线上方 */
+body.theme-doodle #settings-panel {
+  background:
+    linear-gradient(170deg, #fdf6e3 0%, #f8efd8 50%, #fdf3e0 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180, 160, 140, 0.18) 27px, rgba(180, 160, 140, 0.18) 28px);
+}
+body.theme-doodle #chat-panel {
+  background:
+    linear-gradient(170deg, #fef9ee 0%, #fdf4e2 50%, #fcf0da 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180, 160, 140, 0.18) 27px, rgba(180, 160, 140, 0.18) 28px);
+}
+body.theme-doodle #calendar-view {
+  background:
+    linear-gradient(170deg, #fdf6e3 0%, #f8efd8 50%, #fdf3e0 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180, 160, 140, 0.18) 27px, rgba(180, 160, 140, 0.18) 28px);
+}
+
+/* ---- 手绘边框全局覆盖（铅笔描边感 2px solid）---- */
+body.theme-doodle #settings-panel,
+body.theme-doodle #chat-panel,
+body.theme-doodle #calendar-view {
+  border: 2px solid #b8a080;
+  border-radius: 185px 25px 215px 20px / 20px 200px 18px 210px;
+}
+body.theme-doodle #app {
+  border: 2px solid #b8a080;
+  border-radius: 200px 30px 190px 25px / 22px 180px 28px 195px;
+}
+
+/* ---- 设置面板手绘化 ---- */
+body.theme-doodle .setting-group {
+  border: 2px solid #c8b89a;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  background: #fffef9;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-0.4deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-doodle .setting-group:nth-child(even) {
+  transform: rotate(0.5deg);
+  border-radius: 180px 28px 200px 18px / 22px 195px 16px 210px;
+}
+body.theme-doodle .setting-group:hover {
+  transform: rotate(0deg) scale(1.01);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.24);
+}
+body.theme-doodle .setting-group:nth-child(3n) {
+  border-radius: 190px 22px 210px 28px / 18px 185px 24px 205px;
+}
+body.theme-doodle .settings-header {
+  border-bottom: 2px dashed #c8b89a;
+}
+body.theme-doodle .setting-group label {
+  /* 标题下划线：border-bottom 双线模拟手绘波浪感 */
+  border-bottom: 2px dotted #e98a8a;
+  padding-bottom: 3px;
+  display: inline-block;
+  color: #5a4e42;
+}
+
+/* ---- 设置页按钮手绘化 ---- */
+body.theme-doodle .theme-option,
+body.theme-doodle .activity-option {
+  border: 2px solid #b8a080;
+  border-radius: 120px 20px 130px 18px / 16px 125px 22px 120px;
+  background: #fffef9;
+  color: #5a4e42;
+  box-shadow: 1.5px 2px 0 rgba(0, 0, 0, 0.15);
+  transform: rotate(-0.3deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-doodle .theme-option:nth-child(2n),
+body.theme-doodle .activity-option:nth-child(2n) {
+  transform: rotate(0.4deg);
+}
+body.theme-doodle .theme-option:hover,
+body.theme-doodle .activity-option:hover {
+  transform: rotate(0deg) scale(1.04);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.22);
+}
+body.theme-doodle .theme-option.active,
+body.theme-doodle .activity-option.active {
+  background: #fef0dc;
+  border-color: #6a9fd8;
+  color: #4a7ab0;
+  font-weight: 700;
+  box-shadow: 2px 3px 0 rgba(106, 159, 216, 0.3);
+  transform: rotate(0deg);
+}
+body.theme-doodle .theme-option:active,
+body.theme-doodle .activity-option:active {
+  transform: scale(0.95);
+}
+
+/* ---- 设置页输入框手绘化 ---- */
+body.theme-doodle .setting-input,
+body.theme-doodle .form-group input,
+body.theme-doodle .form-group textarea {
+  border: 2px solid #c8b89a;
+  border-radius: 130px 25px 120px 20px / 18px 135px 22px 125px;
+  background: #fffdf5;
+  color: #3a3028;
+  color-scheme: light;
+}
+body.theme-doodle .setting-input:focus,
+body.theme-doodle .form-group input:focus,
+body.theme-doodle .form-group textarea:focus {
+  border-color: #6a9fd8;
+  box-shadow: 2px 3px 0 rgba(106, 159, 216, 0.25);
+  outline: none;
+}
+
+/* ---- 设置页 action-btn 手绘化 ---- */
+body.theme-doodle .action-btn {
+  border: 2px solid #b8a080;
+  border-radius: 150px 20px 140px 22px / 18px 140px 20px 135px;
+  background: #faf3e4;
+  color: #5a4e42;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.15);
+  transform: rotate(-0.3deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-doodle .action-btn:hover {
+  transform: rotate(0deg) translateY(-1px);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.22);
+  background: #f5e8d0;
+}
+body.theme-doodle .action-btn:active {
+  transform: scale(0.96);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* ---- 设置页 miniature cards ---- */
+body.theme-doodle .mini-card {
+  border: 2px solid #d8c8a8;
+  border-radius: 180px 22px 170px 20px / 16px 175px 20px 170px;
+  background: #fffef9;
+  box-shadow: 1.5px 2px 0 rgba(0, 0, 0, 0.12);
+  transform: rotate(-0.3deg);
+}
+body.theme-doodle .affinity-card { border-left: 3px solid #e98a8a; }
+body.theme-doodle .mood-card { border-left: 3px solid #f0a830; }
+body.theme-doodle .coin-card { border-left: 3px solid #6a9fd8; }
+
+/* ---- 生肖宫格手绘化 ---- */
+body.theme-doodle .zodiac-cell {
+  border: 2px solid #c8b89a;
+  border-radius: 80px 18px 90px 15px / 15px 82px 20px 85px;
+  background: #fffef9;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.1);
+  transform: rotate(-0.5deg);
+}
+body.theme-doodle .zodiac-cell:nth-child(2n) { transform: rotate(0.4deg); }
+body.theme-doodle .zodiac-cell:nth-child(3n) { transform: rotate(-0.3deg); }
+body.theme-doodle .zodiac-cell:nth-child(5n) { transform: rotate(0.6deg); }
+body.theme-doodle .zodiac-cell.unlocked {
+  border-color: #6a9fd8;
+  background: #fef9f0;
+  box-shadow: 2px 3px 0 rgba(106, 159, 216, 0.25);
+}
+
+/* ---- 聊天面板手绘化 ---- */
+body.theme-doodle .chat-header {
+  border-bottom: 2px dashed #c8b89a;
+  color: #5a4e42;
+}
+body.theme-doodle .chat-msg {
+  border: 2px solid #c8b89a;
+  box-shadow: 1.5px 2px 0 rgba(0, 0, 0, 0.12);
+}
+body.theme-doodle .chat-user {
+  border-radius: 150px 18px 140px 6px / 16px 145px 6px 130px;
+  background: #e8f0fb;
+  color: #3a3028;
+  border-color: #6a9fd8;
+  transform: rotate(0.6deg);
+}
+body.theme-doodle .chat-assistant {
+  border-radius: 140px 22px 6px 130px / 20px 135px 130px 20px;
+  background: #fffef9;
+  border-color: #c8b89a;
+  transform: rotate(-0.4deg);
+}
+body.theme-doodle .chat-input-row {
+  border-top: 2px dashed #e0d4bc;
+}
+body.theme-doodle #chat-input {
+  border: 2px solid #c8b89a;
+  border-radius: 120px 22px 110px 18px / 18px 125px 20px 115px;
+  background: #fffdf5;
+  color: #3a3028;
+  color-scheme: light;
+}
+body.theme-doodle #chat-input:focus {
+  border-color: #6a9fd8;
+  box-shadow: 2px 3px 0 rgba(106, 159, 216, 0.2);
+}
+body.theme-doodle .chat-send-btn {
+  border: 2px solid #e98a8a;
+  border-radius: 60px 18px 65px 20px / 16px 58px 22px 62px;
+  background: #fce8e8;
+  color: #8a4040;
+  box-shadow: 2px 3px 0 rgba(233, 138, 138, 0.3);
+  transform: rotate(-2deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-doodle .chat-send-btn:hover {
+  transform: rotate(0deg) scale(1.1);
+  box-shadow: 3px 4px 0 rgba(233, 138, 138, 0.4);
+}
+body.theme-doodle .chat-send-btn:active { transform: scale(0.92); }
+body.theme-doodle .chat-mic-btn {
+  border: 2px solid #c8b89a;
+  border-radius: 70px 15px 60px 22px / 16px 65px 20px 70px;
+  background: #fffef9;
+}
+body.theme-doodle .chat-mic-btn:hover {
+  background: #f5e8d0;
+}
+body.theme-doodle .chat-mic-btn.recording {
+  background: #fce8e8;
+  border-color: #e98a8a;
+  color: #8a4040;
+}
+
+/* ---- 日历面板手绘化 ---- */
+body.theme-doodle .cal-header {
+  border-bottom: 2px dashed #c8b89a;
+  color: #5a4e42;
+}
+body.theme-doodle .cal-header button {
+  border: 2px solid #c8b89a;
+  border-radius: 80px 18px 90px 15px / 15px 85px 20px 80px;
+  background: #fffef9;
+  color: #5a4e42;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.1);
+}
+body.theme-doodle .cal-header button:hover {
+  background: #f5e8d0;
+}
+body.theme-doodle .cal-cell {
+  border: 1.5px solid #d8c8a8;
+  border-radius: 60px 15px 65px 18px / 14px 58px 16px 62px;
+  background: #fffef9;
+  box-shadow: 1px 1.5px 0 rgba(0, 0, 0, 0.08);
+  transform: rotate(-0.2deg);
+}
+body.theme-doodle .cal-cell:nth-child(7n+1) { transform: rotate(0.3deg); }
+body.theme-doodle .cal-cell:nth-child(7n+3) { transform: rotate(-0.4deg); }
+body.theme-doodle .cal-cell:nth-child(7n+5) { transform: rotate(0.5deg); }
+body.theme-doodle .cal-cell:hover {
+  background: #fef9f0;
+  transform: rotate(0deg) translateY(-1px);
+}
+body.theme-doodle .cal-cell-today {
+  border-color: #6a9fd8;
+  border-width: 2.5px;
+  background: rgba(106, 159, 216, 0.1);
+  box-shadow: 2px 3px 0 rgba(106, 159, 216, 0.2);
+}
+body.theme-doodle .cal-date-num { color: #3a3028; }
+body.theme-doodle .cal-cell-today .cal-date-num { color: #4a7ab0; }
+
+/* ---- 日历运势卡片手绘化 ---- */
+body.theme-doodle .fortune-card {
+  border: 2px solid #c8b89a;
+  border-radius: 160px 28px 150px 22px / 20px 155px 24px 148px;
+  background: #fffef9;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-0.5deg);
+}
+body.theme-doodle .fortune-score-num {
+  color: #6a9fd8;
+  text-shadow: 2px 3px 0 rgba(106, 159, 216, 0.25);
+}
+body.theme-doodle .fortune-line {
+  border: 2px solid #e0d4bc;
+  border-radius: 100px 22px 110px 18px / 16px 105px 20px 100px;
+  background: #fef9f0;
+  color: #5a4e42;
+}
+body.theme-doodle .fortune-line.fortune-brief {
+  border: 2px dashed #d8c8a8;
+}
+body.theme-doodle .fortune-minicards .mini-card {
+  border: 2px solid #d8c8a8;
+  border-radius: 100px 18px 90px 22px / 16px 95px 20px 92px;
+  background: #fffef9;
+  box-shadow: 1.5px 2px 0 rgba(0, 0, 0, 0.1);
+  transform: rotate(-0.3deg);
+}
+body.theme-doodle .fortune-minicards .mini-card:nth-child(2) { transform: rotate(0.4deg); }
+body.theme-doodle .fortune-minicards .mini-card:nth-child(3) { transform: rotate(-0.5deg); }
+body.theme-doodle .mini-value { color: #4a7ab0; }
+body.theme-doodle .fortune-radar {
+  border: 2px solid #c8b89a;
+  border-radius: 120px 22px 130px 20px / 18px 125px 22px 128px;
+  background: #fffef9;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.12);
+}
+
+/* ---- 日程相关手绘化 ---- */
+body.theme-doodle #schedule-detail {
+  border: 2px solid #c8b89a;
+  border-radius: 140px 25px 135px 20px / 18px 140px 22px 138px;
+  background: #fffef9;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.12);
+}
+body.theme-doodle .schedule-item {
+  border: 2px solid #d8c8a8;
+  border-radius: 100px 20px 110px 18px / 16px 105px 20px 100px;
+  border-left: 3px solid #6a9fd8;
+  background: #fffef9;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.08);
+  transform: rotate(-0.3deg);
+}
+body.theme-doodle .schedule-item:nth-child(2n) { transform: rotate(0.3deg); }
+
+/* ---- 模态框手绘化 ---- */
+body.theme-doodle .modal-content {
+  border: 2.5px solid #b8a080;
+  border-radius: 180px 30px 170px 25px / 20px 175px 28px 165px;
+  background: #fffef9;
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* ---- 气泡手绘化 ---- */
+body.theme-doodle #reminder-bubble {
+  border: 2px solid #b8a080;
+  border-radius: 120px 20px 80px 8px / 16px 115px 10px 90px;
+  background: #fffef9;
+  color: #3a3028;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.22);
+  transform: rotate(-0.8deg);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+body.theme-doodle #reminder-bubble.hidden {
+  transform: translateX(-50%) translateY(-8px) scale(0.92) rotate(-0.8deg);
+  opacity: 0;
+}
+body.theme-doodle #app.theme-gold #reminder-bubble {
+  background: #fffef9;
+  color: #3a3028;
+  border: 2px solid #e98a8a;
+  box-shadow: 3px 4px 0 rgba(233, 138, 138, 0.3);
+}
+
+/* ---- Toast 手绘化 ---- */
+body.theme-doodle #toast {
+  border: 2px solid #b8a080;
+  border-radius: 80px 18px 90px 15px / 15px 85px 20px 80px;
+  background: rgba(58, 48, 40, 0.94);
+  color: #fffef9;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* ---- 右键菜单手绘化 ---- */
+body.theme-doodle #context-menu {
+  border: 2px solid #b8a080;
+  border-radius: 130px 22px 120px 18px / 16px 125px 20px 115px;
+  background: rgba(255, 252, 245, 0.98);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.2);
+}
+body.theme-doodle #context-menu button {
+  border-radius: 60px 15px 65px 18px / 14px 58px 16px 62px;
+  color: #5a4e42;
+}
+body.theme-doodle #context-menu button:hover {
+  background: #fef0dc;
+  color: #4a7ab0;
+}
+body.theme-doodle #context-menu-affinity {
+  border-bottom: 2px dashed #d8c8a8;
+  color: #4a7ab0;
+}
+
+/* ---- 关闭按钮手绘化 ---- */
+body.theme-doodle .close-btn {
+  border: 2px solid #c8b89a;
+  border-radius: 45px 15px 50px 18px / 14px 42px 16px 48px;
+  background: #fffef9;
+  color: #5a4e42;
+}
+body.theme-doodle .close-btn:hover {
+  background: #fce8e8;
+  color: #8a4040;
+  border-color: #e98a8a;
+}
+
+/* ---- 悬浮按钮手绘化 ---- */
+body.theme-doodle .hover-btn {
+  border: 2px solid #b8a080;
+  border-radius: 55px 18px 60px 15px / 15px 58px 20px 55px;
+  background: #fffef9;
+  color: #5a4e42;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.15);
+}
+body.theme-doodle .hover-btn:hover {
+  background: #fef9f0;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* ---- 手绘悬浮窗 App 背景覆盖（各主题色转蜡笔）---- */
+body.theme-doodle #app.theme-cat {
+  background: linear-gradient(160deg, #fdf6e3 0%, #f8efd8 60%, #fdf3e0 100%);
+}
+body.theme-doodle #app.theme-fortune {
+  background: linear-gradient(160deg, #fef0dc 0%, #fdf3e0 60%, #fdf6e3 100%);
+}
+body.theme-doodle #app.theme-bagua {
+  background: linear-gradient(160deg, #e8f0fb 0%, #f0f4fb 60%, #fdf6e3 100%);
+}
+body.theme-doodle #app.theme-gold {
+  background: linear-gradient(160deg, #fffdf5 0%, #fef9f0 60%, #fdf3e0 100%);
+  border: 2.5px solid #e98a8a;
+  box-shadow: inset 0 0 24px rgba(233, 138, 138, 0.15);
+}
+
+/* ---- 星盘区块手绘化 ---- */
+body.theme-doodle .star-chart-toggle,
+body.theme-doodle .star-chart-analysis-btn {
+  border: 2px solid #c8b89a;
+  border-radius: 120px 22px 130px 18px / 16px 125px 20px 120px;
+  background: #faf3e4;
+  color: #5a4e42;
+  box-shadow: 1.5px 2px 0 rgba(0, 0, 0, 0.1);
+}
+body.theme-doodle .star-chart-toggle:hover,
+body.theme-doodle .star-chart-analysis-btn:hover {
+  background: #f5e8d0;
+}
+body.theme-doodle .star-chart-line {
+  border: 1.5px solid #e0d4bc;
+  border-radius: 80px 16px 85px 18px / 14px 78px 16px 82px;
+  background: #fffef9;
+}
+body.theme-doodle .star-chart-analysis {
+  border: 2px dashed #c8b89a;
+  border-radius: 120px 22px 130px 18px / 16px 125px 20px 120px;
+  background: #fffef9;
+}
+
+/* ---- 浅色主题覆盖：手绘模式白底叠色不需调（暖纸色自带高对比） ---- */
+body.theme-doodle .setting-input,
+body.theme-doodle .form-group input,
+body.theme-doodle .form-group textarea {
+  color-scheme: light;
+}
+
+/* ---- 内存预览框手绘化 ---- */
+body.theme-doodle .memory-preview {
+  border: 2px solid #d8c8a8;
+  border-radius: 100px 20px 110px 18px / 16px 105px 20px 100px;
+  background: #fffdf5;
+}
+
+/* ---- 技能配置卡片手绘化 ---- */
+body.theme-doodle .skill-config-card {
+  border: 2px solid #c8b89a;
+  border-radius: 120px 22px 130px 18px / 16px 125px 20px 120px;
+  background: #fffef9;
+}
+
+/* ---- 手绘主题悬停按钮组：与浅色主题同一套逻辑（暖色底不用白叠） ---- */
+body.theme-doodle .theme-option:hover,
+body.theme-doodle .activity-option:hover {
+  background: #f5e8d0;
+}
+body.theme-doodle .chat-mic-btn:hover {
+  background: #f5e8d0;
+}
+body.theme-doodle .cal-cell {
+  background: #fffef9;
+  border-color: #d8c8a8;
+}
+body.theme-doodle .cal-cell:hover {
+  background: #fef9f0;
+}
+body.theme-doodle .cal-cell-empty {
+  background: transparent;
+}
+body.theme-doodle .cal-cell-today {
+  background: rgba(106, 159, 216, 0.12);
+  border-color: #6a9fd8;
+}
+body.theme-doodle .cal-cell-selected {
+  background: rgba(122, 165, 217, 0.2) !important;
+  border-color: #6a9fd8;
+}
+body.theme-doodle .skill-config-card {
+  background: #fffef9;
+}
+body.theme-doodle .settings-header,
+body.theme-doodle .cal-header {
+  border-bottom: 2px dashed #d8c8a8;
+}
+body.theme-doodle #context-menu {
+  border-color: #b8a080;
+}
+body.theme-doodle #context-menu-affinity {
+  border-bottom-color: #d8c8a8;
+}
+
+/* ---- 宠物爱心/称号徽标手绘化 ---- */
+body.theme-doodle #pet-heart {
+  border: 2px solid #e98a8a;
+  border-radius: 40px 12px 45px 10px / 10px 42px 14px 38px;
+  background: #fffef9;
+  color: #e98a8a;
+  box-shadow: 2px 2px 0 rgba(233, 138, 138, 0.3);
+}
+body.theme-doodle #gold-badge,
+body.theme-doodle #zodiac-badge {
+  border: 2px solid #c8b89a;
+  border-radius: 60px 14px 55px 16px / 12px 58px 15px 52px;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.18);
+}
+
+/* ---- 宠物舞台光晕转蜡笔色 ---- */
+body.theme-doodle #pet-stage::before {
+  background: radial-gradient(circle, rgba(122, 165, 217, 0.16) 0%, transparent 70%);
+}
+body.theme-doodle #app.theme-cat #pet-stage::before {
+  background: radial-gradient(circle, rgba(233, 138, 138, 0.18) 0%, transparent 70%);
+}
+body.theme-doodle #app.theme-fortune #pet-stage::before {
+  background: radial-gradient(circle, rgba(240, 168, 48, 0.2) 0%, transparent 70%);
 }
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */

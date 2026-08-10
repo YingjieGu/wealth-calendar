@@ -179,28 +179,32 @@ body.theme-teal #app.theme-gold {
    设计原则：纯 CSS/SVG 实现，零 filter，动画仅 transform/opacity
    ============================================================ */
 body.theme-doodle {
-  /* ---- 方案一 活力系（橙/绿/黄 三色体系）---- */
-  --color-primary: #f58e3d;        /* 橙（主按钮/主强调） */
-  --color-accent: #ffe800;         /* 亮黄（高亮/标签） */
-  --color-accent-soft: rgba(245, 142, 61, 0.14);
-  --pop-orange: #f58e3d;           /* 橙 */
-  --pop-green: #6dfe59;            /* 亮绿 */
-  --pop-yellow: #ffe800;           /* 亮黄 */
-  /* ---- 深色变体（白/浅底上的强调文字，保证对比度）---- */
-  --deep-orange: #c65f1e;          /* 深橙 */
-  --deep-green: #2f7d20;           /* 深绿 */
-  --deep-yellow: #a89100;          /* 深黄 */
-  /* ---- 背景/卡片：白/浅橙（#f58e3d 淡化为 #fff7ef / #fff3e6）---- */
-  --bg: linear-gradient(170deg, #fff7ef 0%, #fff3e6 45%, #fff7ef 100%); /* 浅橙渐变底 */
+  /* ---- 方案二 马卡龙柔和系（粉/浅蓝/浅绿）---- */
+  --color-primary: #fba2ae;        /* 粉（主强调/主按钮） */
+  --color-accent: #79def7;         /* 浅蓝（高亮/辅助） */
+  --color-accent-soft: rgba(251, 162, 174, 0.14);
+  --soft-pink: #fba2ae;            /* 粉 */
+  --soft-blue: #79def7;            /* 浅蓝 */
+  --soft-green: #baf1b3;           /* 浅绿 */
+  /* ---- 中调变体（按钮/实底，配深字保证对比度）---- */
+  --mid-pink: #e8849a;             /* 中粉（按钮实底） */
+  --mid-blue: #57b9d8;             /* 中蓝 */
+  --mid-green: #8fd88a;            /* 中绿 */
+  /* ---- 深调变体（浅底上的强调文字，保证对比度）---- */
+  --deep-pink: #c0566d;            /* 深粉 */
+  --deep-blue: #2e8fb2;            /* 深蓝 */
+  --deep-green: #4fae5c;           /* 深绿 */
+  /* ---- 背景/卡片：浅粉底 + 浅蓝/浅绿分区（#fba2ae 淡化为 #fff0f3）---- */
+  --bg: linear-gradient(170deg, #fff0f3 0%, #eef8fc 45%, #f2faf1 100%); /* 浅粉→浅蓝→浅绿渐变底 */
   --surface: #ffffff;              /* 卡片纯白 */
-  --surface-2: #fff3e6;            /* 浮层浅橙 */
-  --surface-3: #fff7ef;            /* hover浅橙 */
+  --surface-2: #fdf0f2;            /* 浮层浅粉 */
+  --surface-3: #eef8fc;            /* hover浅蓝 */
   --text: #2d2a26;                 /* 暖黑主文字（高对比） */
   --text-dim: #7a6a58;             /* 弱文字暖棕灰 */
-  /* ---- 彩色手绘阴影：橙/绿/黄硬阴影无模糊（贴纸感）---- */
-  --shadow-1: 2px 3px 0 rgba(245, 142, 61, 0.3);
-  --shadow-2: 3px 4px 0 rgba(255, 232, 0, 0.35);
-  --shadow-3: 4px 5px 0 rgba(109, 254, 89, 0.4);
+  /* ---- 彩色手绘阴影：粉/蓝/绿硬阴影无模糊（贴纸感）---- */
+  --shadow-1: 2px 3px 0 rgba(251, 162, 174, 0.35);
+  --shadow-2: 3px 4px 0 rgba(121, 222, 247, 0.4);
+  --shadow-3: 4px 5px 0 rgba(186, 241, 179, 0.5);
   /* ---- 手绘圆角 tokens（保留不对称手绘感）---- */
   --radius-sm: 255px 15px 225px 15px / 15px 225px 15px 255px;
   --radius-md: 185px 25px 215px 20px / 20px 200px 18px 210px;
@@ -210,24 +214,24 @@ body.theme-doodle {
   --font-sans: var(--font-doodle);
   --font-num: var(--font-doodle);
   /* ---- 派生变量：全部显式覆盖，不依赖 var() 级联 ---- */
-  --accent: #ffe800;
-  --accent-dim: #d9c700;
-  --panel-bg: linear-gradient(170deg, #fff7ef 0%, #fff3e6 45%, #fff7ef 100%);
-  --panel-bg2: linear-gradient(170deg, #fff3e6 0%, #fff7ef 50%, #fff0dd 100%);
+  --accent: #79def7;
+  --accent-dim: #67a8c2;
+  --panel-bg: linear-gradient(170deg, #fff0f3 0%, #eef8fc 45%, #f2faf1 100%);
+  --panel-bg2: linear-gradient(170deg, #fdf0f2 0%, #f2faf1 50%, #fff0f8 100%);
   --menu-bg: rgba(255, 255, 255, 0.98);
   --toast-bg: rgba(45, 42, 38, 0.94);
   --text-strong: #2d2a26;
   --text-mid: #6a5a48;
   --card: #ffffff;
-  --card-border: #f58e3d;
+  --card-border: #fba2ae;
   --input-bg: #ffffff;
-  --input-border: #f58e3d;
-  --border-soft: #f7e8d5;
-  --btn-bg: #f58e3d;
-  --btn-hover: #e07a24;
-  --scrollbar: rgba(245, 142, 61, 0.4);
-  --scrollbar-hover: rgba(255, 232, 0, 0.5);
-  --schedule-item: rgba(245, 142, 61, 0.1);
+  --input-border: #79def7;
+  --border-soft: #f0dbe0;
+  --btn-bg: #e8849a;
+  --btn-hover: #d96b82;
+  --scrollbar: rgba(121, 222, 247, 0.45);
+  --scrollbar-hover: rgba(251, 162, 174, 0.5);
+  --schedule-item: rgba(251, 162, 174, 0.12);
 }
 
 /* ---- 孟菲斯波点背景（纯 CSS radial-gradient，替代旧笔记本横线）---- */
@@ -236,56 +240,56 @@ body.theme-doodle #settings-panel,
 body.theme-doodle #chat-panel,
 body.theme-doodle #calendar-view {
   background-image:
-    radial-gradient(circle, rgba(245, 142, 61, 0.12) 2px, transparent 2px),
-    radial-gradient(circle, rgba(255, 232, 0, 0.12) 3px, transparent 3px),
-    radial-gradient(circle, rgba(109, 254, 89, 0.10) 2.5px, transparent 2.5px);
+    radial-gradient(circle, rgba(251, 162, 174, 0.14) 2px, transparent 2px),
+    radial-gradient(circle, rgba(121, 222, 247, 0.16) 3px, transparent 3px),
+    radial-gradient(circle, rgba(186, 241, 179, 0.18) 2.5px, transparent 2.5px);
   background-size: 50px 50px, 80px 80px, 60px 60px;
   background-position: 0 0, 25px 25px, 15px 40px;
 }
 body.theme-doodle #settings-panel {
   background:
-    linear-gradient(170deg, #fff7ef 0%, #fff3e6 50%, #fff7ef 100%),
-    radial-gradient(circle, rgba(245, 142, 61, 0.10) 2px, transparent 2px),
-    radial-gradient(circle, rgba(255, 232, 0, 0.12) 3px, transparent 3px),
-    radial-gradient(circle, rgba(109, 254, 89, 0.08) 2.5px, transparent 2.5px);
+    linear-gradient(170deg, #fff0f3 0%, #eef8fc 50%, #f2faf1 100%),
+    radial-gradient(circle, rgba(251, 162, 174, 0.14) 2px, transparent 2px),
+    radial-gradient(circle, rgba(121, 222, 247, 0.16) 3px, transparent 3px),
+    radial-gradient(circle, rgba(186, 241, 179, 0.18) 2.5px, transparent 2.5px);
   background-size: 100% 100%, 50px 50px, 80px 80px, 60px 60px;
   background-position: 0 0, 0 0, 25px 25px, 15px 40px;
 }
 body.theme-doodle #chat-panel {
   background:
-    linear-gradient(170deg, #fff3e6 0%, #fff7ef 50%, #fff0dd 100%),
-    radial-gradient(circle, rgba(109, 254, 89, 0.08) 2px, transparent 2px),
-    radial-gradient(circle, rgba(255, 232, 0, 0.10) 3px, transparent 3px);
+    linear-gradient(170deg, #fdf0f2 0%, #f2faf1 50%, #fff0f8 100%),
+    radial-gradient(circle, rgba(186, 241, 179, 0.16) 2px, transparent 2px),
+    radial-gradient(circle, rgba(121, 222, 247, 0.14) 3px, transparent 3px);
   background-size: 100% 100%, 55px 55px, 70px 70px;
   background-position: 0 0, 10px 10px, 30px 20px;
 }
 body.theme-doodle #calendar-view {
   background:
-    linear-gradient(170deg, #fff7ef 0%, #fff0dd 50%, #fff7ef 100%),
-    radial-gradient(circle, rgba(255, 232, 0, 0.10) 2px, transparent 2px),
-    radial-gradient(circle, rgba(245, 142, 61, 0.08) 2.5px, transparent 2.5px);
+    linear-gradient(170deg, #fff0f3 0%, #f2faf1 50%, #fff0f8 100%),
+    radial-gradient(circle, rgba(121, 222, 247, 0.14) 2px, transparent 2px),
+    radial-gradient(circle, rgba(251, 162, 174, 0.12) 2.5px, transparent 2.5px);
   background-size: 100% 100%, 45px 45px, 65px 65px;
   background-position: 0 0, 5px 5px, 20px 30px;
 }
 
-/* ---- 手绘边框全局覆盖（橙/黄/绿描边，保留不对称圆角）---- */
+/* ---- 手绘边框全局覆盖（粉/蓝/绿描边，保留不对称圆角）---- */
 body.theme-doodle #settings-panel,
 body.theme-doodle #chat-panel,
 body.theme-doodle #calendar-view {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 185px 25px 215px 20px / 20px 200px 18px 210px;
 }
 body.theme-doodle #app {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 200px 30px 190px 25px / 22px 180px 28px 195px;
 }
 
 /* ---- 设置面板手绘化（白底+粗彩色边框+彩色阴影+微旋转）---- */
 body.theme-doodle .setting-group {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
   background: #ffffff;
-  box-shadow: 3px 4px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 3px 4px 0 rgba(251, 162, 174, 0.35);
   transform: rotate(-0.4deg);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -295,38 +299,38 @@ body.theme-doodle .setting-group:nth-child(even) {
 }
 body.theme-doodle .setting-group:hover {
   transform: rotate(0deg) scale(1.015);
-  box-shadow: 4px 5px 0 rgba(255, 232, 0, 0.35);
+  box-shadow: 4px 5px 0 rgba(121, 222, 247, 0.4);
 }
 body.theme-doodle .setting-group:nth-child(3n) {
   border-radius: 190px 22px 210px 28px / 18px 185px 24px 205px;
 }
-/* 方案一 分区上色：5色循环（橙/黄/绿/浅橙/深黄）*/
+/* 方案二 分区上色：5色循环（粉/浅蓝/浅绿/中粉/浅蓝）*/
 body.theme-doodle .setting-group:nth-child(5n+1) {
-  border-color: #f58e3d;
-  box-shadow: 3px 4px 0 rgba(245, 142, 61, 0.3);
+  border-color: #fba2ae;
+  box-shadow: 3px 4px 0 rgba(251, 162, 174, 0.35);
 }
 body.theme-doodle .setting-group:nth-child(5n+2) {
-  border-color: #ffe800;
-  box-shadow: 3px 4px 0 rgba(255, 232, 0, 0.35);
+  border-color: #79def7;
+  box-shadow: 3px 4px 0 rgba(121, 222, 247, 0.4);
 }
 body.theme-doodle .setting-group:nth-child(5n+3) {
-  border-color: #6dfe59;
-  box-shadow: 3px 4px 0 rgba(109, 254, 89, 0.4);
+  border-color: #baf1b3;
+  box-shadow: 3px 4px 0 rgba(186, 241, 179, 0.5);
 }
 body.theme-doodle .setting-group:nth-child(5n+4) {
-  border-color: #ffb57a;
-  box-shadow: 3px 4px 0 rgba(255, 181, 122, 0.4);
+  border-color: #e8849a;
+  box-shadow: 3px 4px 0 rgba(232, 132, 154, 0.4);
 }
 body.theme-doodle .setting-group:nth-child(5n+5) {
-  border-color: #ffe800;
-  box-shadow: 3px 4px 0 rgba(255, 232, 0, 0.35);
+  border-color: #79def7;
+  box-shadow: 3px 4px 0 rgba(121, 222, 247, 0.4);
 }
 body.theme-doodle .settings-header {
-  border-bottom: 2px dashed #f58e3d;
+  border-bottom: 2px dashed #fba2ae;
   color: #2d2a26;
 }
 body.theme-doodle .setting-group label {
-  border-bottom: 2px dotted #f58e3d;
+  border-bottom: 2px dotted #fba2ae;
   padding-bottom: 3px;
   display: inline-block;
   color: #2d2a26;
@@ -336,64 +340,64 @@ body.theme-doodle .setting-group label {
 /* ---- 波普符号装饰：设置板块标题前彩色符号（CSS 文字符号，非 emoji）---- */
 body.theme-doodle .setting-group label::before {
   content: '✦ ';
-  color: #c65f1e;
+  color: #c0566d;
   font-size: 12px;
 }
-body.theme-doodle .setting-group:nth-child(5n+1) label::before { content: '♥ '; color: #c65f1e; }
-body.theme-doodle .setting-group:nth-child(5n+2) label::before { content: '★ '; color: #a89100; }
-body.theme-doodle .setting-group:nth-child(5n+3) label::before { content: '◆ '; color: #2f7d20; }
-body.theme-doodle .setting-group:nth-child(5n+4) label::before { content: '● '; color: #c65f1e; }
-body.theme-doodle .setting-group:nth-child(5n+5) label::before { content: '✦ '; color: #a89100; }
+body.theme-doodle .setting-group:nth-child(5n+1) label::before { content: '♥ '; color: #c0566d; }
+body.theme-doodle .setting-group:nth-child(5n+2) label::before { content: '★ '; color: #2e8fb2; }
+body.theme-doodle .setting-group:nth-child(5n+3) label::before { content: '◆ '; color: #4fae5c; }
+body.theme-doodle .setting-group:nth-child(5n+4) label::before { content: '● '; color: #c0566d; }
+body.theme-doodle .setting-group:nth-child(5n+5) label::before { content: '✦ '; color: #2e8fb2; }
 
-/* ---- 设置页按钮：pill形状+橙底深字+彩色阴影+微旋转 ---- */
+/* ---- 设置页按钮：pill形状+中粉底深字+彩色阴影+微旋转 ---- */
 body.theme-doodle .theme-option,
 body.theme-doodle .activity-option {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;              /* pill 全圆角 */
   background: #ffffff;
-  color: #c65f1e;
+  color: #c0566d;
   font-weight: 700;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.3);
   transform: rotate(-0.3deg);
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 body.theme-doodle .theme-option:nth-child(2n),
 body.theme-doodle .activity-option:nth-child(2n) {
   transform: rotate(0.4deg);
-  border-color: #ffe800;
-  color: #a89100;
-  box-shadow: 2px 3px 0 rgba(255, 232, 0, 0.35);
+  border-color: #79def7;
+  color: #2e8fb2;
+  box-shadow: 2px 3px 0 rgba(121, 222, 247, 0.4);
 }
 body.theme-doodle .theme-option:hover,
 body.theme-doodle .activity-option:hover {
   transform: translateY(-2px) scale(1.04) rotate(0deg);
-  box-shadow: 3px 5px 0 rgba(245, 142, 61, 0.35);
+  box-shadow: 3px 5px 0 rgba(251, 162, 174, 0.4);
 }
 body.theme-doodle .theme-option.active,
 body.theme-doodle .activity-option.active {
-  background: #f58e3d;
-  border-color: #f58e3d;
+  background: #e8849a;
+  border-color: #e8849a;
   color: #2d2a26;
   font-weight: 800;
-  box-shadow: 3px 5px 0 rgba(245, 142, 61, 0.4);
+  box-shadow: 3px 5px 0 rgba(232, 132, 154, 0.4);
   transform: rotate(0deg);
 }
 body.theme-doodle .theme-option:nth-child(2n).active,
 body.theme-doodle .activity-option:nth-child(2n).active {
-  background: #6dfe59;
-  border-color: #6dfe59;
-  box-shadow: 3px 5px 0 rgba(109, 254, 89, 0.45);
+  background: #57b9d8;
+  border-color: #57b9d8;
+  box-shadow: 3px 5px 0 rgba(87, 185, 216, 0.45);
 }
 body.theme-doodle .theme-option:active,
 body.theme-doodle .activity-option:active {
   transform: scale(0.94);
 }
 
-/* ---- 设置页输入框：橙色描边+亮黄焦点 ---- */
+/* ---- 设置页输入框：浅蓝描边+粉色焦点 ---- */
 body.theme-doodle .setting-input,
 body.theme-doodle .form-group input,
 body.theme-doodle .form-group textarea {
-  border: 2px solid #f58e3d;
+  border: 2px solid #79def7;
   border-radius: 130px 25px 120px 20px / 18px 135px 22px 125px;
   background: #ffffff;
   color: #2d2a26;
@@ -402,298 +406,298 @@ body.theme-doodle .form-group textarea {
 body.theme-doodle .setting-input:focus,
 body.theme-doodle .form-group input:focus,
 body.theme-doodle .form-group textarea:focus {
-  border-color: #f58e3d;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.3);
+  border-color: #fba2ae;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.3);
   outline: none;
 }
 
-/* ---- 设置页 action-btn：pill+橙底深字+彩色阴影 ---- */
+/* ---- 设置页 action-btn：pill+中粉底深字+彩色阴影 ---- */
 body.theme-doodle .action-btn {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;
-  background: #f58e3d;
+  background: #e8849a;
   color: #2d2a26;
   font-weight: 700;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.35);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.35);
   transform: rotate(-0.3deg);
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 body.theme-doodle .action-btn:hover {
   transform: translateY(-2px) scale(1.03) rotate(0deg);
-  box-shadow: 3px 5px 0 rgba(245, 142, 61, 0.45);
-  background: #e07a24;
+  box-shadow: 3px 5px 0 rgba(232, 132, 154, 0.45);
+  background: #d96b82;
 }
 body.theme-doodle .action-btn:active {
   transform: scale(0.94);
-  box-shadow: 1px 1px 0 rgba(245, 142, 61, 0.5);
+  box-shadow: 1px 1px 0 rgba(232, 132, 154, 0.5);
 }
 body.theme-doodle .action-btn.primary {
-  background: #f58e3d;
-  border-color: #f58e3d;
+  background: #e8849a;
+  border-color: #e8849a;
   color: #2d2a26;
 }
 
 /* ---- miniature cards：白底+彩色粗边框+彩色阴影 ---- */
 body.theme-doodle .mini-card {
-  border: 2px solid #f58e3d;
+  border: 2px solid #fba2ae;
   border-radius: 180px 22px 170px 20px / 16px 175px 20px 170px;
   background: #ffffff;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.35);
   transform: rotate(-0.3deg);
 }
-body.theme-doodle .affinity-card { border-left: 4px solid #f58e3d; }
-body.theme-doodle .mood-card { border-left: 4px solid #ffe800; }
-body.theme-doodle .coin-card { border-left: 4px solid #ffe800; }
+body.theme-doodle .affinity-card { border-left: 4px solid #fba2ae; }
+body.theme-doodle .mood-card { border-left: 4px solid #79def7; }
+body.theme-doodle .coin-card { border-left: 4px solid #79def7; }
 
 /* ---- 生肖宫格：白底+彩色边框+微旋转 ---- */
 body.theme-doodle .zodiac-cell {
-  border: 2px solid #f58e3d;
+  border: 2px solid #fba2ae;
   border-radius: 80px 18px 90px 15px / 15px 82px 20px 85px;
   background: #ffffff;
-  box-shadow: 1.5px 2px 0 rgba(245, 142, 61, 0.25);
+  box-shadow: 1.5px 2px 0 rgba(251, 162, 174, 0.3);
   transform: rotate(-0.5deg);
 }
-body.theme-doodle .zodiac-cell:nth-child(2n) { transform: rotate(0.4deg); border-color: #ffe800; }
-body.theme-doodle .zodiac-cell:nth-child(3n) { transform: rotate(-0.3deg); border-color: #6dfe59; }
+body.theme-doodle .zodiac-cell:nth-child(2n) { transform: rotate(0.4deg); border-color: #79def7; }
+body.theme-doodle .zodiac-cell:nth-child(3n) { transform: rotate(-0.3deg); border-color: #baf1b3; }
 body.theme-doodle .zodiac-cell:nth-child(5n) { transform: rotate(0.6deg); }
 body.theme-doodle .zodiac-cell.unlocked {
-  border-color: #f58e3d;
+  border-color: #fba2ae;
   border-width: 2.5px;
-  background: #fff3e6;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.3);
+  background: #fdf0f2;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.35);
 }
 body.theme-doodle .zodiac-cell.unlocked:nth-child(3n+2) {
-  border-color: #6dfe59;
-  box-shadow: 2px 3px 0 rgba(109, 254, 89, 0.4);
+  border-color: #baf1b3;
+  box-shadow: 2px 3px 0 rgba(186, 241, 179, 0.5);
 }
 body.theme-doodle .zodiac-cell.unlocked:nth-child(3n+3) {
-  border-color: #ffe800;
-  box-shadow: 2px 3px 0 rgba(255, 232, 0, 0.4);
-  background: #fff7ef;
+  border-color: #79def7;
+  box-shadow: 2px 3px 0 rgba(121, 222, 247, 0.45);
+  background: #eef8fc;
 }
 
 /* ---- 聊天面板手绘化 ---- */
 body.theme-doodle .chat-header {
-  border-bottom: 2px dashed #f58e3d;
+  border-bottom: 2px dashed #fba2ae;
   color: #2d2a26;
 }
 body.theme-doodle .chat-msg {
-  border: 2px solid #f58e3d;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  border: 2px solid #fba2ae;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.3);
 }
-/* 用户气泡：方案一三色+浅橙四色交替底+暖黑深字 */
+/* 用户气泡：方案二四色交替（中粉/浅蓝/中绿/粉）底+暖黑深字 */
 body.theme-doodle .chat-user {
   border-radius: 150px 18px 140px 6px / 16px 145px 6px 130px;
   color: #2d2a26;
   font-weight: 600;
   transform: rotate(0.6deg);
 }
-body.theme-doodle .chat-user:nth-child(4n+1) { background: #f58e3d; border-color: #f58e3d; }
-body.theme-doodle .chat-user:nth-child(4n+2) { background: #ffe800; border-color: #ffe800; }
-body.theme-doodle .chat-user:nth-child(4n+3) { background: #6dfe59; border-color: #6dfe59; }
-body.theme-doodle .chat-user:nth-child(4n+4) { background: #ffb57a; border-color: #ffb57a; }
+body.theme-doodle .chat-user:nth-child(4n+1) { background: #e8849a; border-color: #e8849a; }
+body.theme-doodle .chat-user:nth-child(4n+2) { background: #79def7; border-color: #79def7; }
+body.theme-doodle .chat-user:nth-child(4n+3) { background: #8fd88a; border-color: #8fd88a; }
+body.theme-doodle .chat-user:nth-child(4n+4) { background: #fba2ae; border-color: #fba2ae; }
 /* 宠物气泡：白底彩色边框 */
 body.theme-doodle .chat-assistant {
   border-radius: 140px 22px 6px 130px / 20px 135px 130px 20px;
   background: #ffffff;
-  border-color: #f58e3d;
+  border-color: #fba2ae;
   color: #2d2a26;
   transform: rotate(-0.4deg);
 }
 body.theme-doodle .chat-input-row {
-  border-top: 2px dashed #f7e8d5;
+  border-top: 2px dashed #f0dbe0;
 }
 body.theme-doodle #chat-input {
-  border: 2px solid #f58e3d;
+  border: 2px solid #79def7;
   border-radius: 999px;
   background: #ffffff;
   color: #2d2a26;
   color-scheme: light;
 }
 body.theme-doodle #chat-input:focus {
-  border-color: #f58e3d;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  border-color: #fba2ae;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.25);
 }
-/* 发送按钮：橙色 pill */
+/* 发送按钮：中粉 pill */
 body.theme-doodle .chat-send-btn {
   border: none;
   border-radius: 999px;
-  background: #f58e3d;
+  background: #e8849a;
   color: #2d2a26;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.35);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.35);
   transform: rotate(-2deg);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 body.theme-doodle .chat-send-btn:hover {
   transform: translateY(-2px) scale(1.1) rotate(0deg);
-  box-shadow: 3px 5px 0 rgba(245, 142, 61, 0.5);
+  box-shadow: 3px 5px 0 rgba(232, 132, 154, 0.5);
 }
 body.theme-doodle .chat-send-btn:active { transform: scale(0.9); }
 body.theme-doodle .chat-mic-btn {
-  border: 2px solid #f58e3d;
+  border: 2px solid #79def7;
   border-radius: 999px;
   background: #ffffff;
-  color: #c65f1e;
+  color: #2e8fb2;
 }
 body.theme-doodle .chat-mic-btn:hover {
-  background: #fff7ef;
+  background: #eef8fc;
 }
 body.theme-doodle .chat-mic-btn.recording {
-  background: #f58e3d;
-  border-color: #f58e3d;
+  background: #e8849a;
+  border-color: #e8849a;
   color: #2d2a26;
 }
 
 /* ---- 日历面板手绘化 ---- */
 body.theme-doodle .cal-header {
-  border-bottom: 2px dashed #f58e3d;
+  border-bottom: 2px dashed #fba2ae;
   color: #2d2a26;
 }
 body.theme-doodle .cal-header button {
-  border: 2px solid #f58e3d;
+  border: 2px solid #79def7;
   border-radius: 999px;
   background: #ffffff;
-  color: #c65f1e;
+  color: #2e8fb2;
   font-weight: 600;
-  box-shadow: 1.5px 2px 0 rgba(245, 142, 61, 0.25);
+  box-shadow: 1.5px 2px 0 rgba(121, 222, 247, 0.25);
 }
 body.theme-doodle .cal-header button:hover {
-  background: #f58e3d;
+  background: #79def7;
   color: #2d2a26;
 }
 body.theme-doodle .cal-cell {
-  border: 1.5px solid #f7e8d5;
+  border: 1.5px solid #f0dbe0;
   border-radius: 60px 15px 65px 18px / 14px 58px 16px 62px;
   background: #ffffff;
-  box-shadow: 1px 1.5px 0 rgba(245, 142, 61, 0.15);
+  box-shadow: 1px 1.5px 0 rgba(251, 162, 174, 0.2);
   transform: rotate(-0.2deg);
 }
 body.theme-doodle .cal-cell:nth-child(7n+1) { transform: rotate(0.3deg); }
 body.theme-doodle .cal-cell:nth-child(7n+3) { transform: rotate(-0.4deg); }
 body.theme-doodle .cal-cell:nth-child(7n+5) { transform: rotate(0.5deg); }
 body.theme-doodle .cal-cell:hover {
-  background: #fff7ef;
+  background: #fff0f3;
   transform: translateY(-2px) rotate(0deg);
 }
 body.theme-doodle .cal-cell-today {
-  border-color: #f58e3d;
+  border-color: #fba2ae;
   border-width: 3px;
-  background: rgba(245, 142, 61, 0.08);
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  background: rgba(251, 162, 174, 0.14);
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.3);
 }
 body.theme-doodle .cal-date-num { color: #2d2a26; }
-body.theme-doodle .cal-cell-today .cal-date-num { color: #c65f1e; font-weight: 800; }
+body.theme-doodle .cal-cell-today .cal-date-num { color: #c0566d; font-weight: 800; }
 body.theme-doodle .cal-cell-empty { background: transparent; }
 body.theme-doodle .cal-cell-selected {
-  background: rgba(255, 232, 0, 0.2) !important;
-  border-color: #ffe800;
+  background: rgba(121, 222, 247, 0.2) !important;
+  border-color: #79def7;
 }
 
-/* ---- 日历运势卡片：白底+橙色粗边框+彩色阴影 ---- */
+/* ---- 日历运势卡片：白底+粉色粗边框+彩色阴影 ---- */
 body.theme-doodle .fortune-card {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 160px 28px 150px 22px / 20px 155px 24px 148px;
   background: #ffffff;
-  box-shadow: 4px 5px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 4px 5px 0 rgba(251, 162, 174, 0.35);
   transform: rotate(-0.5deg);
 }
 body.theme-doodle .fortune-score-num {
-  color: #f58e3d;
-  text-shadow: 2px 3px 0 rgba(245, 142, 61, 0.3);
+  color: #e8849a;
+  text-shadow: 2px 3px 0 rgba(232, 132, 154, 0.3);
 }
 body.theme-doodle .fortune-score-label::after {
   content: ' ☆';
-  color: #ffe800;
+  color: #79def7;
   font-size: 11px;
 }
 body.theme-doodle .fortune-line {
-  border: 2px solid #f7e8d5;
+  border: 2px solid #f0dbe0;
   border-radius: 100px 22px 110px 18px / 16px 105px 20px 100px;
-  background: #fff3e6;
+  background: #fdf0f2;
   color: #6a5a48;
 }
 body.theme-doodle .fortune-line.fortune-brief {
-  border: 2px dashed #f5e2c8;
+  border: 2px dashed #e8c9d0;
 }
 
-/* ---- 运势 7 维度各自方案一色左边框（财运橙/桃花亮黄/事业浅橙/学业亮绿/健康深绿/出行橙/签约深黄，加浅色调区分层级）---- */
-body.theme-doodle .fortune-dim:nth-child(1) { border-left: 4px solid #f58e3d; }   /* 财运=橙 */
-body.theme-doodle .fortune-dim:nth-child(2) { border-left: 4px solid #ffe800; }   /* 桃花=亮黄 */
-body.theme-doodle .fortune-dim:nth-child(3) { border-left: 4px solid #ffb57a; }   /* 事业=浅橙 */
-body.theme-doodle .fortune-dim:nth-child(4) { border-left: 4px solid #6dfe59; }   /* 学业=亮绿 */
-body.theme-doodle .fortune-dim:nth-child(5) { border-left: 4px solid #2f7d20; }   /* 健康=深绿 */
-body.theme-doodle .fortune-dim:nth-child(6) { border-left: 4px solid #f58e3d; }   /* 出行=橙 */
-body.theme-doodle .fortune-dim:nth-child(7) { border-left: 4px solid #a89100; }   /* 签约=深黄 */
+/* ---- 运势 7 维度各自方案二色左边框（财运粉/桃花粉深调/事业浅蓝/学业浅蓝深调/健康浅绿/出行浅绿深调/签约粉）---- */
+body.theme-doodle .fortune-dim:nth-child(1) { border-left: 4px solid #fba2ae; }   /* 财运=粉 */
+body.theme-doodle .fortune-dim:nth-child(2) { border-left: 4px solid #e8849a; }   /* 桃花=粉偏深 */
+body.theme-doodle .fortune-dim:nth-child(3) { border-left: 4px solid #79def7; }   /* 事业=浅蓝 */
+body.theme-doodle .fortune-dim:nth-child(4) { border-left: 4px solid #2e8fb2; }   /* 学业=浅蓝深调 */
+body.theme-doodle .fortune-dim:nth-child(5) { border-left: 4px solid #baf1b3; }   /* 健康=浅绿 */
+body.theme-doodle .fortune-dim:nth-child(6) { border-left: 4px solid #4fae5c; }   /* 出行=浅绿深调 */
+body.theme-doodle .fortune-dim:nth-child(7) { border-left: 4px solid #fba2ae; }   /* 签约=粉 */
 body.theme-doodle .fortune-dim-label { color: #2d2a26; font-weight: 700; }
-body.theme-doodle .fortune-dim:nth-child(1) .fortune-dim-score { color: #c65f1e; }
-body.theme-doodle .fortune-dim:nth-child(2) .fortune-dim-score { color: #a89100; }
-body.theme-doodle .fortune-dim:nth-child(3) .fortune-dim-score { color: #c65f1e; }
-body.theme-doodle .fortune-dim:nth-child(4) .fortune-dim-score { color: #2f7d20; }
-body.theme-doodle .fortune-dim:nth-child(5) .fortune-dim-score { color: #2f7d20; }
-body.theme-doodle .fortune-dim:nth-child(6) .fortune-dim-score { color: #c65f1e; }
-body.theme-doodle .fortune-dim:nth-child(7) .fortune-dim-score { color: #a89100; }
+body.theme-doodle .fortune-dim:nth-child(1) .fortune-dim-score { color: #c0566d; }
+body.theme-doodle .fortune-dim:nth-child(2) .fortune-dim-score { color: #c0566d; }
+body.theme-doodle .fortune-dim:nth-child(3) .fortune-dim-score { color: #2e8fb2; }
+body.theme-doodle .fortune-dim:nth-child(4) .fortune-dim-score { color: #2e8fb2; }
+body.theme-doodle .fortune-dim:nth-child(5) .fortune-dim-score { color: #4fae5c; }
+body.theme-doodle .fortune-dim:nth-child(6) .fortune-dim-score { color: #4fae5c; }
+body.theme-doodle .fortune-dim:nth-child(7) .fortune-dim-score { color: #c0566d; }
 
-/* ---- 运势迷你卡方案一三色 ---- */
+/* ---- 运势迷你卡方案二马卡龙三色 ---- */
 body.theme-doodle .fortune-minicards .mini-card:nth-child(1) {
-  border-color: #ffe800;
-  box-shadow: 2px 3px 0 rgba(255, 232, 0, 0.35);
+  border-color: #fba2ae;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.35);
 }
 body.theme-doodle .fortune-minicards .mini-card:nth-child(2) {
-  border-color: #f58e3d;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.35);
+  border-color: #79def7;
+  box-shadow: 2px 3px 0 rgba(121, 222, 247, 0.4);
 }
 body.theme-doodle .fortune-minicards .mini-card:nth-child(3) {
-  border-color: #6dfe59;
-  box-shadow: 2px 3px 0 rgba(109, 254, 89, 0.4);
+  border-color: #baf1b3;
+  box-shadow: 2px 3px 0 rgba(186, 241, 179, 0.5);
 }
 body.theme-doodle .fortune-minicards .mini-card:nth-child(2) { transform: rotate(0.4deg); }
 body.theme-doodle .fortune-minicards .mini-card:nth-child(3) { transform: rotate(-0.5deg); }
-body.theme-doodle .mini-value { color: #c65f1e; font-weight: 700; }
+body.theme-doodle .mini-value { color: #c0566d; font-weight: 700; }
 body.theme-doodle .fortune-radar {
-  border: 2px solid #f58e3d;
+  border: 2px solid #fba2ae;
   border-radius: 120px 22px 130px 20px / 18px 125px 22px 128px;
   background: #ffffff;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.3);
 }
 
 /* ---- 日程相关 ---- */
 body.theme-doodle #schedule-detail {
-  border: 2px solid #f58e3d;
+  border: 2px solid #fba2ae;
   border-radius: 140px 25px 135px 20px / 18px 140px 22px 138px;
   background: #ffffff;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.25);
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.3);
 }
 body.theme-doodle .schedule-item {
-  border: 2px solid #f7e8d5;
+  border: 2px solid #f0dbe0;
   border-radius: 100px 20px 110px 18px / 16px 105px 20px 100px;
-  border-left: 4px solid #f58e3d;
+  border-left: 4px solid #fba2ae;
   background: #ffffff;
-  box-shadow: 1.5px 2px 0 rgba(245, 142, 61, 0.12);
+  box-shadow: 1.5px 2px 0 rgba(251, 162, 174, 0.15);
   transform: rotate(-0.3deg);
 }
-body.theme-doodle .schedule-item:nth-child(2n) { transform: rotate(0.3deg); border-left-color: #ffe800; }
-body.theme-doodle .schedule-item:nth-child(3n) { border-left-color: #6dfe59; }
+body.theme-doodle .schedule-item:nth-child(2n) { transform: rotate(0.3deg); border-left-color: #79def7; }
+body.theme-doodle .schedule-item:nth-child(3n) { border-left-color: #baf1b3; }
 body.theme-doodle .schedule-title::before {
   content: '▶ ';
-  color: #f58e3d;
+  color: #fba2ae;
   font-size: 7px;
 }
 
 /* ---- 模态框 ---- */
 body.theme-doodle .modal-content {
-  border: 3px solid #f58e3d;
+  border: 3px solid #fba2ae;
   border-radius: 180px 30px 170px 25px / 20px 175px 28px 165px;
   background: #ffffff;
-  box-shadow: 5px 6px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 5px 6px 0 rgba(251, 162, 174, 0.35);
 }
 
-/* ---- 气泡：白底+橙色边框+彩色阴影 ---- */
+/* ---- 气泡：白底+粉色边框+彩色阴影 ---- */
 body.theme-doodle #reminder-bubble {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 120px 20px 80px 8px / 16px 115px 10px 90px;
   background: #ffffff;
   color: #2d2a26;
-  box-shadow: 4px 5px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 4px 5px 0 rgba(251, 162, 174, 0.35);
   transform: rotate(-0.8deg);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
@@ -704,25 +708,25 @@ body.theme-doodle #reminder-bubble.hidden {
 body.theme-doodle #app.theme-gold #reminder-bubble {
   background: #ffffff;
   color: #2d2a26;
-  border: 2.5px solid #ffe800;
-  box-shadow: 4px 5px 0 rgba(255, 232, 0, 0.4);
+  border: 2.5px solid #79def7;
+  box-shadow: 4px 5px 0 rgba(121, 222, 247, 0.4);
 }
 
-/* ---- Toast：深底+橙色边框+白字 ---- */
+/* ---- Toast：深底+中粉边框+白字 ---- */
 body.theme-doodle #toast {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;
   background: rgba(45, 42, 38, 0.94);
   color: #ffffff;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.4);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.4);
 }
 
-/* ---- 右键菜单：白底+橙色边框 ---- */
+/* ---- 右键菜单：白底+粉色边框 ---- */
 body.theme-doodle #context-menu {
-  border: 2.5px solid #f58e3d;
+  border: 2.5px solid #fba2ae;
   border-radius: 130px 22px 120px 18px / 16px 125px 20px 115px;
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 4px 5px 0 rgba(245, 142, 61, 0.3);
+  box-shadow: 4px 5px 0 rgba(251, 162, 174, 0.35);
 }
 body.theme-doodle #context-menu button {
   border-radius: 999px;
@@ -730,147 +734,147 @@ body.theme-doodle #context-menu button {
   font-weight: 600;
 }
 body.theme-doodle #context-menu button:hover {
-  background: #fff7ef;
-  color: #c65f1e;
+  background: #fff0f3;
+  color: #c0566d;
 }
 body.theme-doodle #context-menu-affinity {
-  border-bottom: 2px dashed #f7e8d5;
-  color: #f58e3d;
+  border-bottom: 2px dashed #f0dbe0;
+  color: #fba2ae;
 }
 
-/* ---- 关闭按钮：白底+橙色边框+hover变橙 ---- */
+/* ---- 关闭按钮：白底+中粉边框+hover变粉 ---- */
 body.theme-doodle .close-btn {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;
   background: #ffffff;
-  color: #f58e3d;
+  color: #e8849a;
   font-weight: 700;
 }
 body.theme-doodle .close-btn:hover {
-  background: #f58e3d;
+  background: #e8849a;
   color: #2d2a26;
-  border-color: #f58e3d;
+  border-color: #e8849a;
   transform: rotate(90deg);
 }
 
-/* ---- 悬浮按钮：方案一三色+浅橙四色 ---- */
+/* ---- 悬浮按钮：方案二马卡龙四色 ---- */
 body.theme-doodle .hover-btn {
   border-radius: 999px;
   background: #ffffff;
   font-weight: 700;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.2);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.25);
 }
 body.theme-doodle .hover-btn:nth-child(1) {
-  border: 2px solid #f58e3d;
-  color: #c65f1e;
+  border: 2px solid #e8849a;
+  color: #c0566d;
 }
 body.theme-doodle .hover-btn:nth-child(2) {
-  border: 2px solid #ffe800;
-  color: #a89100;
-  box-shadow: 2px 3px 0 rgba(255, 232, 0, 0.3);
+  border: 2px solid #79def7;
+  color: #2e8fb2;
+  box-shadow: 2px 3px 0 rgba(121, 222, 247, 0.35);
 }
 body.theme-doodle .hover-btn:nth-child(3) {
-  border: 2px solid #6dfe59;
-  color: #2f7d20;
-  box-shadow: 2px 3px 0 rgba(109, 254, 89, 0.35);
+  border: 2px solid #baf1b3;
+  color: #4fae5c;
+  box-shadow: 2px 3px 0 rgba(186, 241, 179, 0.45);
 }
 body.theme-doodle .hover-btn:nth-child(4) {
-  border: 2px solid #ffb57a;
-  color: #c65f1e;
-  box-shadow: 2px 3px 0 rgba(255, 181, 122, 0.4);
+  border: 2px solid #fba2ae;
+  color: #c0566d;
+  box-shadow: 2px 3px 0 rgba(251, 162, 174, 0.4);
 }
 body.theme-doodle .hover-btn:hover {
   transform: translateY(-3px) scale(1.12);
-  box-shadow: 3px 5px 0 rgba(245, 142, 61, 0.35);
+  box-shadow: 3px 5px 0 rgba(232, 132, 154, 0.4);
 }
 
-/* ---- 手绘悬浮窗 App 背景（白/浅橙渐变替代米黄纸底）---- */
+/* ---- 手绘悬浮窗 App 背景（浅粉/浅蓝/浅绿渐变替代米黄纸底）---- */
 body.theme-doodle #app.theme-cat {
-  background: linear-gradient(160deg, #fff7ef 0%, #fff3e6 60%, #fff7ef 100%);
+  background: linear-gradient(160deg, #fff0f3 0%, #eef8fc 60%, #fff0f3 100%);
 }
 body.theme-doodle #app.theme-fortune {
-  background: linear-gradient(160deg, #fff3e6 0%, #fff7ef 60%, #fff0dd 100%);
+  background: linear-gradient(160deg, #fdf0f2 0%, #f2faf1 60%, #fff0f3 100%);
 }
 body.theme-doodle #app.theme-bagua {
-  background: linear-gradient(160deg, #fff7ef 0%, #fff3e6 60%, #fff0dd 100%);
+  background: linear-gradient(160deg, #eef8fc 0%, #f2faf1 60%, #fff0f3 100%);
 }
 body.theme-doodle #app.theme-gold {
-  background: linear-gradient(160deg, #fff9ec 0%, #fff3e6 60%, #fff7ef 100%);
-  border: 3px solid #ffe800;
-  box-shadow: inset 0 0 30px rgba(255, 232, 0, 0.25);
+  background: linear-gradient(160deg, #fff5ec 0%, #fdf0f2 60%, #fff0f3 100%);
+  border: 3px solid #79def7;
+  box-shadow: inset 0 0 30px rgba(121, 222, 247, 0.3);
 }
 
 /* ---- 星盘区块 ---- */
 body.theme-doodle .star-chart-toggle,
 body.theme-doodle .star-chart-analysis-btn {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;
   background: #ffffff;
-  color: #c65f1e;
+  color: #c0566d;
   font-weight: 600;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.2);
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.25);
 }
 body.theme-doodle .star-chart-toggle:hover,
 body.theme-doodle .star-chart-analysis-btn:hover {
-  background: #f58e3d;
+  background: #e8849a;
   color: #2d2a26;
 }
 body.theme-doodle .star-chart-line {
-  border: 1.5px solid #f7e8d5;
+  border: 1.5px solid #f0dbe0;
   border-radius: 80px 16px 85px 18px / 14px 78px 16px 82px;
   background: #ffffff;
 }
 body.theme-doodle .star-chart-analysis {
-  border: 2px dashed #f58e3d;
+  border: 2px dashed #fba2ae;
   border-radius: 120px 22px 130px 18px / 16px 125px 20px 120px;
-  background: #fff3e6;
+  background: #fdf0f2;
 }
 
 /* ---- 内存预览框/技能配置卡片 ---- */
 body.theme-doodle .memory-preview {
-  border: 2px solid #f58e3d;
+  border: 2px solid #79def7;
   border-radius: 100px 20px 110px 18px / 16px 105px 20px 100px;
   background: #ffffff;
 }
 body.theme-doodle .skill-config-card {
-  border: 2px solid #f58e3d;
+  border: 2px solid #fba2ae;
   border-radius: 120px 22px 130px 18px / 16px 125px 20px 120px;
   background: #ffffff;
 }
 
 /* ---- 宠物爱心/称号徽标 ---- */
 body.theme-doodle #pet-heart {
-  border: 2px solid #f58e3d;
+  border: 2px solid #e8849a;
   border-radius: 999px;
   background: #ffffff;
-  color: #f58e3d;
-  box-shadow: 2px 3px 0 rgba(245, 142, 61, 0.3);
+  color: #e8849a;
+  box-shadow: 2px 3px 0 rgba(232, 132, 154, 0.35);
 }
 body.theme-doodle #gold-badge,
 body.theme-doodle #zodiac-badge {
-  border: 2px solid #ffe800;
+  border: 2px solid #79def7;
   border-radius: 999px;
-  background: #ffe800;
+  background: #79def7;
   color: #2d2a26;
-  box-shadow: 2px 3px 0 rgba(255, 232, 0, 0.4);
+  box-shadow: 2px 3px 0 rgba(121, 222, 247, 0.45);
 }
 
-/* ---- 宠物舞台光晕转方案一色 ---- */
+/* ---- 宠物舞台光晕转方案二色 ---- */
 body.theme-doodle #pet-stage::before {
-  background: radial-gradient(circle, rgba(245, 142, 61, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(251, 162, 174, 0.2) 0%, transparent 70%);
 }
 body.theme-doodle #app.theme-cat #pet-stage::before {
-  background: radial-gradient(circle, rgba(255, 181, 122, 0.22) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(121, 222, 247, 0.2) 0%, transparent 70%);
 }
 body.theme-doodle #app.theme-fortune #pet-stage::before {
-  background: radial-gradient(circle, rgba(255, 232, 0, 0.18) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(186, 241, 179, 0.22) 0%, transparent 70%);
 }
 
 /* ---- 界面主题切换按钮多色 ---- */
 body.theme-doodle #ui-theme-options .activity-option:nth-child(1) { border-color: #5a4a3a; color: #4a3a2e; }  /* 深色 */
-body.theme-doodle #ui-theme-options .activity-option:nth-child(2) { border-color: #f58e3d; color: #c65f1e; }  /* 浅色 */
-body.theme-doodle #ui-theme-options .activity-option:nth-child(3) { border-color: #6dfe59; color: #2f7d20; }  /* 青涩 */
-body.theme-doodle #ui-theme-options .activity-option:nth-child(4) { border-color: #ffe800; color: #a89100; }  /* 手绘 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(2) { border-color: #fba2ae; color: #c0566d; }  /* 浅色 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(3) { border-color: #baf1b3; color: #4fae5c; }  /* 青涩 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(4) { border-color: #79def7; color: #2e8fb2; }  /* 手绘 */
 
 /* ---- 设置页板块微旋转差异化 ---- */
 body.theme-doodle .setting-group:nth-child(odd) { transform: rotate(-0.5deg); }

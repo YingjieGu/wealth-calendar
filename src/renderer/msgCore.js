@@ -267,6 +267,19 @@
     return `📮 主人有 ${count} 封未读邮件，记得查收哦~`;
   }
 
+  // v0.4.24 剥离 emoji 纯函数：移除 Unicode emoji（含 ZWJ 序列、变体选择器、区域指示符），
+  // 保留中文/英文字母/数字/标点；压缩多余空白。仅用于 TTS 合成前剥离，不影响气泡/聊天界面显示。
+  function stripEmoji(text) {
+    if (!text || typeof text !== 'string') return '';
+    // [\p{Extended_Pictographic}] 覆盖: 基础 emoji、ZWJ 序列 (👨‍👩‍👧)、keycap (#️⃣)
+    // [\p{Regional_Indicator}] 覆盖: 旗帜 (🇨🇳 = 区域指示符对)
+    // ️: 变体选择器 16（emoji 呈现，如 ❤️ = ❤ + ️）
+    // ‍: ZWJ（零宽连字，如 👨‍👩‍👧 内的 ‍）
+    const stripped = String(text).replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}️‍]/gu, '');
+    // 压缩多余空白（多个空格/制表/换行 → 单个空格），trim 首尾
+    return stripped.replace(/\s+/g, ' ').trim();
+  }
+
   // ==================== 系统提示音：内置短"叮" WAV（base64，零外部依赖）====================
   // 0.22s 双音 (880Hz+1760Hz) 指数衰减，44100Hz 16bit 单声道，RIFF/WAVE
   const SYSTEM_CHIME_B64 = 'UklGRvBLAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YcxLAAAAACATfiVlNjVFaFGeWptgUGPVYmpfcFlkUdZHXj2Y'
@@ -548,6 +561,7 @@
     HOLIDAY_LINES,
     holidayLine,
     mailLine,
+    stripEmoji,
     SYSTEM_CHIME_B64,
     // v0.4.18 主题目录 + 生肖收集
     THEME_CATALOG,

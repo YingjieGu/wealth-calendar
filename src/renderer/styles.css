@@ -187,10 +187,18 @@ body.theme-doodle {
   --surface-3: #fef0dc;            /* hover：淡杏 */
   --text: #3a3028;                 /* 铅笔灰主文字 */
   --text-dim: #7a6e62;             /* 弱文字 */
-  /* ---- 手绘阴影：硬阴影无模糊（贴纸感）---- */
-  --shadow-1: 2px 3px 0 rgba(0, 0, 0, 0.18);
-  --shadow-2: 3px 4px 0 rgba(0, 0, 0, 0.22);
-  --shadow-3: 4px 5px 0 rgba(0, 0, 0, 0.26);
+  /* ---- 多色蜡笔调色板（v0.4.24 颜色丰富化）---- */
+  --doodle-pink: #f2a0b6;          /* 蜡笔粉（桃花/爱心） */
+  --doodle-blue: #7aa5d9;          /* 蜡笔蓝（事业/主色） */
+  --doodle-green: #9cc79c;         /* 蜡笔绿（健康） */
+  --doodle-orange: #f0b878;        /* 蜡笔橙（出行/活力） */
+  --doodle-purple: #b8a0d8;        /* 蜡笔紫（学业/神秘） */
+  --doodle-teal: #8cc4b8;          /* 蜡笔青（签约/稳定） */
+  --doodle-gold: #e8c878;          /* 蜡笔金（财运） */
+  /* ---- 手绘阴影：硬阴影无模糊（贴纸感，彩色替代纯黑）---- */
+  --shadow-1: 2px 3px 0 rgba(160, 140, 120, 0.22);
+  --shadow-2: 3px 4px 0 rgba(140, 150, 175, 0.25);
+  --shadow-3: 4px 5px 0 rgba(150, 170, 155, 0.25);
   /* ---- 手绘圆角 tokens（不对称，模拟手绘）---- */
   --radius-sm: 255px 15px 225px 15px / 15px 225px 15px 255px;
   --radius-md: 185px 25px 215px 20px / 20px 200px 18px 210px;
@@ -762,6 +770,175 @@ body.theme-doodle #app.theme-cat #pet-stage::before {
 body.theme-doodle #app.theme-fortune #pet-stage::before {
   background: radial-gradient(circle, rgba(240, 168, 48, 0.2) 0%, transparent 70%);
 }
+
+/* ===== v0.4.24 doodle 颜色丰富化 ===== */
+
+/* ---- 分区上色：设置页板块多色交替（蜡笔粉/蓝/绿/橙/紫循环）---- */
+body.theme-doodle .setting-group:nth-child(5n+1) {
+  background: #fff5f5;
+  border-color: #f2a0b6;
+  box-shadow: 2px 3px 0 rgba(242, 160, 182, 0.25);
+}
+body.theme-doodle .setting-group:nth-child(5n+2) {
+  background: #f5f8fd;
+  border-color: #7aa5d9;
+  box-shadow: 2px 3px 0 rgba(122, 165, 217, 0.25);
+}
+body.theme-doodle .setting-group:nth-child(5n+3) {
+  background: #f5faf5;
+  border-color: #9cc79c;
+  box-shadow: 2px 3px 0 rgba(156, 199, 156, 0.25);
+}
+body.theme-doodle .setting-group:nth-child(5n+4) {
+  background: #fef9f2;
+  border-color: #f0b878;
+  box-shadow: 2px 3px 0 rgba(240, 184, 120, 0.25);
+}
+body.theme-doodle .setting-group:nth-child(5n+5) {
+  background: #f8f4fc;
+  border-color: #b8a0d8;
+  box-shadow: 2px 3px 0 rgba(184, 160, 216, 0.25);
+}
+
+/* ---- 运势 7 维度卡片各自代表色（财运金/桃花粉/事业蓝/学业紫/健康绿/出行橙/签约青）---- */
+body.theme-doodle .fortune-dim:nth-child(1) { border-left: 3px solid var(--doodle-gold); }    /* 财运 */
+body.theme-doodle .fortune-dim:nth-child(2) { border-left: 3px solid var(--doodle-pink); }    /* 桃花 */
+body.theme-doodle .fortune-dim:nth-child(3) { border-left: 3px solid var(--doodle-blue); }    /* 事业 */
+body.theme-doodle .fortune-dim:nth-child(4) { border-left: 3px solid var(--doodle-purple); }  /* 学业 */
+body.theme-doodle .fortune-dim:nth-child(5) { border-left: 3px solid var(--doodle-green); }   /* 健康 */
+body.theme-doodle .fortune-dim:nth-child(6) { border-left: 3px solid var(--doodle-orange); }  /* 出行 */
+body.theme-doodle .fortune-dim:nth-child(7) { border-left: 3px solid var(--doodle-teal); }    /* 签约 */
+body.theme-doodle .fortune-dim-label { color: #5a4e42; }
+body.theme-doodle .fortune-dim-score {
+  font-weight: 800;
+}
+body.theme-doodle .fortune-dim:nth-child(1) .fortune-dim-score { color: #b89a30; }
+body.theme-doodle .fortune-dim:nth-child(2) .fortune-dim-score { color: #d07080; }
+body.theme-doodle .fortune-dim:nth-child(3) .fortune-dim-score { color: #5a8ab8; }
+body.theme-doodle .fortune-dim:nth-child(4) .fortune-dim-score { color: #8a70b0; }
+body.theme-doodle .fortune-dim:nth-child(5) .fortune-dim-score { color: #6a9a6a; }
+body.theme-doodle .fortune-dim:nth-child(6) .fortune-dim-score { color: #c89050; }
+body.theme-doodle .fortune-dim:nth-child(7) .fortune-dim-score { color: #5a9890; }
+
+/* ---- 运势迷你卡多色 ---- */
+body.theme-doodle .fortune-minicards .mini-card:nth-child(1) {
+  border-color: var(--doodle-gold);
+  box-shadow: 1.5px 2px 0 rgba(232, 200, 120, 0.3);
+}
+body.theme-doodle .fortune-minicards .mini-card:nth-child(2) {
+  border-color: var(--doodle-blue);
+  box-shadow: 1.5px 2px 0 rgba(122, 165, 217, 0.3);
+}
+body.theme-doodle .fortune-minicards .mini-card:nth-child(3) {
+  border-color: var(--doodle-green);
+  box-shadow: 1.5px 2px 0 rgba(156, 199, 156, 0.3);
+}
+
+/* ---- 聊天消息多色用户气泡（粉/蓝/绿/橙/紫交替）---- */
+body.theme-doodle .chat-user:nth-child(4n+1) { background: #fde8f0; border-color: #f2a0b6; }
+body.theme-doodle .chat-user:nth-child(4n+2) { background: #e8f0fb; border-color: #7aa5d9; }
+body.theme-doodle .chat-user:nth-child(4n+3) { background: #e8f6e8; border-color: #9cc79c; }
+body.theme-doodle .chat-user:nth-child(4n+4) { background: #fef4e8; border-color: #f0b878; }
+
+/* ---- 日历日程多色左侧色条 ---- */
+body.theme-doodle .schedule-item:nth-child(3n+1) { border-left-color: var(--doodle-pink); }
+body.theme-doodle .schedule-item:nth-child(3n+2) { border-left-color: var(--doodle-blue); }
+body.theme-doodle .schedule-item:nth-child(3n+3) { border-left-color: var(--doodle-green); }
+
+/* ---- 生肖宫格解锁多色彩 ---- */
+body.theme-doodle .zodiac-cell.unlocked:nth-child(3n+1) {
+  border-color: var(--doodle-pink);
+  background: #fff5f5;
+}
+body.theme-doodle .zodiac-cell.unlocked:nth-child(3n+2) {
+  border-color: var(--doodle-blue);
+  background: #f5f8fd;
+}
+body.theme-doodle .zodiac-cell.unlocked:nth-child(3n+3) {
+  border-color: var(--doodle-green);
+  background: #f5faf5;
+}
+
+/* ---- action-btn 多色变体 ---- */
+body.theme-doodle .action-btn.primary {
+  background: #fce8e8;
+  border-color: var(--doodle-pink);
+  color: #8a4040;
+  box-shadow: 2px 3px 0 rgba(242, 160, 182, 0.3);
+}
+body.theme-doodle .action-btn.primary:hover {
+  background: #fad8d8;
+}
+
+/* ---- 悬浮按钮多色：面板/聊天/日历/设置各自不同 ---- */
+body.theme-doodle .hover-btn:nth-child(1) {
+  border-color: var(--doodle-pink);
+  box-shadow: 2px 3px 0 rgba(242, 160, 182, 0.22);
+}
+body.theme-doodle .hover-btn:nth-child(2) {
+  border-color: var(--doodle-blue);
+  box-shadow: 2px 3px 0 rgba(122, 165, 217, 0.22);
+}
+body.theme-doodle .hover-btn:nth-child(3) {
+  border-color: var(--doodle-green);
+  box-shadow: 2px 3px 0 rgba(156, 199, 156, 0.22);
+}
+body.theme-doodle .hover-btn:nth-child(4) {
+  border-color: var(--doodle-orange);
+  box-shadow: 2px 3px 0 rgba(240, 184, 120, 0.22);
+}
+
+/* ---- 彩色手绘标题下划线（设置板块标签 + 聊天/日历标题）---- */
+body.theme-doodle .settings-header,
+body.theme-doodle .cal-header {
+  border-bottom: 2px dashed var(--doodle-blue);
+}
+body.theme-doodle .chat-header {
+  border-bottom: 2px dashed var(--doodle-pink);
+}
+
+/* ---- 小装饰：星星/波点/爱心用 CSS 伪元素点缀（克制，不过度）---- */
+/* 设置板块标题前加小星星 */
+body.theme-doodle .setting-group label::before {
+  content: '★ ';
+  color: var(--doodle-gold);
+  font-size: 10px;
+}
+body.theme-doodle .setting-group:nth-child(5n+1) label::before { content: '♥ '; color: var(--doodle-pink); }
+body.theme-doodle .setting-group:nth-child(5n+2) label::before { content: '★ '; color: var(--doodle-blue); }
+body.theme-doodle .setting-group:nth-child(5n+3) label::before { content: '♦ '; color: var(--doodle-green); }
+body.theme-doodle .setting-group:nth-child(5n+4) label::before { content: '● '; color: var(--doodle-orange); }
+body.theme-doodle .setting-group:nth-child(5n+5) label::before { content: '★ '; color: var(--doodle-purple); }
+/* 运势总分旁点缀星星 */
+body.theme-doodle .fortune-score-label::after {
+  content: ' ☆';
+  color: var(--doodle-gold);
+  font-size: 10px;
+}
+/* 日历日程标题前小三角点缀 */
+body.theme-doodle .schedule-title::before {
+  content: '▶ ';
+  color: var(--doodle-blue);
+  font-size: 8px;
+}
+
+/* ---- 整个卡片微旋转差异化（不同板块旋转角度微调）---- */
+body.theme-doodle .setting-group:nth-child(odd) { transform: rotate(-0.5deg); }
+body.theme-doodle .setting-group:nth-child(even) { transform: rotate(0.4deg); }
+body.theme-doodle .setting-group:nth-child(3n) { transform: rotate(-0.3deg); }
+body.theme-doodle .setting-group:hover { transform: rotate(0deg) scale(1.01); }
+
+/* ---- 运势总分装饰 ---- */
+body.theme-doodle .fortune-score-num {
+  color: var(--doodle-blue);
+  text-shadow: 2px 3px 0 rgba(122, 165, 217, 0.3);
+}
+
+/* ---- 界面主题切换按钮多色 ---- */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(1) { border-color: #7a80b0; }  /* 深色 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(2) { border-color: #f0b878; }  /* 浅色 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(3) { border-color: #8cc4b8; }  /* 青涩 */
+body.theme-doodle #ui-theme-options .activity-option:nth-child(4) { border-color: #f2a0b6; }  /* 手绘 */
 
 /* ---------- 全局细滚动条（对话/日历/设置统一 4px 半透明圆角，hover 变亮） ---------- */
 *::-webkit-scrollbar {

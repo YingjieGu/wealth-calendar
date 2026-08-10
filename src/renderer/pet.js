@@ -1301,7 +1301,9 @@ const PetState = {
         if (item.chime) {
           await this._playChime();
         }
-        const r = await window.wealthCalendar.ttsSynthesize(item.text);
+        const r = await window.wealthCalendar.ttsSynthesize(
+          (typeof MsgCore !== 'undefined' && MsgCore.stripEmoji) ? MsgCore.stripEmoji(item.text) : item.text
+        );
         if (r && r.audioBase64) await this._playAudio(r.audioBase64);
       }
     } catch (e) { console.warn('[tts] queue:', e.message); }

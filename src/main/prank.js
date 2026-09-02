@@ -11,6 +11,7 @@
 const { execFileSync } = require('child_process');
 const { getActiveWindowTitle } = require('./windowInfo');
 const userMemory = require('./userMemory');
+const iconPranks = require('./iconPranks'); // v0.4.30 桌面图标大乱斗（Windows 专属）
 
 let prankTimer = null;
 let mainWindow = null;
@@ -201,6 +202,17 @@ function doPrank(opts = {}) {
       : 'title';
   }
 
+  // v0.4.30 桌面图标大乱斗（Windows 专属）：仅 win32 由调度 30% 触发或手动 mode:'icons'；
+  // 平台不符/自动排列/无图标/PowerShell 失败等一律返回 ok:false → 落到下方普通玩法降级
+  if (mode === 'icons') {
+    const ir = iconPranks.tryIconPrank({ log: (m) => console.log(m), intervalMs: 25 });
+    if (ir && ir.ok) {
+      const result = { type: 'icons', text: ir.text, mode: ir.mode, iconCount: ir.iconCount, movedCount: ir.movedCount };
+      broadcast(result);
+      return result;
+    }
+  }
+
   // 打字玩法（随机插入表情符号；工具不可用时自动降级到标题吐槽）
   if (mode === 'typed' && canType) {
     let text = TYPING_LINES[Math.floor(Math.random() * TYPING_LINES.length)];
@@ -260,8 +272,10 @@ function schedulePrank() {
     try {
       const cur = getSettings() || {};
       if (cur.prankMode === true && Math.random() < TRIGGER_CHANCE) {
-        // 到点随机二选一：吐槽（标题甜话）或捣蛋操作（打字/窗口抖动）
-        if (Math.random() < 0.5) doRoast();
+        // v0.4.30 到点玩法：win32 30% 走桌面图标大乱斗（其余吐槽/打字/窗口抖动）；
+        // 图标玩法不可用（自动排列/无图标等）由 doPrank 内部优雅降级到标题吐槽
+        if (process.platform === 'win32' && Math.random() < 0.3) doPrank({ mode: 'icons' });
+        else if (Math.random() < 0.5) doRoast();
         else doPrank();
       }
     } catch (e) { /* ignore */ }

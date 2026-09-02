@@ -236,6 +236,34 @@ def count_wuxing(pillars):
 # Almanac helpers
 # ---------------------------------------------------------------------------
 
+# v0.4.29 十二时辰：子23-1 / 丑1-3 / 寅3-5 / 卯5-7 / 辰7-9 / 巳9-11 /
+#             午11-13 / 未13-15 / 申15-17 / 酉17-19 / 戌19-21 / 亥21-23
+SHICHEN_NAMES = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+
+def build_time_slots(year, month, day):
+    """十二时辰干支：每个时辰起于奇数钟点、止于下个奇数钟点；
+    取本自然日内偶数中点钟点（0/2/…/22 时）构造 Solar，经 lunar-python
+    getTimeGan/getTimeZhi 得时柱干支（五鼠遁由 lunar-python 按日干自动推）。
+    """
+    slots = []
+    for i in range(12):
+        start_h = (2 * i - 1) % 24
+        end_h = (2 * i + 1) % 24
+        mid_h = (2 * i) % 24  # 0,2,...,22 全部落在本自然日内，12 时辰各取一支
+        lunar = Solar.fromYmdHms(year, month, day, mid_h, 0, 0).getLunar()
+        tg = lunar.getTimeGan()
+        tz = lunar.getTimeZhi()
+        slots.append({
+            "index": i,
+            "name": SHICHEN_NAMES[i],
+            "hourRange": "%02d:00-%02d:00" % (start_h, end_h),
+            "ganZhi": tg + tz,
+            "gan": tg,
+            "zhi": tz,
+            "zhiWuXing": DI_ZHI_WUXING.get(tz, ""),
+        })
+    return slots
+
 def get_almanac_data(lunar, date_str=None):
     """Extract almanac data from a Lunar object."""
     solar = lunar.getSolar()
@@ -276,6 +304,8 @@ def get_almanac_data(lunar, date_str=None):
         "jieQi": lunar.getCurrentJieQi() or "",
         "lu": lunar.getDayLu() or "",
         "sha": lunar.getDaySha() or "",
+        # v0.4.29 十二时辰体系：每时辰干支/五行（供主进程时辰播报推算吉凶宜忌）
+        "timeSlots": build_time_slots(solar.getYear(), solar.getMonth(), solar.getDay()),
     }
 
 # ---------------------------------------------------------------------------

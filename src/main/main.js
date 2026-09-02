@@ -19,6 +19,7 @@ const calendarStore = require('./calendarStore');
 const { startReminder, stopReminder } = require('./reminder');
 const sidecar = require('./sidecar');
 const fortuneEngine = require('./fortuneEngine');
+const timeSlotEngine = require('./timeSlotEngine');
 const chatEngine = require('./chatEngine');
 const wallpaper = require('./wallpaper');
 const multimodal = require('./multimodal');
@@ -1105,6 +1106,20 @@ function setupIPC() {
   ipcMain.handle('fortune:by-date', (_event, dateStr, force) => {
     return fortuneEngine.getFortuneByDate(dateStr, !!force, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
   });
+
+  // --- v0.4.29 十二时辰播报体系 ---
+  // 当日 12 时辰吉凶播报（含完整文案，按日缓存；首调触发 fortune 生成，天然幂等）
+  ipcMain.handle('timeslot:list', async (_event, dateStr) => {
+    try {
+      return await timeSlotEngine.getTimeSlotsForDate(dateStr, { requestSidecar: (m, p, b) => sidecar.requestSidecar(m, p, b) });
+    } catch (e) {
+      console.error('[timeslot] list failed:', e.message);
+      return { ok: false, error: e.message };
+    }
+  });
+
+  // 下一时辰边界（纯函数）：渲染层排程用（返回 boundaryTs/index/dateStr）
+  ipcMain.handle('timeslot:next-boundary', (_event, nowTs) => timeSlotEngine.nextBoundary(nowTs || Date.now()));
 
   // ⑥ 即时通讯类：邮件未读数（仅当设置面板配置了邮箱才启用；密码只在本机 settings.json，
   // 经本机 Python 标准库 imaplib 查询，不上传）

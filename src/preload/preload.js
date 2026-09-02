@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
   todayAlmanac: (dateStr) => ipcRenderer.invoke('fortune:almanac', dateStr),
   getDailyFortune: (dateStr, force) => ipcRenderer.invoke('fortune:daily', dateStr, force),
   getFortuneByDate: (dateStr, force) => ipcRenderer.invoke('fortune:by-date', dateStr, force),
+  // v0.4.29 十二时辰播报：当日 12 时辰吉凶播报列表 + 下一时辰边界排程
+  getTimeSlots: (dateStr) => ipcRenderer.invoke('timeslot:list', dateStr),
+  timeSlotNext: (nowTs) => ipcRenderer.invoke('timeslot:next-boundary', nowTs),
 
   // Reminder listener
   onScheduleReminder: (callback) => {

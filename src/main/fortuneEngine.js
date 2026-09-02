@@ -572,7 +572,7 @@ function _signOf(p) {
   return (p && (p.sign || p.signEn)) || '';
 }
 
-// 星盘分析 LLM prompt：compact JSON（行星落座/上升/天顶/相位），要求 4 段中文解读
+// LLM prompt：compact JSON（行星落座/上升/天顶/相位），要求 4 段中文解读
 function buildNatalAnalysisPrompt(chartData) {
   const d = (chartData && chartData.data && !chartData.error) ? chartData.data : (chartData || {});
   const planets = d.planets || {};
@@ -643,17 +643,18 @@ async function analyzeNatalChart(chartData, deps = {}) {
       return { text: lines.length ? lines.join('\n') : templateNatalAnalysis(chartData).join('\n'), source: 'llm' };
     } catch (e) {
       console.error('[star] LLM analyze failed, fallback to template:', e.message);
-      appendLLMDebug(`星盘分析 LLM 失败(模板降级): ${e.message}`);
+      appendLLMDebug(`LLM 失败(模板降级): ${e.message}`);
     }
   }
   return { text: templateNatalAnalysis(chartData).join('\n'), source: 'template' };
 }
 
-// OpenAI 兼容文本补全（星盘分析用）：与 callLLM 同模式，直接返回 content 纯文本
-async function callLLMText({ apiKey, baseUrl, model }, systemPrompt, userPrompt) {
+// OpenAI 兼容文本补全（星盘分析/时辰批量用）：与 callLLM 同模式，直接返回 content 纯文本。
+// opts.maxTokens 可调：星盘分析 1000 够用；v0.4.29 时辰批量 12 条需更多（reasoning 也占预算）。
+async function callLLMText({ apiKey, baseUrl, model }, systemPrompt, userPrompt, opts = {}) {
   const url = `${(baseUrl || 'https://api.deepseek.com').replace(/\/$/, '')}/chat/completions`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60000);
+  const timer = setTimeout(() => controller.abort(), 90000);
   try {
     let res;
     try {
@@ -667,16 +668,16 @@ async function callLLMText({ apiKey, baseUrl, model }, systemPrompt, userPrompt)
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          max_tokens: 1000,
+          max_tokens: opts.maxTokens || 1000,
         }),
       });
     } catch (fetchErr) {
-      appendLLMDebug(`星盘分析 LLM fetch 失败: ${fetchErr && fetchErr.message}`);
+      appendLLMDebug(`LLM fetch 失败: ${fetchErr && fetchErr.message}`);
       throw new Error(`LLM fetch failed: ${fetchErr && fetchErr.message}`);
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      appendLLMDebug(`星盘分析 LLM HTTP ${res.status} ${errText.slice(0, 200)}`);
+      appendLLMDebug(`LLM HTTP ${res.status} ${errText.slice(0, 200)}`);
       throw new Error(`LLM HTTP ${res.status}`);
     }
     const json = await res.json();
@@ -686,7 +687,7 @@ async function callLLMText({ apiKey, baseUrl, model }, systemPrompt, userPrompt)
     if (!content) throw new Error('LLM empty response');
     return String(content);
   } catch (e) {
-    appendLLMDebug(`星盘分析 LLM 调用失败: ${e.message}`);
+    appendLLMDebug(`LLM 调用失败: ${e.message}`);
     throw e;
   } finally {
     clearTimeout(timer);
@@ -711,6 +712,8 @@ module.exports = {
   analyzeNatalChart,
   templateNatalAnalysis,
   buildNatalAnalysisPrompt,
+  // v0.4.29 时辰播报：批量生成 12 时辰文案复用
+  callLLMText,
   ZODIAC_SUN_PERSONALITY,
   ZODIAC_MOON_EMOTION,
   ZODIAC_RISING_IMAGE,

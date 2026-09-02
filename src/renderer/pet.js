@@ -47,6 +47,9 @@ const PetState = {
     // ③ 运势提醒消息池（按天生成一批，次日替换）
     this._fortuneMsgPool = null;   // { date:'YYYY-MM-DD', lines:[], idx }
     this._fortuneSegmentsQueue = []; // 兼容 v0.4.16 分段队列
+    // v0.4.29 十二时辰播报：边界定时器 + 当日播报缓存
+    this._tsTimer = null;          // 时辰边界触发定时器
+    this._tsCache = null;          // { date:'YYYY-MM-DD', list:[slot×12] }
     // ④ 工作协助每日一次去重
     this._workLineDate = '';
     // ⑥ 即时通讯邮件未读（每天提醒一次去重）
@@ -67,11 +70,11 @@ const PetState = {
     this.setupInteraction();
     this.startProactive();
     this._loadPetGrowth(); // 养成系统：亲密度/金币/每日任务/心情 初始化
-    // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒 / 每日运势分段播报
+    // 豆包式陪伴玩法：时间问候 / 空闲感知 / 喝水提醒 / 十二时辰播报(v0.4.29)
     this.sayTimeGreeting();
     this.startIdleWatch();
     this.startWaterReminder();
-    this.startFortuneSlots();
+    this.startTimeSlotBroadcast(); // v0.4.29 时辰播报取代旧四时段播报（保留 30s 总运势总览）
     // ④ 工作协助：每天给一次时间感知的工作提示（周一/周五/月末）
     setTimeout(() => this._maybeWorkLine(), 25000);
     // ⑥ 即时通讯：邮件未读提醒（仅当设置里配了邮箱才生效）
@@ -1175,11 +1178,11 @@ const PetState = {
         const wishMap = { wealth: '求财', love: '求姻缘', career: '求事业', health: '求健康', study: '求学业', peace: '求平安' };
         wishHint = wishMap[wish] ? `，今天重点：${wishMap[wish]}` : '';
       } catch (e) { /* ignore */ }
-      // ③ 运势提醒类：当天运势出来后生成一批消息保存，直到第二天新运势替换；
-      // 启动只播总运势 1 条，其余存入消息池，由 startFortuneSlots 分散到一天多个时段播报
+      // v0.4.29 精简：启动只播当日总运势总览 1 条（早上 30s），
+      // 其余时段让位给十二时辰播报（startTimeSlotBroadcast），防轰炸。
       const pool = this._ensureFortunePool(fortune);
       const line = pool.lines[0] + wishHint;
-      pool.idx = 1; // 下一条从池内第 2 条开始
+      pool.idx = 1; // 消息池仅保留总运势首条（历史兼容，不再按旧四时段轮换）
       // 运势类播报：优先级(4)，先系统提示音再语音播报
       this._broadcast(line, { speech: true, priority: MsgCore.PRIORITY.fortune, category: 'fortune' });
     } catch (e) { /* ignore */ }
@@ -1195,64 +1198,110 @@ const PetState = {
     }
     return this._fortuneMsgPool;
   },
-  _nextFortuneLine() {
-    const p = this._fortuneMsgPool;
-    if (!p || !p.lines || !p.lines.length) return null;
-    const line = p.lines[p.idx % p.lines.length];
-    p.idx += 1;
-    return line;
+  // ---- v0.4.29 十二时辰播报（取代旧四时段播报）----
+  // 每天按 12 时辰（子23-1/丑1-3/寅3-5/卯5-7/辰7-9/巳9-11/午11-13/未13-15/申15-17/酉17-19/戌19-21/亥21-23）
+  // 每 2h 一轮换（奇数钟点为边界），到点播报该时辰吉凶（气泡+语音+进聊天），整天 12 条轮转；
+  // 播报内容从主进程 getTimeSlots 取（当日 12 条，LLM/模板），localStorage 按(日期,时辰)去重防重播；
+  // 22:00-7:00 深夜静音（只气泡+进聊天，不叮声不语音，避免打扰休息）；
+  // 早上 30s 的 sayDailyFortune 总运势总览 1 次保留（startProactive 触发）。
+  startTimeSlotBroadcast() {
+    if (!window.wealthCalendar || !window.wealthCalendar.getTimeSlots) return;
+    // 稍晚于 30s 总运势播报，先 catch-up 当前时辰（若今日未播过），再按下一时辰边界排程
+    setTimeout(() => {
+      this._tsPruneFired();
+      this._tsBoot();
+    }, 55 * 1000);
   },
 
-  // ---- 每日运势分段播报（上午/中午/下午/晚上 四时段, 每时段 4-6 条, 每天 16-24 条）----
-  // 时段内均匀铺开(间隔 23-35 分钟), 每条同时发到聊天框(只追加不打断);
-  // 内容池: 主求方向约一半, 另一半轮换 幸运数字/彩票建议/最强维度/吉时。
-  startFortuneSlots() {
-    this._scheduleNextFortuneBroadcast();
-  },
-
-  _scheduleNextFortuneBroadcast() {
-    if (this._fortuneSlotTimer) { clearTimeout(this._fortuneSlotTimer); this._fortuneSlotTimer = null; }
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    // 四时段: 上午 9:00-11:30 / 中午 12:00-14:30 / 下午 15:00-17:30 / 晚上 19:00-21:30
-    const slots = [
-      { start: 9 * 60, end: 11 * 60 + 30 },
-      { start: 12 * 60, end: 14 * 60 + 30 },
-      { start: 15 * 60, end: 17 * 60 + 30 },
-      { start: 19 * 60, end: 21 * 60 + 30 },
-    ];
-    // 每时段 4-6 条（按日期做轻微变化）, 均匀铺在时段前 140 分钟内（间隔约 23-35 分钟）
-    const daySeed = now.getDate();
-    const times = [];
-    for (const s of slots) {
-      const n = 4 + ((daySeed * 7 + s.start) % 3);
-      for (let i = 0; i < n; i++) {
-        times.push(s.start + 8 + i * Math.floor(140 / n));
-      }
-    }
-    const future = times.filter((t) => t > nowMin);
-    if (!future.length) {
-      // 今天播完，明天凌晨再排
-      this._fortuneSlotTimer = setTimeout(() => this.startFortuneSlots(), 6 * 3600 * 1000);
-      return;
-    }
-    const wait = (future[0] - nowMin) * 60000;
-    this._fortuneSlotTimer = setTimeout(() => {
-      this._doFortuneBroadcast();
-      this._scheduleNextFortuneBroadcast();
-    }, wait);
-  },
-
-  async _doFortuneBroadcast() {
+  async _tsBoot() {
     try {
-      const result = await window.wealthCalendar.getDailyFortune();
-      if (!result || !result.data) return;
-      // ③ 运势提醒消息池轮换：每次只播 1 条，分散各时段，不集中轰炸；
-      // 池跨天自动替换（_ensureFortunePool 按日期重建）
-      const pool = this._ensureFortunePool(result.data);
-      const line = this._nextFortuneLine();
-      // 运势类播报：优先级(4)，先系统提示音再语音播报
-      if (line) this._broadcast(line, { speech: true, priority: MsgCore.PRIORITY.fortune, category: 'fortune' });
+      const now = new Date();
+      const dateStr = this._tsDateStr(now);
+      const index = this._tsIndexAt(now.getHours());
+      if (!this._tsMarked(dateStr, index)) {
+        await this._tsFire(dateStr, index);
+      }
+      this._tsScheduleNext();
+    } catch (e) { /* ignore */ }
+  },
+
+  _tsScheduleNext() {
+    if (this._tsTimer) { clearTimeout(this._tsTimer); this._tsTimer = null; }
+    if (!window.wealthCalendar || !window.wealthCalendar.timeSlotNext) return;
+    window.wealthCalendar.timeSlotNext().then((plan) => {
+      if (!plan || !plan.ok || typeof plan.boundaryTs !== 'number') {
+        // 主进程不可用：2h 后再试
+        this._tsTimer = setTimeout(() => this._tsScheduleNext(), 2 * 3600 * 1000);
+        return;
+      }
+      const wait = Math.max(5000, plan.boundaryTs - Date.now());
+      this._tsTimer = setTimeout(() => {
+        this._tsOnBoundary(plan)
+          .catch(() => {})
+          .then(() => this._tsScheduleNext());
+      }, wait);
+    }).catch(() => {
+      // IPC 失败：2h 后重试排程
+      this._tsTimer = setTimeout(() => this._tsScheduleNext(), 2 * 3600 * 1000);
+    });
+  },
+
+  async _tsOnBoundary(plan) {
+    // 到点触发；若系统休眠错过边界太久（>25min）则跳过，直接排下一边界，避免连播轰炸
+    if (plan.boundaryTs && Date.now() - plan.boundaryTs > 25 * 60 * 1000) return;
+    const dateStr = plan.dateStr || this._tsDateStr(new Date(plan.boundaryTs));
+    const index = plan.index;
+    if (this._tsMarked(dateStr, index)) return;
+    await this._tsFire(dateStr, index);
+  },
+
+  async _tsFire(dateStr, index) {
+    const slot = await this._tsSlot(dateStr, index);
+    if (!slot || !slot.text) return;
+    this._tsMark(dateStr, index);
+    // 22:00-7:00 深夜静音：气泡+聊天照常，不叮声不语音
+    const hour = new Date().getHours();
+    const nightSilent = hour >= 22 || hour < 7;
+    this._broadcast(slot.text, {
+      speech: !nightSilent,
+      priority: MsgCore.PRIORITY.fortune,
+      category: 'fortune',
+    });
+  },
+
+  // 取某日某时辰的播报对象；跨天自动换当日列表（主进程已按日缓存）
+  async _tsSlot(dateStr, index) {
+    try {
+      if (!this._tsCache || this._tsCache.date !== dateStr) {
+        const r = await window.wealthCalendar.getTimeSlots(dateStr);
+        this._tsCache = { date: dateStr, list: (r && Array.isArray(r.slots) ? r.slots : []) };
+      }
+      return this._tsCache.list[index] || null;
+    } catch (e) { return null; }
+  },
+
+  _tsIndexAt(hour) { return Math.floor(((hour + 1) % 24) / 2); },
+  _tsDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+  _tsMarkKey(dateStr, index) { return `wc-ts-fired-${dateStr}-${index}`; },
+  _tsMarked(dateStr, index) {
+    try { return localStorage.getItem(this._tsMarkKey(dateStr, index)) === '1'; } catch (e) { return false; }
+  },
+  _tsMark(dateStr, index) {
+    try { localStorage.setItem(this._tsMarkKey(dateStr, index), '1'); } catch (e) { /* ignore */ }
+  },
+  // 启动时清理 3 天前的已播标记，避免 localStorage 无限累积
+  _tsPruneFired() {
+    try {
+      const cutoff = this._tsDateStr(new Date(Date.now() - 3 * 24 * 3600 * 1000));
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.indexOf('wc-ts-fired-') === 0) {
+          const date = key.slice('wc-ts-fired-'.length, -2);
+          if (date < cutoff) localStorage.removeItem(key);
+        }
+      }
     } catch (e) { /* ignore */ }
   },
 

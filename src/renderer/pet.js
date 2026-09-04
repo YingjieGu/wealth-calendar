@@ -861,7 +861,9 @@ const PetState = {
   // v0.4.22 同文本去重：opts.dedupe=true 时同文本已在队列/正在显示 → 不入队；
   // fortune 类（category==='fortune'）默认 dedupe=true，user 交互不受影响（兜底防重复播报）
   enqueueMsg(text, opts = {}) {
-    const str = String(text == null ? '' : text);
+    // v0.4.31 兜底：消息正文统一清掉旧版"瞄了一眼"前缀（旧缓存文案新会话即被替换）
+    let str = String(text == null ? '' : text);
+    if (typeof MsgCore !== 'undefined' && MsgCore.stripPhrase) str = MsgCore.stripPhrase(str);
     if (!str) return null;
     const item = {
       id: ++this._msgSeq,
@@ -1350,9 +1352,11 @@ const PetState = {
         if (item.chime) {
           await this._playChime();
         }
-        const r = await window.wealthCalendar.ttsSynthesize(
-          (typeof MsgCore !== 'undefined' && MsgCore.stripEmoji) ? MsgCore.stripEmoji(item.text) : item.text
-        );
+        // v0.4.31 统一走 speechText：先清旧前缀再剥 emoji，emoji 不会转文字读出来
+        const sText = (typeof MsgCore !== 'undefined' && MsgCore.speechText)
+          ? MsgCore.speechText(item.text)
+          : ((typeof MsgCore !== 'undefined' && MsgCore.stripEmoji) ? MsgCore.stripEmoji(item.text) : item.text);
+        const r = await window.wealthCalendar.ttsSynthesize(sText);
         if (r && r.audioBase64) await this._playAudio(r.audioBase64);
       }
     } catch (e) { console.warn('[tts] queue:', e.message); }
@@ -1364,9 +1368,13 @@ const PetState = {
   speak(text) {
     this._ttsEnqueue(text, {});
   },
-  // 运势类语音播报：先"叮~"提示音再"小财帮你瞄了一眼：..."语音
+  // v0.4.31 运势类语音播报：只播内容正文（去"瞄了一眼"口播前缀），先"叮~"提示音；
+  // 合成文本统一 speechText（先 stripPhrase 再剥 emoji，emoji 不读成字）
   speakFortune(line) {
-    this._ttsEnqueue(`小财帮你瞄了一眼：${String(line || '')}`, { chime: true });
+    const sText = (typeof MsgCore !== 'undefined' && MsgCore.speechText)
+      ? MsgCore.speechText(line)
+      : String(line || '');
+    this._ttsEnqueue(sText, { chime: true });
   },
   // 播放 base64 音频，等待播完或超时（15s 兜底，避免阻塞后续播报）
   _playAudio(base64) {

@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('wealthCalendar', {
     ipcRenderer.on('pet-prank', (_event, data) => callback && callback(data));
   },
   prankTriggerTest: (mode) => ipcRenderer.invoke('prank:trigger-test', mode),
+  prankImmediate: () => ipcRenderer.invoke('prank:immediate'),
 
   // 伙伴模式：窗口感知 + 选中文本总结
   getActiveWindowTitle: () => ipcRenderer.invoke('get-active-window-title'),

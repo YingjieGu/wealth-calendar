@@ -61,7 +61,11 @@ const ChatPanel = {
     try {
       const settings = await window.wealthCalendar.loadSettings();
       if (settings.ttsEnabled === false) return;
-      const r = await window.wealthCalendar.ttsSynthesize(text);
+      // v0.4.31 兜底直连合成也统一 speechText（去旧前缀 + 剥 emoji）
+      const sText = (typeof MsgCore !== 'undefined' && MsgCore.speechText)
+        ? MsgCore.speechText(text)
+        : String(text || '');
+      const r = await window.wealthCalendar.ttsSynthesize(sText);
       if (r && r.audioBase64) {
         const audio = new Audio(`data:audio/mpeg;base64,${r.audioBase64}`);
         audio.play().catch((e) => console.warn('[tts] audio play failed:', e));

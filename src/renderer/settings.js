@@ -498,6 +498,42 @@ const SettingsManager = {
       });
     });
 
+    // v0.4.31 "😼 立即捣蛋一次"：强制触发一次捣蛋（主进程优先桌面图标大乱斗；
+    // 平台不符/自动排列等已在气泡文案告知原因）。30 秒冷却防连点。
+    const prankNowBtn = document.getElementById('btn-prank-now');
+    if (prankNowBtn && prankNowBtn.dataset.bound !== '1') {
+      prankNowBtn.dataset.bound = '1';
+      prankNowBtn.addEventListener('click', async () => {
+        if (!window.wealthCalendar || !window.wealthCalendar.prankImmediate) return;
+        if (prankNowBtn.disabled) return;
+        prankNowBtn.disabled = true;
+        const label = '😼 立即捣蛋一次';
+        let remain = 30;
+        const tick = () => {
+          remain -= 1;
+          if (remain <= 0) {
+            clearInterval(cd);
+            prankNowBtn.disabled = false;
+            prankNowBtn.textContent = label;
+          } else {
+            prankNowBtn.textContent = `😼 立即捣蛋（${remain}s）`;
+          }
+        };
+        prankNowBtn.textContent = `😼 立即捣蛋（${remain}s）`;
+        const cd = setInterval(tick, 1000);
+        try {
+          const r = await window.wealthCalendar.prankImmediate();
+          if (r && r.reason === 'disabled') {
+            showToast((r && r.text) || '请先在设置里开启捣蛋模式');
+          } else if (r && r.ok) {
+            showToast('😼 已触发：桌面图标大乱斗来啦~ 看小财表演！');
+          } else {
+            showToast(r && r.text ? String(r.text).split('。')[0] + '。' : '已触发一次捣蛋（本次走了吐槽）');
+          }
+        } catch (e) { /* ignore */ }
+      });
+    }
+
     // 伙伴模式开关（settings.partnerMode，默认关；开启后小财感知你在做什么）
     this.applyPartner();
     document.querySelectorAll('#partner-options .activity-option').forEach((btn) => {

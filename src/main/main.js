@@ -915,6 +915,12 @@ function setupIPC() {
     try { return prank.doTick({ force: true, mode: mode || null }); } catch (e) { return { ok: false, reason: e.message }; }
   });
 
+  // v0.4.31 设置页"😼 立即捣蛋一次"：强制触发一次（优先桌面图标大乱斗），
+  // 平台不符/自动排列等由 prank.immediatePrank 走吐槽并在气泡文案里告知原因
+  ipcMain.handle('prank:immediate', () => {
+    try { return prank.immediatePrank(); } catch (e) { return { ok: false, reason: e.message }; }
+  });
+
   // --- 开机启动（settings.autostart，默认关） ---
   ipcMain.handle('autostart:set', (_event, enabled) => {
     const s = loadSettings();

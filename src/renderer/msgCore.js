@@ -280,6 +280,23 @@
     return stripped.replace(/\s+/g, ' ').trim();
   }
 
+  // v0.4.31 播报文案兜底：清掉旧版口播前缀"小财帮你瞄了一眼：…"（旧缓存无法即时改、
+  // 新生成即生效；渲染/语音前统一替换，避免旧文案残留）。只清固定短语，不动正文。
+  function stripPhrase(text) {
+    if (!text || typeof text !== 'string') return text;
+    return String(text)
+      .split('小财帮你瞄了一眼：').join('')
+      .split('小财帮你瞄了一眼:').join('')
+      .split('小财帮你瞄了一眼').join('')
+      .trim(); // 前缀删除常留一个紧邻空格，一并去掉首尾空白
+  }
+
+  // v0.4.31 TTS 合成统一入口：先清旧前缀再做 emoji 剥离——emoji/符号不会转成文字被读出来
+  // （如 🕐 不会读成"时钟"），只保留中文文字 + 数字 + 标点。
+  function speechText(text) {
+    return stripEmoji(stripPhrase(text));
+  }
+
   // ==================== 系统提示音：内置短"叮" WAV（base64，零外部依赖）====================
   // 0.22s 双音 (880Hz+1760Hz) 指数衰减，44100Hz 16bit 单声道，RIFF/WAVE
   const SYSTEM_CHIME_B64 = 'UklGRvBLAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YcxLAAAAACATfiVlNjVFaFGeWptgUGPVYmpfcFlkUdZHXj2Y'
@@ -562,6 +579,8 @@
     holidayLine,
     mailLine,
     stripEmoji,
+    stripPhrase,
+    speechText,
     SYSTEM_CHIME_B64,
     // v0.4.18 主题目录 + 生肖收集
     THEME_CATALOG,

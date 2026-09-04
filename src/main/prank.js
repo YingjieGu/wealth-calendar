@@ -202,7 +202,7 @@ function doPrank(opts = {}) {
       : 'title';
   }
 
-  // v0.4.30 桌面图标大乱斗（Windows 专属）：仅 win32 由调度 30% 触发或手动 mode:'icons'；
+  // v0.4.31 桌面图标大乱斗（Windows 专属）：仅 win32 由调度 50% 触发或手动 mode:'icons'；
   // 平台不符/自动排列/无图标/PowerShell 失败等一律返回 ok:false → 落到下方普通玩法降级
   if (mode === 'icons') {
     const ir = iconPranks.tryIconPrank({ log: (m) => console.log(m), intervalMs: 25 });
@@ -250,6 +250,57 @@ function broadcast(result) {
   } catch (e) { /* ignore */ }
 }
 
+// --- v0.4.31 立即捣蛋（设置页"😼 立即捣蛋一次"按钮，演示/调试用） ---
+// 图标玩法被环境挡下的原因，做成能让用户看懂的提示语
+const ICON_BLOCK_NOTE = {
+  platform: '这个桌面图标大乱斗只有 Windows 能玩，当前系统不支持，小财先撒个娇~',
+  autoArrange: '你的桌面开了「自动排列/对齐网格」，图标被系统管得死死的，小财挪不动~',
+  'no-icons': '桌面没有显示图标，小财没图标可玩啦~',
+  exec: '小财想动桌面图标，但 Windows 桌面接口没接上，这次先不玩了~',
+  'no-frames': '这次图标玩法没排好，小财改成吐槽~',
+};
+
+// 立即触发一次捣蛋：优先桌面图标大乱斗（win32 且非自动排列）；平台不符/自动排列/无图标/
+// 执行失败 → 走吐槽并在气泡文案里告知原因（让用户分清是"没触发"还是"环境不支持"）。
+// prankMode 未开启 → 返回 disabled 不广播（渲染层按钮给 toast 提示先开启）。
+function immediatePrank() {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, reason: 'no-window' };
+  const s = getSettings() || {};
+  if (s.prankMode !== true) return { ok: false, reason: 'disabled', text: '捣蛋模式还没开启，先点「😜 开启」再试哦~' };
+
+  const win32 = process.platform === 'win32';
+  if (win32) {
+    iconPranks.__reset(); // 演示按钮实时探测：不吃 10 分钟自动排列缓存
+    const ir = iconPranks.tryIconPrank({ log: (m) => console.log(m), intervalMs: 25 });
+    if (ir && ir.ok) {
+      const result = {
+        ok: true, type: 'icons', text: ir.text, mode: ir.mode,
+        reason: 'ok', iconCount: ir.iconCount, movedCount: ir.movedCount,
+      };
+      broadcast(result);
+      return result;
+    }
+    const reason = (ir && ir.reason) || 'exec';
+    const roast = titleRoast();
+    const note = ICON_BLOCK_NOTE[reason] || ICON_BLOCK_NOTE.exec;
+    const result = {
+      ok: false, type: 'title', text: note + (roast.text ? ' ' + roast.text : ''),
+      title: roast.title || null, matched: !!roast.matched, reason,
+    };
+    broadcast(result);
+    return result;
+  }
+
+  const roast = titleRoast();
+  const note = ICON_BLOCK_NOTE.platform;
+  const result = {
+    ok: false, type: 'title', text: note + (roast.text ? ' ' + roast.text : ''),
+    title: roast.title || null, matched: !!roast.matched, reason: 'platform',
+  };
+  broadcast(result);
+  return result;
+}
+
 // --- 调度：v0.4.19 单通道（5-10 分钟），到点随机吐槽或捣蛋二选一，无每日上限 ---
 function scheduleNext() {
   stopTimers();
@@ -272,9 +323,9 @@ function schedulePrank() {
     try {
       const cur = getSettings() || {};
       if (cur.prankMode === true && Math.random() < TRIGGER_CHANCE) {
-        // v0.4.30 到点玩法：win32 30% 走桌面图标大乱斗（其余吐槽/打字/窗口抖动）；
+        // v0.4.31 到点玩法：win32 50% 走桌面图标大乱斗（其余吐槽/打字/窗口抖动）；
         // 图标玩法不可用（自动排列/无图标等）由 doPrank 内部优雅降级到标题吐槽
-        if (process.platform === 'win32' && Math.random() < 0.3) doPrank({ mode: 'icons' });
+        if (process.platform === 'win32' && Math.random() < 0.5) doPrank({ mode: 'icons' });
         else if (Math.random() < 0.5) doRoast();
         else doPrank();
       }
@@ -318,5 +369,6 @@ function doTick({ force, mode } = {}) {
 }
 
 module.exports = {
-  startPrank, stopPrank, onSettingsChanged, doTick, doPrank, doRoast, wiggleWindow, getActiveWindowTitle, matchTitleRoast,
+  startPrank, stopPrank, onSettingsChanged, doTick, doPrank, doRoast, immediatePrank,
+  wiggleWindow, getActiveWindowTitle, matchTitleRoast, ICON_BLOCK_NOTE,
 };

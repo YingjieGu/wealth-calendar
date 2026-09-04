@@ -2803,6 +2803,12 @@ body.theme-light #zodiac-badge {
   background: var(--surface-2);
   border: 1px dashed var(--border-soft);
 }
+/* v0.4.31 修复星盘"分析前空虚线框"：styles 无全局 .hidden 规则，补星盘折叠/结果卡隐藏，
+   否则 <div class="star-chart-analysis hidden"> 在点分析前也渲染成空虚线框 */
+#star-chart-body.hidden,
+#star-chart-analysis.hidden {
+  display: none;
+}
 .star-chart-analysis-p {
   margin: 0 0 8px;
   font-size: 12px;

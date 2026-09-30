@@ -176,7 +176,7 @@ npm run dist:linux   # Linux AppImage
 1. **用户信息** — 出生年月日时（精确到分钟）+ 性别（用于八字/星盘）
 2. **AI 命理** — 填入兼容 OpenAI 模式的 API Key
    - Base URL：`https://api.deepseek.com`
-   - Model：`deepseek-chat`
+   - Model：`deepseek-v4-flash`（当前默认；也可填其他兼容 OpenAI 模式的模型名）
    - 留空则自动降级为本地模板运势
 3. **主求方向** — 求财 / 求姻缘 / … / 或「✨推荐」
 4. **语音对话** — 点 💬 → 🎤（首次识别会下载 whisper 模型 ~75MB）
